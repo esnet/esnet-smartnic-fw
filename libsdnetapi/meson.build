@@ -1,0 +1,45 @@
+sources = files(
+  [
+    'src/sdnetapi.c',
+    'src/sdnetio.c',
+  ]
+)
+
+ext_incdir = include_directories('include')
+int_incdir = include_directories('src/include')
+
+libsdnetapi = shared_library(
+  'sdnetapi',
+  sources,
+  dependencies : [
+    dependency('libsdnetdrv'),
+    libsnutil_dep,
+  ],
+  include_directories : [
+    ext_incdir,
+    int_incdir,
+  ],
+  install : true,
+  soversion : 1,
+)
+
+install_headers(
+  [
+    'include/sdnetapi.h',
+  ],
+  subdir : 'esnet-smartnic'
+)
+
+pkg = import('pkgconfig')
+pkg.generate(
+  libsdnetapi,
+  subdirs : 'esnet-smartnic',
+)
+
+libsdnetapi_dep = declare_dependency(
+  include_directories : [ext_incdir],
+  link_with : [
+    libsdnetapi,
+    libsnutil,
+  ])
+
