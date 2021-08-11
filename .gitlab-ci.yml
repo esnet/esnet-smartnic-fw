@@ -6,7 +6,7 @@ stages:
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  HT_SWDEV_DOCKER_IMAGE: hub.es.net:5000/hightouch-swdev-docker:v1.8
+  HT_SWDEV_DOCKER_IMAGE: hub.es.net:5000/hightouch-swdev-docker:v1.10
   ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/main/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
 
 pull_smartnic_hwapi_job:
@@ -33,9 +33,9 @@ build_job:
   needs:
     - pull_smartnic_hwapi_job
 
-package_job:
+.package:
   stage: package
-  image: ubuntu:focal
+  image: ubuntu:$OS_CODENAME
   variables:
     DEBEMAIL: "smartnic@es.net"
     DEBFULLNAME: "ESnet SmartNIC Developers"
@@ -43,16 +43,16 @@ package_job:
   before_script:
     - |
       cat <<_EOF > /etc/apt/sources.list
-      deb http://linux.mirrors.es.net/ubuntu focal main restricted
-      deb http://linux.mirrors.es.net/ubuntu focal-updates main restricted
-      deb http://linux.mirrors.es.net/ubuntu focal universe
-      deb http://linux.mirrors.es.net/ubuntu focal-updates universe
-      deb http://linux.mirrors.es.net/ubuntu focal multiverse
-      deb http://linux.mirrors.es.net/ubuntu focal-updates multiverse
-      deb http://linux.mirrors.es.net/ubuntu focal-backports main restricted universe multiverse
-      deb http://security.ubuntu.com/ubuntu focal-security main restricted
-      deb http://security.ubuntu.com/ubuntu focal-security universe
-      deb http://security.ubuntu.com/ubuntu focal-security multiverse
+      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} main restricted
+      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates main restricted
+      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} universe
+      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates universe
+      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} multiverse
+      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates multiverse
+      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-backports main restricted universe multiverse
+      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security main restricted
+      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security universe
+      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security multiverse
       _EOF
     - apt update -y
     - ln -fs /usr/share/zoneinfo/America/Toronto /etc/localtime
@@ -66,7 +66,8 @@ package_job:
         libdistro-info-perl
     - |
       apt install -y --no-install-recommends \
-        python3-pip
+        python3-pip \
+        python3-setuptools
     - pip3 install meson
     - pip3 install pyyaml-include
     - pip3 install yq
@@ -80,14 +81,31 @@ package_job:
       dch --create \
         --package esnet-smartnic \
         --newversion 1.0.0-${CI_PIPELINE_ID} \
-        --distribution focal \
+        --distribution ${OS_CODENAME} \
         --urgency medium debian/changelog
     - dpkg-buildpackage --build=binary -us -uc
-    - mkdir debs
-    - cp ../*.deb ../*.ddeb ../*.buildinfo ../*.changes ./debs
+    - mkdir -p debs/${OS_CODENAME}
+    - cp ../*.deb ../*.ddeb ../*.buildinfo ../*.changes ./debs/${OS_CODENAME}
   artifacts:
     paths:
       - debs
   needs:
     - pull_smartnic_hwapi_job
 
+.base_os_1804:
+  variables:
+    OS_CODENAME: bionic
+
+.base_os_2004:
+  variables:
+    OS_CODENAME: focal
+
+package_1804:
+  extends:
+    - .base_os_1804
+    - .package
+
+package_2004:
+  extends:
+    - .base_os_2004
+    - .package
