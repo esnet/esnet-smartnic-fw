@@ -21,15 +21,15 @@ pull_smartnic_hwapi_job:
     expire_in: 1 week
   needs: []
 
-build_job:
+.build:
   stage: build
-  image: ${HT_SWDEV_DOCKER_IMAGE}-focal
+  image: ${HT_SWDEV_DOCKER_IMAGE}-${OS_CODENAME}
   script:
-    - meson build
-    - ninja -C build
+    - meson build-${OS_CODENAME}
+    - ninja -C build-${OS_CODENAME}
   artifacts:
     paths:
-      - build
+      - build-${OS_CODENAME}
   needs:
     - pull_smartnic_hwapi_job
 
@@ -99,6 +99,20 @@ build_job:
 .base_os_2004:
   variables:
     OS_CODENAME: focal
+
+build_1804:
+  extends:
+    - .base_os_1804
+    - .build
+  artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+
+build_2004:
+  extends:
+    - .base_os_2004
+    - .build
+  artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
 
 package_1804:
   extends:
