@@ -104,8 +104,12 @@ package_1804:
   extends:
     - .base_os_1804
     - .package
+  artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
 
 package_2004:
   extends:
     - .base_os_2004
     - .package
+  artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
