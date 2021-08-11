@@ -66,7 +66,8 @@ build_job:
         libdistro-info-perl
     - |
       apt install -y --no-install-recommends \
-        python3-pip
+        python3-pip \
+        python3-setuptools
     - pip3 install meson
     - pip3 install pyyaml-include
     - pip3 install yq
