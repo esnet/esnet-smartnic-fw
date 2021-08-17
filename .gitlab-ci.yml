@@ -17,6 +17,7 @@ pull_smartnic_hwapi_job:
     - mkdir -p subprojects/packagefiles
     - wget --no-verbose -O subprojects/packagefiles/esnet-smartnic-hwapi.zip $ESNET_SMARTNIC_HWAPI_URL
   artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
       - subprojects/packagefiles/esnet-smartnic-hwapi.zip
     expire_in: 1 week
@@ -86,7 +87,12 @@ pull_smartnic_hwapi_job:
         --urgency medium debian/changelog
     - dpkg-buildpackage --build=binary -us -uc
     - mkdir -p debs/${OS_CODENAME}
-    - cp ../*.deb ../*.ddeb ../*.buildinfo ../*.changes ./debs/${OS_CODENAME}
+    # Output of debian builds goes to '..' and can't currently be changed
+    # These need to be mv's to ensure that we minimize pollution in the CI build env
+    # We also need to be careful to mv only our output files to not interfere with other builds
+    #   See: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=657401
+    #   See: https://pmhahn.github.io/debian-oot-build/
+    - mv ../*-${CI_PIPELINE_ID}_*.{buildinfo,changes,deb,ddeb} ./debs/${OS_CODENAME}
   artifacts:
     paths:
       - debs
