@@ -17,6 +17,7 @@ pull_smartnic_hwapi_job:
     - mkdir -p subprojects/packagefiles
     - wget --no-verbose -O subprojects/packagefiles/esnet-smartnic-hwapi.zip $ESNET_SMARTNIC_HWAPI_URL
   artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
       - subprojects/packagefiles/esnet-smartnic-hwapi.zip
     expire_in: 1 week
