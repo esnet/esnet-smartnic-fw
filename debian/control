@@ -1,7 +1,7 @@
 Source: esnet-smartnic
 Priority: optional
 Maintainer: Stacey Sheldon <stac@es.net>
-Build-Depends: debhelper-compat (= 10), ninja-build, python3-click, python3-yaml, python3-jinja2
+Build-Depends: debhelper-compat (= 10), ninja-build, python3-click, python3-yaml, python3-jinja2, libgmp-dev
 Standards-Version: 4.4.1
 Section: libs
 Homepage: <insert the upstream URL, if relevant>
