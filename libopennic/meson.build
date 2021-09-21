@@ -2,6 +2,7 @@ sources = files(
   [
     'src/cmac.c',
     'src/sysmon.c',
+    'src/pcie.c',
   ]
 )
 
@@ -25,6 +26,7 @@ install_headers(
   [
     'include/cmac.h',
     'include/sysmon.h',
+    'include/smartnic.h',
   ],
   subdir : 'esnet-smartnic'
 )
