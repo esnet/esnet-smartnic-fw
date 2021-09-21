@@ -28,6 +28,7 @@ extern bool sdnet_table_delete_k(void * sdnet_handle,
 				 size_t    key_len,
 				 uint8_t * mask,
 				 size_t    mask_len);
+extern void sdnet_print_target_config (void);
 
 enum sdnet_config_opcode {
 			  OP_TABLE_ADD = 1,

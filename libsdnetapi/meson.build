@@ -2,6 +2,7 @@ sources = files(
   [
     'src/sdnetapi.c',
     'src/sdnetconfig.c',
+    'src/sdnetinfo.c',
     'src/sdnetio.c',
   ]
 )
