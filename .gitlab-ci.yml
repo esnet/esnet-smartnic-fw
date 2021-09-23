@@ -14,8 +14,12 @@ pull_smartnic_hwapi_job:
   stage: pull_smartnic_hwapi
   image: ${HT_SWDEV_DOCKER_IMAGE}-focal
   script:
+    - echo "Downloading smartnic hwapi"
+    - TMPDIR="$(mktemp --directory)"
+    - wget --no-verbose --trust-server-names --content-disposition --directory-prefix="$TMPDIR" $ESNET_SMARTNIC_HWAPI_URL
+    - ls -l ${TMPDIR}/*.zip
     - mkdir -p subprojects/packagefiles
-    - wget --no-verbose -O subprojects/packagefiles/esnet-smartnic-hwapi.zip $ESNET_SMARTNIC_HWAPI_URL
+    - mv ${TMPDIR}/*.zip subprojects/packagefiles/esnet-smartnic-hwapi.zip
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
