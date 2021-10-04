@@ -25,6 +25,10 @@ libsdnetapi = shared_library(
     ext_incdir,
     int_incdir,
   ],
+  c_args : [
+    #'-DSDNETIO_DEBUG',
+    #'-DSDNETCONFIG_DEBUG',
+  ],
   install : true,
   soversion : 1,
 )
