@@ -1,6 +1,8 @@
 sources = files(
   [
     'src/sdnetapi.c',
+    'src/sdnetconfig.c',
+    'src/sdnetinfo.c',
     'src/sdnetio.c',
   ]
 )
@@ -8,16 +10,24 @@ sources = files(
 ext_incdir = include_directories('include')
 int_incdir = include_directories('src/include')
 
+cc = meson.get_compiler('c')
+libgmp_dep = cc.find_library('gmp')
+
 libsdnetapi = shared_library(
   'sdnetapi',
   sources,
   dependencies : [
+    libgmp_dep,
     dependency('libsdnetdrv'),
     libsnutil_dep,
   ],
   include_directories : [
     ext_incdir,
     int_incdir,
+  ],
+  c_args : [
+    #'-DSDNETIO_DEBUG',
+    #'-DSDNETCONFIG_DEBUG',
   ],
   install : true,
   soversion : 1,
@@ -42,4 +52,3 @@ libsdnetapi_dep = declare_dependency(
     libsdnetapi,
     libsnutil,
   ])
-

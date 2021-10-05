@@ -5,6 +5,7 @@
 // reserved.
 //
 
+#include <stdio.h>		/* fprintf */
 #include "sdnetapi.h"		/* API */
 #include "sdnet_0_defs.h"	/* XilSdnetTargetConfig_sdnet_0 */
 #include "sdnetio.h"		/* sdnetio_reg_* */
@@ -55,6 +56,20 @@ static XilSdnetReturnType device_read(XilSdnetEnvIf *EnvIfPtr, XilSdnetAddressTy
     return XIL_SDNET_SUCCESS;
 }
 
+static XilSdnetReturnType log_info(XilSdnetEnvIf *UNUSED(EnvIfPtr), const char *MessagePtr)
+{
+  fprintf(stdout, "%s\n", MessagePtr);
+
+  return XIL_SDNET_SUCCESS;
+}
+
+static XilSdnetReturnType log_error(XilSdnetEnvIf *UNUSED(EnvIfPtr), const char *MessagePtr)
+{
+  fprintf(stderr, "%s\n", MessagePtr);
+
+  return XIL_SDNET_SUCCESS;
+}
+
 void * sdnet_init(uintptr_t sdnet_base_addr)
 {
   struct sdnet_user_context * sdnet_user;
@@ -83,6 +98,8 @@ void * sdnet_init(uintptr_t sdnet_base_addr)
   sdnet_env->WordWrite32 = (XilSdnetWordWrite32Fp) &device_write;
   sdnet_env->WordRead32  = (XilSdnetWordRead32Fp)  &device_read;
   sdnet_env->UserCtx     = (XilSdnetUserCtxType)   sdnet_user;
+  sdnet_env->LogError    = (XilSdnetLogFp)         &log_error;
+  sdnet_env->LogInfo     = (XilSdnetLogFp)         &log_info;
 
   // Initialize the sdnet target
   if (XilSdnetTargetInit(sdnet_target, sdnet_env, &XilSdnetTargetConfig_sdnet_0) != XIL_SDNET_SUCCESS) {
