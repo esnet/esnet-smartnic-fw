@@ -143,6 +143,9 @@ package_2004:
 
 trigger_downstream_job:
   stage: trigger_downstream
+  # Make sure the downstream pipeline doesn't inherit any of the global env vars from this project
+  inherit:
+    variables: false
   trigger:
     project: ht/hightouch-xilinx
     branch: main
