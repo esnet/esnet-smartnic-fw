@@ -178,6 +178,24 @@ bool sdnet_table_insert_kma(void * sdnet_handle,
     return false;
   }
 
+  XilSdnetTableMode table_mode;
+  if (XilSdnetTableGetMode(table, &table_mode) != XIL_SDNET_SUCCESS) {
+    return false;
+  }
+
+  // Certain table modes insist on a NULL mask parameter
+  switch (table_mode) {
+  case XIL_SDNET_TABLE_MODE_DCAM:
+  case XIL_SDNET_TABLE_MODE_BCAM:
+  case XIL_SDNET_TABLE_MODE_TINY_BCAM:
+    // Mask parameter must be NULL for these table modes
+    mask = NULL;
+    break;
+  default:
+    // All other table modes require the mask
+    break;
+  }
+
   if (XilSdnetTableInsert(table, key, mask, priority, action_id, params) != XIL_SDNET_SUCCESS) {
     return false;
   }
@@ -198,6 +216,24 @@ bool sdnet_table_delete_k(void * sdnet_handle,
   XilSdnetTableCtx * table;
   if (XilSdnetTargetGetTableByName(sdnet_target, (char *)table_name, &table) != XIL_SDNET_SUCCESS) {
     return false;
+  }
+
+  XilSdnetTableMode table_mode;
+  if (XilSdnetTableGetMode(table, &table_mode) != XIL_SDNET_SUCCESS) {
+    return false;
+  }
+
+  // Certain table modes insist on a NULL mask parameter
+  switch (table_mode) {
+  case XIL_SDNET_TABLE_MODE_DCAM:
+  case XIL_SDNET_TABLE_MODE_BCAM:
+  case XIL_SDNET_TABLE_MODE_TINY_BCAM:
+    // Mask parameter must be NULL for these table modes
+    mask = NULL;
+    break;
+  default:
+    // All other table modes require the mask
+    break;
   }
 
   if (XilSdnetTableDelete(table, key, mask) != XIL_SDNET_SUCCESS) {
