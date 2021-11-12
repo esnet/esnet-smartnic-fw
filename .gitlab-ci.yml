@@ -8,7 +8,6 @@ stages:
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  HT_SWDEV_DOCKER_IMAGE: hub.es.net:5000/hightouch-swdev-docker:v1.11
   ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/main/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
   INTERNAL_IMAGE_TAG: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
 
@@ -48,7 +47,12 @@ pull_smartnic_hwapi_job:
 
 .build:
   stage: build
-  image: ${HT_SWDEV_DOCKER_IMAGE}-${OS_CODENAME}
+  image: ${INTERNAL_IMAGE_TAG}-${OS_CODENAME}
+  before_script:
+    - |
+      mk-build-deps --install \
+        --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes' \
+        debian/control
   script:
     - meson build-${OS_CODENAME}
     - ninja -C build-${OS_CODENAME}
