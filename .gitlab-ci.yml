@@ -1,5 +1,6 @@
 ---
 stages:
+  - build_env
   - pull_smartnic_hwapi
   - build
   - package
@@ -9,6 +10,18 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
   HT_SWDEV_DOCKER_IMAGE: hub.es.net:5000/hightouch-swdev-docker:v1.11
   ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/main/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
+  INTERNAL_IMAGE_TAG: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
+
+.build_env:
+  stage: build_env
+  image: docker:20.10.10
+  services:
+    - docker:20.10.10-dind
+  script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+    - docker build --pull -t $INTERNAL_IMAGE_TAG-$OS_CODENAME --build-arg=OS_CODENAME=$OS_CODENAME ./pkg-build
+    - docker push $INTERNAL_IMAGE_TAG-$OS_CODENAME
+  timeout: 2h
 
 pull_smartnic_hwapi_job:
   stage: pull_smartnic_hwapi
@@ -37,47 +50,14 @@ pull_smartnic_hwapi_job:
     paths:
       - build-${OS_CODENAME}
     expire_in: 3 month
-  needs:
-    - pull_smartnic_hwapi_job
 
 .package:
   stage: package
-  image: ubuntu:$OS_CODENAME
+  image: ${INTERNAL_IMAGE_TAG}-${OS_CODENAME}
   variables:
     DEBEMAIL: "smartnic@es.net"
     DEBFULLNAME: "ESnet SmartNIC Developers"
     DEBIAN_FRONTEND: noninteractive
-  before_script:
-    - |
-      cat <<_EOF > /etc/apt/sources.list
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} main restricted
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates main restricted
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} universe
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates universe
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} multiverse
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates multiverse
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-backports main restricted universe multiverse
-      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security main restricted
-      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security universe
-      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security multiverse
-      _EOF
-    - apt update -y
-    - ln -fs /usr/share/zoneinfo/America/Toronto /etc/localtime
-    - |
-      apt install -y --no-install-recommends \
-        build-essential \
-        cdbs \
-        devscripts \
-        equivs \
-        fakeroot \
-        libdistro-info-perl
-    - |
-      apt install -y --no-install-recommends \
-        python3-pip \
-        python3-setuptools
-    - pip3 install meson
-    - pip3 install pyyaml-include
-    - pip3 install yq
   script:
     - |
       mk-build-deps --install \
@@ -102,8 +82,6 @@ pull_smartnic_hwapi_job:
     paths:
       - debs
     expire_in: 3 month
-  needs:
-    - pull_smartnic_hwapi_job
 
 .base_os_1804:
   variables:
@@ -113,12 +91,29 @@ pull_smartnic_hwapi_job:
   variables:
     OS_CODENAME: focal
 
+build_env_1804:
+  extends:
+    - .base_os_1804
+    - .build_env
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+
+build_env_2004:
+  extends:
+    - .base_os_2004
+    - .build_env
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+
 build_1804:
   extends:
     - .base_os_1804
     - .build
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+  needs:
+    - pull_smartnic_hwapi_job
+    - build_env_1804
 
 build_2004:
   extends:
@@ -126,6 +121,9 @@ build_2004:
     - .build
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+  needs:
+    - pull_smartnic_hwapi_job
+    - build_env_2004
 
 package_1804:
   extends:
@@ -133,6 +131,9 @@ package_1804:
     - .package
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+  needs:
+    - pull_smartnic_hwapi_job
+    - build_env_1804
 
 package_2004:
   extends:
@@ -140,6 +141,9 @@ package_2004:
     - .package
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+  needs:
+    - pull_smartnic_hwapi_job
+    - build_env_2004
 
 trigger_downstream_job:
   stage: trigger_downstream
