@@ -8,7 +8,6 @@ stages:
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/main/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
   INTERNAL_IMAGE_TAG: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
 
 .build_env:
@@ -26,6 +25,7 @@ pull_smartnic_hwapi_job:
   stage: pull_smartnic_hwapi
   image: ubuntu:focal
   variables:
+    ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/main/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - apt update -y
