@@ -68,6 +68,7 @@ pull_sn_hw:
     DEBEMAIL: "smartnic@es.net"
     DEBFULLNAME: "ESnet SmartNIC Developers"
     DEBIAN_FRONTEND: noninteractive
+    SN_FW_VER: ${CI_PIPELINE_ID}
   script:
     - |
       mk-build-deps --install \
@@ -77,7 +78,7 @@ pull_sn_hw:
     - |
       dch --create \
         --package esnet-smartnic \
-        --newversion 1.0.0-${CI_PIPELINE_ID} \
+        --newversion 1.0.0-${SN_FW_VER} \
         --distribution ${OS_CODENAME} \
         --urgency medium debian/changelog
     - dpkg-buildpackage --build=binary -us -uc
@@ -87,7 +88,7 @@ pull_sn_hw:
     # We also need to be careful to mv only our output files to not interfere with other builds
     #   See: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=657401
     #   See: https://pmhahn.github.io/debian-oot-build/
-    - mv ../*-${CI_PIPELINE_ID}_*.{buildinfo,changes,deb,ddeb} ./sn-stack/debs/${OS_CODENAME}
+    - mv ../*-${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} ./sn-stack/debs/${OS_CODENAME}
   artifacts:
     paths:
       - sn-stack
