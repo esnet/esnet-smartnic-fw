@@ -155,7 +155,7 @@ package_2004:
     - pull_sn_hw
     - build_env_2004
 
-trigger_downstream_job:
+trigger_downstream:
   stage: trigger_downstream
   # Make sure the downstream pipeline doesn't inherit any of the global env vars from this project
   inherit:
