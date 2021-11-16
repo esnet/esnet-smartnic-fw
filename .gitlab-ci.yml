@@ -6,6 +6,20 @@ stages:
 
 variables:
   SN_HW_REPO_BRANCH: main
+
+# need_sn_hw:
+#   stage: pull_sn_hw
+#   image: ubuntu:focal
+#   variables:
+#     GIT_STRATEGY: none
+#   script:
+#     - ls -lhR esnet-smartnic-hwapi
+#   needs:
+#     - project: ht/hightouch-xilinx-dp
+#       job: export_hwapi
+#       ref: $SN_HW_REPO_BRANCH
+#       artifacts: true
+
 pull_sn_hw:
   stage: pull_sn_hw
   image: ubuntu:focal
