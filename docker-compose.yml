@@ -1,0 +1,80 @@
+services:
+  sn-fw-pkg:
+    container_name: sn-fw-pkg
+    image: sn-fw-pkg:${OS_CODENAME?}
+    build:
+      context: pkg-build
+      args:
+        OS_CODENAME: ${OS_CODENAME?}
+    tmpfs:
+      # Note: Meson requires that it can execute code from its build dir for a sanity check
+      - /build:exec
+    volumes:
+      - source:/source
+      - sn-hw:/sn-hw
+      - output:/output
+    environment:
+      DEBEMAIL: "smartnic@es.net"
+      DEBFULLNAME: "ESnet SmartNIC Developers"
+      DEBIAN_FRONTEND: noninteractive
+      SN_HW_VER: ${SN_HW_VER?}
+      SN_FW_VER: ${SN_FW_VER?}
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -x
+      - |
+        cp -a /source /build &&
+        cd /build/source &&
+        find subprojects \
+          -mindepth 1 \
+          -maxdepth 2 \
+          \( -type f -path 'subprojects/*.wrap' -prune \) \
+          -o \
+          \( -type d -path 'subprojects/packagefiles/*.overlay' -prune \) \
+          -o \
+          \( -type d -path 'subprojects/packagefiles' \) \
+          -o \
+          \( -type d -print0 -prune \) \
+          -o \
+          -print0 \
+          | xargs \
+              --null \
+              --no-run-if-empty \
+              rm -r &&
+        SN_HW_API="/sn-hw/artifacts.hightouch-xilinx-dp.export_hwapi.${SN_HW_VER}.zip" &&
+        [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $$SN_HW_API" ; exit 1) &&
+        ln -fs \
+          $${SN_HW_API} \
+          subprojects/packagefiles/esnet-smartnic-hwapi.zip &&
+        cd /build/source &&
+        mk-build-deps --install \
+          --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes' \
+          debian/control &&
+        rm -f debian/changelog &&
+        dch --create \
+          --package esnet-smartnic \
+          --newversion 1.0.0-${SN_FW_VER} \
+          --distribution ${OS_CODENAME} \
+          --urgency medium debian/changelog &&
+        dpkg-buildpackage --build=binary -us -uc &&
+        mkdir -p /output/debs/${OS_CODENAME} &&
+        mv ../*-${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} /output/debs/${OS_CODENAME} &&
+        file subprojects/esnet-smartnic-hwapi/firmware/esnet-smartnic.bit
+
+volumes:
+  source:
+    driver_opts:
+      type: none
+      device: ${PWD}
+      o: bind,ro
+  sn-hw:
+    driver_opts:
+      type: none
+      device: ${PWD}/sn-hw
+      o: bind,ro
+  output:
+    driver_opts:
+      type: none
+      device: ${PWD}/sn-stack
+      o: bind

@@ -1,25 +1,8 @@
 ---
 stages:
-  - build_env
   - pull_sn_hw
-  - build
   - package
   - trigger_downstream
-
-variables:
-  GIT_SUBMODULE_STRATEGY: recursive
-  INTERNAL_IMAGE_TAG: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
-
-.build_env:
-  stage: build_env
-  image: docker:20.10.10
-  services:
-    - docker:20.10.10-dind
-  script:
-    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
-    - docker build --pull -t $INTERNAL_IMAGE_TAG-$OS_CODENAME --build-arg=OS_CODENAME=$OS_CODENAME ./pkg-build
-    - docker push $INTERNAL_IMAGE_TAG-$OS_CODENAME
-  timeout: 2h
 
 pull_sn_hw:
   stage: pull_sn_hw
@@ -53,125 +36,55 @@ pull_sn_hw:
         hwapi.env
   needs: []
 
-.build:
-  stage: build
-  image: ${INTERNAL_IMAGE_TAG}-${OS_CODENAME}
-  before_script:
-    - |
-      ln -s \
-        ../../sn-hw/artifacts.hightouch-xilinx-dp.export_hwapi.${SN_HW_VER}.zip \
-        subprojects/packagefiles/esnet-smartnic-hwapi.zip
-  script:
-    - |
-      mk-build-deps --install \
-        --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes' \
-        debian/control
-    - meson build-${OS_CODENAME}
-    - ninja -C build-${OS_CODENAME}
-  artifacts:
-    paths:
-      - build-${OS_CODENAME}
-    expire_in: 3 month
-
-.package:
+.compose_package:
   stage: package
-  image: ${INTERNAL_IMAGE_TAG}-${OS_CODENAME}
+  image: docker:20.10.10
+  services:
+    - docker:20.10.10-dind
   variables:
-    DEBEMAIL: "smartnic@es.net"
-    DEBFULLNAME: "ESnet SmartNIC Developers"
-    DEBIAN_FRONTEND: noninteractive
+    GIT_SUBMODULE_STRATEGY: recursive
+    OS_CODENAME: focal
     SN_FW_VER: ${CI_PIPELINE_ID}
+    DOCKER_COMPOSE_URL: https://dispense.es.net/Linux/github-mirrors/docker/compose/v2.1.1/docker-compose-linux-x86_64
+    #COMPOSE_PROJECT_NAME: ${CI_PROJECT_NAME}-${CI_PIPELINE_ID}-${CI_JOB_ID}
   before_script:
-    - |
-      ln -s \
-        ../../sn-hw/artifacts.hightouch-xilinx-dp.export_hwapi.${SN_HW_VER}.zip \
-        subprojects/packagefiles/esnet-smartnic-hwapi.zip
+    # Install docker compose v2 plugin
+    - mkdir -p /usr/local/lib/docker/cli-plugins
+    - wget  -O /usr/local/lib/docker/cli-plugins/docker-compose ${DOCKER_COMPOSE_URL}
+    - chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+    - docker compose version
   script:
     - |
-      mk-build-deps --install \
-        --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes' \
-        debian/control
-    - rm -f debian/changelog
-    - |
-      dch --create \
-        --package esnet-smartnic \
-        --newversion 1.0.0-${SN_FW_VER} \
-        --distribution ${OS_CODENAME} \
-        --urgency medium debian/changelog
-    - dpkg-buildpackage --build=binary -us -uc
-    - mkdir -p sn-stack/debs/${OS_CODENAME}
-    # Output of debian builds goes to '..' and can't currently be changed
-    # These need to be mv's to ensure that we minimize pollution in the CI build env
-    # We also need to be careful to mv only our output files to not interfere with other builds
-    #   See: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=657401
-    #   See: https://pmhahn.github.io/debian-oot-build/
-    - mv ../*-${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} ./sn-stack/debs/${OS_CODENAME}
+      cat <<_EOF > .env
+      SN_HW_VER=${SN_HW_VER}
+      SN_FW_VER=${SN_FW_VER}
+      OS_CODENAME=${OS_CODENAME}
+      _EOF
+    - cat .env
+    - docker compose config
+    - docker compose ps
+    - docker ps
+    - docker compose build sn-fw-pkg
+    - docker compose run --rm sn-fw-pkg
   artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
       - sn-stack
     expire_in: 3 month
+  needs:
+    - pull_sn_hw
 
-.base_os_1804:
+package_bionic:
+  extends:
+    - .compose_package
   variables:
     OS_CODENAME: bionic
 
-.base_os_2004:
+package_focal:
+  extends:
+    - .compose_package
   variables:
     OS_CODENAME: focal
-
-build_env_1804:
-  extends:
-    - .base_os_1804
-    - .build_env
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
-
-build_env_2004:
-  extends:
-    - .base_os_2004
-    - .build_env
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
-
-build_1804:
-  extends:
-    - .base_os_1804
-    - .build
-  artifacts:
-    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
-  needs:
-    - pull_sn_hw
-    - build_env_1804
-
-build_2004:
-  extends:
-    - .base_os_2004
-    - .build
-  artifacts:
-    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
-  needs:
-    - pull_sn_hw
-    - build_env_2004
-
-package_1804:
-  extends:
-    - .base_os_1804
-    - .package
-  artifacts:
-    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
-  needs:
-    - pull_sn_hw
-    - build_env_1804
-
-package_2004:
-  extends:
-    - .base_os_2004
-    - .package
-  artifacts:
-    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
-  needs:
-    - pull_sn_hw
-    - build_env_2004
 
 trigger_downstream:
   stage: trigger_downstream
