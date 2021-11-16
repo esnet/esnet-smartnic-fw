@@ -9,7 +9,7 @@ ENV LANG C.UTF-8
 ARG OS_CODENAME
 
 # Configure local ubuntu mirror as package source
-COPY sources.list /etc/apt/sources.list
+COPY sources.${OS_CODENAME}.list /etc/apt/sources.list
 
 RUN \
   ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime && \
