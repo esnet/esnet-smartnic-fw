@@ -4,11 +4,13 @@ stages:
   - package
   - trigger_downstream
 
+variables:
+  SN_HW_REPO_BRANCH: main
 pull_sn_hw:
   stage: pull_sn_hw
   image: ubuntu:focal
   variables:
-    ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/main/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
+    ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/$SN_HW_REPO_BRANCH/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - apt update -y
