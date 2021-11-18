@@ -77,10 +77,16 @@ pull_sn_hw:
       OS_CODENAME=${OS_CODENAME}
       _EOF
     - cat .env
+    - echo -e "\e[0Ksection_start:`date +%s`:section_001[collapsed=true]\r\e[0KExpanded compose config"
     - docker compose config
+    - echo -e "\e[0Ksection_end:`date +%s`:section_001\r\e[0K"
+    - echo -e "\e[0Ksection_start:`date +%s`:section_002[collapsed=true]\r\e[0KDebug info for compose in CI"
     - docker compose ps
     - docker ps
+    - echo -e "\e[0Ksection_end:`date +%s`:section_002\r\e[0K"
+    - echo -e "\e[0Ksection_start:`date +%s`:section_003[collapsed=true]\r\e[0KContainer Build"
     - docker compose build sn-fw-pkg
+    - echo -e "\e[0Ksection_end:`date +%s`:section_003\r\e[0K"
     - docker compose run --rm sn-fw-pkg
     # Also export our build context into the standalone sn-stack artifact
     - cp .env sn-stack/.env
