@@ -82,6 +82,8 @@ pull_sn_hw:
     - docker ps
     - docker compose build sn-fw-pkg
     - docker compose run --rm sn-fw-pkg
+    # Also export our build context into the standalone sn-stack artifact
+    - cp .env sn-stack/.env
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
