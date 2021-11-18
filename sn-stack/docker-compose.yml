@@ -2,12 +2,12 @@ services:
   smartnic-hw:
     container_name: smartnic-hw
     hostname: smartnic-hw
-    image: smartnic-hw:$SN_FW_VER
+    image: smartnic-hw:${SN_FW_VER?}
     build:
       context: .
       dockerfile: smartnic-hw/Dockerfile
       args:
-        SN_FW_VER: $SN_FW_VER
+        SN_FW_VER: ${SN_FW_VER?}
     init: true
     user: root
     privileged: true
@@ -21,12 +21,12 @@ services:
   smartnic-fw:
     container_name: smartnic-fw
     hostname: smartnic-fw
-    image: smartnic-fw:$SN_FW_VER
+    image: smartnic-fw:${SN_FW_VER?}
     build:
       context: .
       dockerfile: smartnic-fw/Dockerfile
       args:
-        SN_FW_VER: $SN_FW_VER
+        SN_FW_VER: ${SN_FW_VER?}
     depends_on:
       smartnic-hw:
         condition: service_completed_successfully
