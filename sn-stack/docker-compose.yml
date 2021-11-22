@@ -1,0 +1,47 @@
+services:
+  smartnic-hw:
+    container_name: smartnic-hw
+    hostname: smartnic-hw
+    image: smartnic-hw:${SN_FW_VER?}
+    build:
+      context: .
+      dockerfile: smartnic-hw/Dockerfile
+      args:
+        SN_FW_VER: ${SN_FW_VER?}
+    init: true
+    user: root
+    privileged: true
+    entrypoint:
+      - /usr/local/bin/program_card.sh
+      - localhost:3121
+      - "${HW_TARGET_SERIAL:-*}"
+      - /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit
+      #- FORCE
+
+  smartnic-fw:
+    container_name: smartnic-fw
+    hostname: smartnic-fw
+    image: smartnic-fw:${SN_FW_VER?}
+    build:
+      context: .
+      dockerfile: smartnic-fw/Dockerfile
+      args:
+        SN_FW_VER: ${SN_FW_VER?}
+    depends_on:
+      smartnic-hw:
+        condition: service_completed_successfully
+    init: true
+    user: root
+    privileged: true
+    environment:
+      - REGIO_SELECT=$FPGA_PCIE_DEV.0
+    volumes:
+      - /sys/bus/pci:/sys/bus/pci
+      - /dev:/dev
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2 &&
+        setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2 &&
+        sleep infinity

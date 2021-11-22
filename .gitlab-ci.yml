@@ -1,147 +1,124 @@
 ---
 stages:
-  - pull_smartnic_hwapi
-  - build
+  - pull_sn_hw
   - package
   - trigger_downstream
 
 variables:
-  GIT_SUBMODULE_STRATEGY: recursive
-  HT_SWDEV_DOCKER_IMAGE: hub.es.net:5000/hightouch-swdev-docker:v1.11
-  ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/main/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
+  SN_HW_REPO_BRANCH: main
 
-pull_smartnic_hwapi_job:
-  stage: pull_smartnic_hwapi
-  image: ${HT_SWDEV_DOCKER_IMAGE}-focal
+# need_sn_hw:
+#   stage: pull_sn_hw
+#   image: ubuntu:focal
+#   variables:
+#     GIT_STRATEGY: none
+#   script:
+#     - ls -lhR esnet-smartnic-hwapi
+#   needs:
+#     - project: ht/hightouch-xilinx-dp
+#       job: export_hwapi
+#       ref: $SN_HW_REPO_BRANCH
+#       artifacts: true
+
+pull_sn_hw:
+  stage: pull_sn_hw
+  image: ubuntu:focal
+  variables:
+    ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/$SN_HW_REPO_BRANCH/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
+    GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    - apt update -y
+    - ln -fs /usr/share/zoneinfo/America/Toronto /etc/localtime
+    - apt install -y --no-install-recommends wget ca-certificates
   script:
     - echo "Downloading smartnic hwapi"
-    - TMPDIR="$(mktemp --directory)"
-    - wget --no-verbose --trust-server-names --content-disposition --directory-prefix="$TMPDIR" $ESNET_SMARTNIC_HWAPI_URL
-    - ls -l ${TMPDIR}/*.zip
-    - mkdir -p subprojects/packagefiles
-    - mv ${TMPDIR}/*.zip subprojects/packagefiles/esnet-smartnic-hwapi.zip
+    - mkdir -p ./sn-hw/
+    - |
+      wget \
+        --no-verbose \
+        --trust-server-names \
+        --content-disposition \
+        --directory-prefix=./sn-hw \
+        $ESNET_SMARTNIC_HWAPI_URL
+    - ls ./sn-hw/*.zip | sed -re 's/^.*\.([0-9]+)\.zip$/SN_HW_VER=\1/' >> hwapi.env
+    - cat hwapi.env
   artifacts:
     name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
-      - subprojects/packagefiles/esnet-smartnic-hwapi.zip
+      - sn-hw
     expire_in: 3 month
+    reports:
+      dotenv:
+        hwapi.env
   needs: []
 
-.build:
-  stage: build
-  image: ${HT_SWDEV_DOCKER_IMAGE}-${OS_CODENAME}
-  script:
-    - meson build-${OS_CODENAME}
-    - ninja -C build-${OS_CODENAME}
-  artifacts:
-    paths:
-      - build-${OS_CODENAME}
-    expire_in: 3 month
-  needs:
-    - pull_smartnic_hwapi_job
-
-.package:
+.compose_package:
   stage: package
-  image: ubuntu:$OS_CODENAME
+  image: docker:20.10.10
+  services:
+    - docker:20.10.10-dind
   variables:
-    DEBEMAIL: "smartnic@es.net"
-    DEBFULLNAME: "ESnet SmartNIC Developers"
-    DEBIAN_FRONTEND: noninteractive
+    GIT_SUBMODULE_STRATEGY: recursive
+    OS_CODENAME: focal
+    SN_FW_VER: ${CI_PIPELINE_ID}
+    DOCKER_COMPOSE_URL: https://dispense.es.net/Linux/github-mirrors/docker/compose/v2.1.1/docker-compose-linux-x86_64
+    # Give our docker compose stack a unique prefix in case multiple concurrent jobs run on the same gitlab-ci runner
+    COMPOSE_PROJECT_NAME: ${CI_PROJECT_NAME}-pipe${CI_PIPELINE_ID}-job${CI_JOB_ID}
   before_script:
-    - |
-      cat <<_EOF > /etc/apt/sources.list
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} main restricted
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates main restricted
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} universe
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates universe
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME} multiverse
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-updates multiverse
-      deb http://linux.mirrors.es.net/ubuntu ${OS_CODENAME}-backports main restricted universe multiverse
-      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security main restricted
-      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security universe
-      deb http://security.ubuntu.com/ubuntu ${OS_CODENAME}-security multiverse
-      _EOF
-    - apt update -y
-    - ln -fs /usr/share/zoneinfo/America/Toronto /etc/localtime
-    - |
-      apt install -y --no-install-recommends \
-        build-essential \
-        cdbs \
-        devscripts \
-        equivs \
-        fakeroot \
-        libdistro-info-perl
-    - |
-      apt install -y --no-install-recommends \
-        python3-pip \
-        python3-setuptools
-    - pip3 install meson
-    - pip3 install pyyaml-include
-    - pip3 install yq
+    # Install docker compose v2 plugin
+    - mkdir -p /usr/local/lib/docker/cli-plugins
+    - wget  -O /usr/local/lib/docker/cli-plugins/docker-compose ${DOCKER_COMPOSE_URL}
+    - chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+    - docker compose version
   script:
     - |
-      mk-build-deps --install \
-        --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes' \
-        debian/control
-    - rm -f debian/changelog
-    - |
-      dch --create \
-        --package esnet-smartnic \
-        --newversion 1.0.0-${CI_PIPELINE_ID} \
-        --distribution ${OS_CODENAME} \
-        --urgency medium debian/changelog
-    - dpkg-buildpackage --build=binary -us -uc
-    - mkdir -p debs/${OS_CODENAME}
-    # Output of debian builds goes to '..' and can't currently be changed
-    # These need to be mv's to ensure that we minimize pollution in the CI build env
-    # We also need to be careful to mv only our output files to not interfere with other builds
-    #   See: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=657401
-    #   See: https://pmhahn.github.io/debian-oot-build/
-    - mv ../*-${CI_PIPELINE_ID}_*.{buildinfo,changes,deb,ddeb} ./debs/${OS_CODENAME}
+      cat <<_EOF > .env
+      SN_HW_VER=${SN_HW_VER}
+      SN_FW_VER=${SN_FW_VER}
+      OS_CODENAME=${OS_CODENAME}
+      _EOF
+    - cat .env
+    - echo -e "\e[0Ksection_start:`date +%s`:section_001[collapsed=true]\r\e[0KExpanded compose config"
+    - docker compose config
+    - echo -e "\e[0Ksection_end:`date +%s`:section_001\r\e[0K"
+    - echo -e "\e[0Ksection_start:`date +%s`:section_002[collapsed=true]\r\e[0KDebug info for compose in CI"
+    - docker compose ls
+    - docker compose ps
+    - docker container ls | grep "$COMPOSE_PROJECT_NAME" || /bin/true
+    - docker volume    ls | grep "$COMPOSE_PROJECT_NAME" || /bin/true
+    - echo -e "\e[0Ksection_end:`date +%s`:section_002\r\e[0K"
+    - echo -e "\e[0Ksection_start:`date +%s`:section_003[collapsed=true]\r\e[0KContainer Build"
+    - docker compose build sn-fw-pkg
+    - echo -e "\e[0Ksection_end:`date +%s`:section_003\r\e[0K"
+    # Clean up absolutely everything related to our compose stack *before* we run
+    - docker compose down -v --remove-orphans
+    # Run the build
+    - docker compose run --rm sn-fw-pkg
+    # Clean up absolutely everything related to our compose stack *after* we run
+    - docker compose down -v --remove-orphans
+    # Also export our build context into the standalone sn-stack artifact
+    - cp .env sn-stack/.env
   artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
     paths:
-      - debs
+      - sn-stack
     expire_in: 3 month
   needs:
-    - pull_smartnic_hwapi_job
+    - pull_sn_hw
 
-.base_os_1804:
+package_bionic:
+  extends:
+    - .compose_package
   variables:
     OS_CODENAME: bionic
 
-.base_os_2004:
+package_focal:
+  extends:
+    - .compose_package
   variables:
     OS_CODENAME: focal
 
-build_1804:
-  extends:
-    - .base_os_1804
-    - .build
-  artifacts:
-    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
-
-build_2004:
-  extends:
-    - .base_os_2004
-    - .build
-  artifacts:
-    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
-
-package_1804:
-  extends:
-    - .base_os_1804
-    - .package
-  artifacts:
-    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
-
-package_2004:
-  extends:
-    - .base_os_2004
-    - .package
-  artifacts:
-    name: "artifacts.$CI_PROJECT_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
-
-trigger_downstream_job:
+trigger_downstream:
   stage: trigger_downstream
   # Make sure the downstream pipeline doesn't inherit any of the global env vars from this project
   inherit:
