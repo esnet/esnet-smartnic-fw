@@ -62,7 +62,8 @@ pull_sn_hw:
     OS_CODENAME: focal
     SN_FW_VER: ${CI_PIPELINE_ID}
     DOCKER_COMPOSE_URL: https://dispense.es.net/Linux/github-mirrors/docker/compose/v2.1.1/docker-compose-linux-x86_64
-    #COMPOSE_PROJECT_NAME: ${CI_PROJECT_NAME}-${CI_PIPELINE_ID}-${CI_JOB_ID}
+    # Give our docker compose stack a unique prefix in case multiple concurrent jobs run on the same gitlab-ci runner
+    COMPOSE_PROJECT_NAME: ${CI_PROJECT_NAME}-pipe${CI_PIPELINE_ID}-job${CI_JOB_ID}
   before_script:
     # Install docker compose v2 plugin
     - mkdir -p /usr/local/lib/docker/cli-plugins
@@ -81,13 +82,20 @@ pull_sn_hw:
     - docker compose config
     - echo -e "\e[0Ksection_end:`date +%s`:section_001\r\e[0K"
     - echo -e "\e[0Ksection_start:`date +%s`:section_002[collapsed=true]\r\e[0KDebug info for compose in CI"
+    - docker compose ls
     - docker compose ps
-    - docker ps
+    - docker container ls | grep "$COMPOSE_PROJECT_NAME" || /bin/true
+    - docker volume    ls | grep "$COMPOSE_PROJECT_NAME" || /bin/true
     - echo -e "\e[0Ksection_end:`date +%s`:section_002\r\e[0K"
     - echo -e "\e[0Ksection_start:`date +%s`:section_003[collapsed=true]\r\e[0KContainer Build"
     - docker compose build sn-fw-pkg
     - echo -e "\e[0Ksection_end:`date +%s`:section_003\r\e[0K"
+    # Clean up absolutely everything related to our compose stack *before* we run
+    - docker compose down -v --remove-orphans
+    # Run the build
     - docker compose run --rm sn-fw-pkg
+    # Clean up absolutely everything related to our compose stack *after* we run
+    - docker compose down -v --remove-orphans
     # Also export our build context into the standalone sn-stack artifact
     - cp .env sn-stack/.env
   artifacts:

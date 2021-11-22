@@ -1,6 +1,5 @@
 services:
   sn-fw-pkg:
-    container_name: sn-fw-pkg
     image: sn-fw-pkg:${OS_CODENAME?}
     build:
       context: pkg-build
