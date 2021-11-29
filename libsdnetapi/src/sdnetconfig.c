@@ -6,6 +6,7 @@
 
 #include "sdnetapi.h"		/* API */
 #include "sdnet_0_defs.h"	/* XilSdnetTargetConfig_sdnet_0 */
+#include "unused.h"		/* UNUSED */
 
 static const struct XilSdnetTargetTableConfig *sdnet_config_find_table_by_name(struct XilSdnetTargetConfig *tcfg, const char *table_name)
 {
@@ -80,7 +81,7 @@ enum mask_field_encoding {
 			  MASK_FIELD_ENC_RANGE,
 };
 
-static bool extend_match(mpz_t *key, mpz_t *mask, char field_type, unsigned int field_size_bits, unsigned int field_bit_pos, const char *key_field_str, char *mask_field_str, enum mask_field_encoding mask_field_encoding)
+static bool extend_match(mpz_t *key, mpz_t *mask, char field_type, unsigned int field_size_bits, unsigned int UNUSED(field_bit_pos), const char *key_field_str, char *mask_field_str, enum mask_field_encoding mask_field_encoding)
 {
   // Ensure that we have pointers for the results
   if (!key) {
@@ -272,13 +273,13 @@ static bool extend_match(mpz_t *key, mpz_t *mask, char field_type, unsigned int 
 #endif
 
   // Extend the current key to include this field
-  // by shift field left, then inclusive-or the key field above the previous fields
-  mpz_mul_2exp(key_field, key_field, field_bit_pos);
+  // by shifting all previous fields to the left and inclusive-or the new key field into the lsbs
+  mpz_mul_2exp(*key, *key, field_size_bits);
   mpz_ior(*key, *key, key_field);
 
   // Extend the current mask to include this field
-  // by shift field left, then inclusive-or the mask field above the previous fields
-  mpz_mul_2exp(mask_field, mask_field, field_bit_pos);
+  // by shifting all previous fields to the left and inclusive-or the new mask field into the lsbs
+  mpz_mul_2exp(*mask, *mask, field_size_bits);
   mpz_ior(*mask, *mask, mask_field);
 
   // Release memory held by intermediate gmp values
@@ -299,7 +300,7 @@ static bool extend_match(mpz_t *key, mpz_t *mask, char field_type, unsigned int 
   return false;
 }
 
-static bool extend_params(mpz_t *params, unsigned int field_size_bits, unsigned int field_bit_pos, const char *param_field_str)
+static bool extend_params(mpz_t *params, unsigned int field_size_bits, unsigned int UNUSED(field_bit_pos), const char *param_field_str)
 {
   // Ensure that we have pointers for the results
   if (!params) {
@@ -337,8 +338,8 @@ static bool extend_params(mpz_t *params, unsigned int field_size_bits, unsigned 
 #endif
 
   // Extend the current param to include this field
-  // by shift field left, then inclusive-or the param field above the previous fields
-  mpz_mul_2exp(param_field, param_field, field_bit_pos);
+  // by shifting all previous fields to the left and inclusive-or the new param field into the lsbs
+  mpz_mul_2exp(*params, *params, field_size_bits);
   mpz_ior(*params, *params, param_field);
 
   // Release memory held by intermediate gmp values
@@ -487,9 +488,15 @@ static bool parse_match_fields(struct sdnet_config_entry *entry, const XilSdnetT
   mpz_init(mask);
   uint16_t field_bit_pos = 0;
 
-  // Parse each of the key/mask fields in the match
-  char *match_token;
-  char **match_cursor = &match_str;
+  // Split format string into tokens
+
+  struct field_spec {
+    unsigned int size;
+    char         type;
+  };
+  #define FIELD_SPEC_MAX_ENTRIES 32
+  struct field_spec field_spec_table[FIELD_SPEC_MAX_ENTRIES];
+  unsigned int field_spec_entries = 0;
 
   char *table_fmt = strdup(t->Config.CamConfig.FormatStringPtr);
   char *table_fmt_cursor = table_fmt;
@@ -501,20 +508,42 @@ static bool parse_match_fields(struct sdnet_config_entry *entry, const XilSdnetT
 #ifdef SDNETCONFIG_DEBUG
     fprintf(stderr, "[%3u] field format: '%s' -- ", line_no, field_fmt);
 #endif
-    unsigned int field_size_bits;
-    char field_type;
-    int matched = sscanf(field_fmt, "%u%c", &field_size_bits, &field_type);
+    if (field_spec_entries >= FIELD_SPEC_MAX_ENTRIES) {
+#ifdef SDNETCONFIG_DEBUG
+      fprintf(stderr, "Table format '%s' requires more than max %u spec entries\n", t->Config.CamConfig.FormatStringPtr, FIELD_SPEC_MAX_ENTRIES);
+#endif
+      goto out_error;
+    }
+    struct field_spec * field_spec = &field_spec_table[field_spec_entries];
+    field_spec_entries++;
+
+    int matched = sscanf(field_fmt, "%u%c", &field_spec->size, &field_spec->type);
     if (matched != 2) {
       // Field format is not in the expected form
 #ifdef SDNETCONFIG_DEBUG
       fprintf(stderr, "Invalid format\n");
 #endif
-      free(table_fmt);
       goto out_error;
     }
 #ifdef SDNETCONFIG_DEBUG
-    fprintf(stderr, "size=%u, type='%c'\n", field_size_bits, field_type);
+    fprintf(stderr, "size=%u, type='%c'\n", field_spec->size, field_spec->type);
 #endif
+  }
+
+  // Parse each of the key/mask fields in the match
+  char *match_token;
+  char **match_cursor = &match_str;
+
+  // NOTE: The format string tokens describe the fields of the key from lsbs up to msbs.
+  //       The key fields in the p4bm file describe the fields from msbs down to lsbs.
+  //
+  //       The format string tokens will be consumed in reverse order to account for this
+  //       discrepancy.
+
+  for (int field_spec_index = field_spec_entries - 1; field_spec_index >= 0; field_spec_index--) {
+    struct field_spec * field_spec = &field_spec_table[field_spec_index];
+    unsigned int field_size_bits = field_spec->size;
+    char         field_type      = field_spec->type;
 
     // Read one key/mask field
     match_token = strsep(match_cursor, " ");
