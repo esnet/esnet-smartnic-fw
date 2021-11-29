@@ -354,7 +354,7 @@ static bool extend_params(mpz_t *params, unsigned int field_size_bits, unsigned 
   return false;
 }
 
-static bool parse_param_fields(struct sdnet_config_entry *entry, const XilSdnetAction *a, char *param_str, unsigned int line_no)
+static bool parse_param_fields(struct sdnet_config_entry *entry, const XilSdnetTargetTableConfig *t, const XilSdnetAction *a, char *param_str, unsigned int line_no)
 {
 #ifndef SDNETCONFIG_DEBUG
   (void)line_no;
@@ -371,7 +371,10 @@ static bool parse_param_fields(struct sdnet_config_entry *entry, const XilSdnetA
   }
 
   // Allocate space for the final param storage
-  unsigned int param_size_padded_bytes = (param_size_bits + 7) / 8;
+  // Note: The params for any given action are packed into the lsbs of a bit vector that is sized such that it
+  //       would fit the parameters of the longest action parameters.  This means that actions with shorter parameters
+  //       still need to allocate a max-sized byte array.
+  unsigned int param_size_padded_bytes = (t->Config.CamConfig.ResponseSizeBits - t->Config.ActionIdWidthBits + 7) / 8;
   entry->params = (uint8_t *) calloc(1, param_size_padded_bytes);
   entry->params_len = param_size_padded_bytes;
 
@@ -718,7 +721,7 @@ static bool parse_table_add_cmd(XilSdnetTargetConfig *sdnet_config, struct sdnet
     goto out_error;
   }
 
-  if (!parse_param_fields(entry, a, param_str, line_no)) {
+  if (!parse_param_fields(entry, t, a, param_str, line_no)) {
     // Failed to parse the provided action parameters for this table + action
     goto out_error;
   }
