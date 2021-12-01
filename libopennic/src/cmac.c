@@ -2,8 +2,16 @@
 #include "memory-barriers.h"	/* barrier() */
 
 bool cmac_enable(volatile struct cmac_block * cmac) {
-  cmac->conf_rx_1.ctl_rx_enable = 0x1;
-  cmac->conf_tx_1.ctl_tx_enable = 0x1;
+  union cmac_conf_rx_1 conf_rx = {
+    .ctl_rx_enable = 1,
+  };
+  cmac->conf_rx_1._v = conf_rx._v;
+
+  union cmac_conf_tx_1 conf_tx = {
+    .ctl_tx_enable = 1,
+  };
+  cmac->conf_tx_1._v = conf_tx._v;
+
   barrier();
 
   uint32_t tx_status;
