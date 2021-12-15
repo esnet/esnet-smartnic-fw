@@ -1,6 +1,6 @@
 project('esnet-opennic-hwapi', 'c')
 
-subdir('libsdnetdrv')
+subdir('libvitisnetp4drv')
 subdir('regmap')
 
 install_subdir(
