@@ -5,10 +5,10 @@ HW_TARGET_SERIAL=$2
 BITFILE_PATH=$3
 
 # Set up our vivado runtime env
-source /opt/Xilinx/Vivado_Lab/2021.1/settings64.sh
+source /opt/Xilinx/Vivado_Lab/2021.2/settings64.sh
 
 # Collect all of the JTAG register values for the currently loaded FPGA device
-/opt/Xilinx/Vivado_Lab/2021.1/bin/vivado_lab \
+/opt/Xilinx/Vivado_Lab/2021.2/bin/vivado_lab \
     -nolog \
     -nojournal \
     -tempDir /tmp/ \
