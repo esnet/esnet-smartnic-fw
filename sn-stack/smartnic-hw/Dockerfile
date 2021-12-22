@@ -1,4 +1,4 @@
-FROM xilinx-labtools:v2021.1
+FROM xilinx-labtools:v2021.2
 
 ENV DEBIAN_FRONTEND=noninteractive
 
