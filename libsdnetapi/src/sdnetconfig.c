@@ -5,13 +5,13 @@
 #include <gmp.h>    /* mpz_* */
 
 #include "sdnetapi.h"		/* API */
-#include "sdnet_0_defs.h"	/* XilSdnetTargetConfig_sdnet_0 */
+#include "sdnet_0_defs.h"	/* XilVitisNetP4TargetConfig_sdnet_0 */
 #include "unused.h"		/* UNUSED */
 
-static const struct XilSdnetTargetTableConfig *sdnet_config_find_table_by_name(struct XilSdnetTargetConfig *tcfg, const char *table_name)
+static const struct XilVitisNetP4TargetTableConfig *sdnet_config_find_table_by_name(struct XilVitisNetP4TargetConfig *tcfg, const char *table_name)
 {
   for (unsigned int tidx = 0; tidx < tcfg->TableListSize; tidx++) {
-    XilSdnetTargetTableConfig *t = tcfg->TableListPtr[tidx];
+    XilVitisNetP4TargetTableConfig *t = tcfg->TableListPtr[tidx];
     if (!strcmp(t->NameStringPtr, table_name)) {
       return t;
     }
@@ -20,11 +20,11 @@ static const struct XilSdnetTargetTableConfig *sdnet_config_find_table_by_name(s
   return NULL;
 }
 
-static const struct XilSdnetAction *sdnet_config_find_action_by_name(const struct XilSdnetTargetTableConfig *ttc, const char *action_name)
+static const struct XilVitisNetP4Action *sdnet_config_find_action_by_name(const struct XilVitisNetP4TargetTableConfig *ttc, const char *action_name)
 {
-  const struct XilSdnetTableConfig *tc = &ttc->Config;
+  const struct XilVitisNetP4TableConfig *tc = &ttc->Config;
   for (unsigned int aidx = 0; aidx < tc->ActionListSize; aidx++) {
-    XilSdnetAction *a = tc->ActionListPtr[aidx];
+    XilVitisNetP4Action *a = tc->ActionListPtr[aidx];
     if (!strcmp(a->NameStringPtr, action_name)) {
       return a;
     }
@@ -32,12 +32,12 @@ static const struct XilSdnetAction *sdnet_config_find_action_by_name(const struc
   return NULL;
 }
 
-static unsigned int sdnet_config_get_param_size_bits(const struct XilSdnetAction *a)
+static unsigned int sdnet_config_get_param_size_bits(const struct XilVitisNetP4Action *a)
 {
   unsigned int param_size_bits = 0;
 
   for (unsigned int pidx = 0; pidx < a->ParamListSize; pidx++) {
-    XilSdnetAttribute *attr = &a->ParamListPtr[pidx];
+    XilVitisNetP4Attribute *attr = &a->ParamListPtr[pidx];
     param_size_bits += attr->Value;
   }
 
@@ -354,7 +354,7 @@ static bool extend_params(mpz_t *params, unsigned int field_size_bits, unsigned 
   return false;
 }
 
-static bool parse_param_fields(struct sdnet_config_entry *entry, const XilSdnetTargetTableConfig *t, const XilSdnetAction *a, char *param_str, unsigned int line_no)
+static bool parse_param_fields(struct sdnet_config_entry *entry, const XilVitisNetP4TargetTableConfig *t, const XilVitisNetP4Action *a, char *param_str, unsigned int line_no)
 {
 #ifndef SDNETCONFIG_DEBUG
   (void)line_no;
@@ -387,7 +387,7 @@ static bool parse_param_fields(struct sdnet_config_entry *entry, const XilSdnetT
   char *param_token;
   char **param_cursor = &param_str;
   for (unsigned int pidx = 0; pidx < a->ParamListSize; pidx++) {
-    XilSdnetAttribute *attr = &a->ParamListPtr[pidx];
+    XilVitisNetP4Attribute *attr = &a->ParamListPtr[pidx];
 #ifdef SDNETCONFIG_DEBUG
     fprintf(stderr, "[%3u] param: '%s' (%u bits)\n", line_no, attr->NameStringPtr, attr->Value);
 #endif
@@ -470,7 +470,7 @@ static bool parse_param_fields(struct sdnet_config_entry *entry, const XilSdnetT
  *        Value: 0x44 0x55 0x66 0x77 0x22 0x33 0x11
  */
 
-static bool parse_match_fields(struct sdnet_config_entry *entry, const XilSdnetTargetTableConfig *t, char *match_str, unsigned int line_no)
+static bool parse_match_fields(struct sdnet_config_entry *entry, const XilVitisNetP4TargetTableConfig *t, char *match_str, unsigned int line_no)
 {
 #ifndef SDNETCONFIG_DEBUG
   (void)line_no;
@@ -658,7 +658,7 @@ static bool parse_match_fields(struct sdnet_config_entry *entry, const XilSdnetT
   return false;
 }
 
-static bool parse_table_add_cmd(XilSdnetTargetConfig *sdnet_config, struct sdnet_config_entry *entry, char *line, unsigned int line_no)
+static bool parse_table_add_cmd(XilVitisNetP4TargetConfig *sdnet_config, struct sdnet_config_entry *entry, char *line, unsigned int line_no)
 {
   char *token;
   char **cursor = &line;
@@ -671,7 +671,7 @@ static bool parse_table_add_cmd(XilSdnetTargetConfig *sdnet_config, struct sdnet
 #ifdef SDNETCONFIG_DEBUG
   fprintf(stderr, "[%3u] lookup table name: '%s' -- ", line_no, token);
 #endif
-  const struct XilSdnetTargetTableConfig *t = sdnet_config_find_table_by_name(sdnet_config, token);
+  const struct XilVitisNetP4TargetTableConfig *t = sdnet_config_find_table_by_name(sdnet_config, token);
   if (t == NULL) {
     // No matching table name
 #ifdef SDNETCONFIG_DEBUG
@@ -689,7 +689,7 @@ static bool parse_table_add_cmd(XilSdnetTargetConfig *sdnet_config, struct sdnet
 #ifdef SDNETCONFIG_DEBUG
   fprintf(stderr, "[%3u] lookup table action name: '%s' -- ", line_no, token);
 #endif
-  const struct XilSdnetAction *a = sdnet_config_find_action_by_name(t, token);
+  const struct XilVitisNetP4Action *a = sdnet_config_find_action_by_name(t, token);
   if (a == NULL) {
     // No matching action for this table
 #ifdef SDNETCONFIG_DEBUG
@@ -781,7 +781,7 @@ struct sdnet_config *sdnet_config_load_p4bm(const char *config_file)
     entry->raw = strdup(line);
     entry->line_no = line_no;
 
-    if (!parse_table_add_cmd(&XilSdnetTargetConfig_sdnet_0,
+    if (!parse_table_add_cmd(&XilVitisNetP4TargetConfig_sdnet_0,
 			     entry,
 			     line,
 			     line_no)) {

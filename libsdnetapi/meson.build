@@ -18,7 +18,7 @@ libsdnetapi = shared_library(
   sources,
   dependencies : [
     libgmp_dep,
-    dependency('libsdnetdrv'),
+    dependency('libvitisnetp4drv'),
     libsnutil_dep,
   ],
   include_directories : [
