@@ -21,10 +21,13 @@ services:
     entrypoint:
       - /bin/bash
       - -c
+      - -e
+      - -o
+      - pipefail
       - -x
       - |
-        cp -a /source /build &&
-        cd /build/source &&
+        cp -a /source /build
+        cd /build/source
         find subprojects \
           -mindepth 1 \
           -maxdepth 2 \
@@ -40,27 +43,27 @@ services:
           | xargs \
               --null \
               --no-run-if-empty \
-              rm -r &&
-        SN_HW_API="/sn-hw/artifacts.hightouch-xilinx-dp.export_hwapi.${SN_HW_VER}.zip" &&
-        [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $$SN_HW_API" ; exit 1) &&
+              rm -r
+        SN_HW_API="/sn-hw/artifacts.hightouch-xilinx-dp.export_hwapi.${SN_HW_VER}.zip"
+        [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $$SN_HW_API" ; exit 1)
         ln -fs \
           $${SN_HW_API} \
-          subprojects/packagefiles/esnet-smartnic-hwapi.zip &&
-        cd /build/source &&
+          subprojects/packagefiles/esnet-smartnic-hwapi.zip
+        cd /build/source
         mk-build-deps --install \
           --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes' \
-          debian/control &&
-        rm -f debian/changelog &&
+          debian/control
+        rm -f debian/changelog
         dch --create \
           --package esnet-smartnic \
           --newversion 1.0.0-${SN_FW_VER} \
           --distribution ${OS_CODENAME} \
-          --urgency medium debian/changelog &&
-        dpkg-buildpackage --build=binary -us -uc &&
-        mkdir -p /output/debs/${OS_CODENAME} &&
-        mv ../*-${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} /output/debs/${OS_CODENAME} &&
-        find /output/debs -type d -print0 | xargs --no-run-if-empty --null chmod a=rwx &&
-        find /output/debs -type f -print0 | xargs --no-run-if-empty --null chmod a=rw  &&
+          --urgency medium debian/changelog
+        dpkg-buildpackage --build=binary -us -uc
+        mkdir -p /output/debs/${OS_CODENAME}
+        mv ../*-${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} /output/debs/${OS_CODENAME}
+        find /output/debs -type d -print0 | xargs --no-run-if-empty --null chmod a=rwx
+        find /output/debs -type f -print0 | xargs --no-run-if-empty --null chmod a=rw
         file subprojects/esnet-smartnic-hwapi/firmware/esnet-smartnic.bit
 
 volumes:
