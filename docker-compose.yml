@@ -18,6 +18,7 @@ services:
       DEBIAN_FRONTEND: noninteractive
       SN_HW_VER: ${SN_HW_VER?}
       SN_FW_VER: ${SN_FW_VER?}
+      OS_CODENAME: ${OS_CODENAME?}
     entrypoint:
       - /bin/bash
       - -c
@@ -44,8 +45,8 @@ services:
               --null \
               --no-run-if-empty \
               rm -r
-        SN_HW_API="/sn-hw/artifacts.hightouch-xilinx-dp.export_hwapi.${SN_HW_VER}.zip"
-        [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $$SN_HW_API" ; exit 1)
+        SN_HW_API="/sn-hw/artifacts.hightouch-xilinx-dp.export_hwapi.$${SN_HW_VER}.zip"
+        [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $${SN_HW_API}" ; exit 1)
         ln -fs \
           $${SN_HW_API} \
           subprojects/packagefiles/esnet-smartnic-hwapi.zip
@@ -56,12 +57,12 @@ services:
         rm -f debian/changelog
         dch --create \
           --package esnet-smartnic \
-          --newversion 1.0.0-${SN_FW_VER} \
-          --distribution ${OS_CODENAME} \
+          --newversion 1.0.0-$${SN_FW_VER} \
+          --distribution $${OS_CODENAME} \
           --urgency medium debian/changelog
         dpkg-buildpackage --build=binary -us -uc
-        mkdir -p /output/debs/${OS_CODENAME}
-        mv ../*-${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} /output/debs/${OS_CODENAME}
+        mkdir -p /output/debs/$${OS_CODENAME}
+        mv ../*-$${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} /output/debs/$${OS_CODENAME}
         find /output/debs -type d -print0 | xargs --no-run-if-empty --null chmod a=rwx
         find /output/debs -type f -print0 | xargs --no-run-if-empty --null chmod a=rw
         file subprojects/esnet-smartnic-hwapi/firmware/esnet-smartnic.bit
