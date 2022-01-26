@@ -1,4 +1,5 @@
-FROM ubuntu:focal
+ARG DOCKERHUB_PROXY
+FROM ${DOCKERHUB_PROXY}library/ubuntu:focal
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV LC_ALL C.UTF-8
@@ -35,11 +36,4 @@ RUN \
   update-locale LANG=en_US.UTF-8 && \
   rm -rf /var/lib/apt/lists/*
 
-ARG SN_FW_VER
-COPY debs/focal/*-${SN_FW_VER}_*.deb /debs/
-COPY debs/focal/*-${SN_FW_VER}_*.ddeb /debs/
-RUN dpkg -i \
-    /debs/esnet-smartnic1_1.0.0-${SN_FW_VER}_amd64.deb \
-    /debs/esnet-smartnic1-dbgsym_1.0.0-${SN_FW_VER}_amd64.ddeb \
-    /debs/esnet-smartnic-dev_1.0.0-${SN_FW_VER}_amd64.deb
 CMD ["/bin/bash", "-l"]
