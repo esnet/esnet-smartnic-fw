@@ -1,6 +1,5 @@
 services:
   smartnic-hw:
-    container_name: smartnic-hw
     hostname: smartnic-hw
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
     init: true
@@ -28,7 +27,6 @@ services:
           # FORCE
 
   smartnic-fw:
-    container_name: smartnic-fw
     hostname: smartnic-fw
     build:
       context: ${SN_STACK_ROOT-.}/smartnic-fw
