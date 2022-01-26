@@ -45,3 +45,10 @@ services:
         setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2 &&
         setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2 &&
         sleep infinity
+
+volumes:
+  debs:
+    driver_opts:
+      type: none
+      device: ${SN_STACK_ROOT-${PWD}}/debs/focal
+      o: bind,ro
