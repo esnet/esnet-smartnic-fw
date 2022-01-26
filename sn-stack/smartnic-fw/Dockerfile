@@ -26,14 +26,15 @@ RUN \
     python3-yaml \
     vim-tiny \
     && \
-  pip3 install \
-    pyyaml-include \
-    yq \
-    && \
   apt-get autoclean && \
   apt-get autoremove && \
   locale-gen en_US.UTF-8 && \
   update-locale LANG=en_US.UTF-8 && \
   rm -rf /var/lib/apt/lists/*
+
+# RUN \
+#   pip3 install \
+#     pyyaml-include \
+#     yq
 
 CMD ["/bin/bash", "-l"]
