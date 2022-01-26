@@ -65,6 +65,11 @@ services:
         mv ../*-$${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} /output/debs/$${OS_CODENAME}
         find /output/debs -type d -print0 | xargs --no-run-if-empty --null chmod a=rwx
         find /output/debs -type f -print0 | xargs --no-run-if-empty --null chmod a=rw
+        cat <<_EOF > /output/buildinfo.env
+        SN_HW_VER=$${SN_HW_VER}
+        SN_FW_VER=$${SN_FW_VER}
+        OS_CODENAME=$${OS_CODENAME}
+        _EOF
         file subprojects/esnet-smartnic-hwapi/firmware/esnet-smartnic.bit
 
 volumes:
