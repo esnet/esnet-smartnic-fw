@@ -13,18 +13,18 @@ RUN \
   apt-get update -y && \
   apt-get upgrade -y && \
   apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
-    python3-click \
-    python3-yaml \
-    python3-jinja2 \
-    libgmp10 \
-    pciutils \
     coreutils \
     jq \
-    vim-tiny \
-    lsb-release \
+    libgmp10 \
     locales \
+    lsb-release \
+    pciutils \
+    python3 \
+    python3-click \
+    python3-jinja2 \
+    python3-pip \
+    python3-yaml \
+    vim-tiny \
     && \
   pip3 install \
     pyyaml-include \
