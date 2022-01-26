@@ -2,7 +2,7 @@ services:
   smartnic-hw:
     container_name: smartnic-hw
     hostname: smartnic-hw
-    image: xilinx-labtools-docker:v2021.2-latest
+    image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
     init: true
     user: root
     privileged: true
