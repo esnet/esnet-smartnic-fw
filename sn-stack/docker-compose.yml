@@ -1,47 +1,70 @@
 services:
   smartnic-hw:
-    container_name: smartnic-hw
     hostname: smartnic-hw
-    image: smartnic-hw:${SN_FW_VER?}
-    build:
-      context: .
-      dockerfile: smartnic-hw/Dockerfile
-      args:
-        SN_FW_VER: ${SN_FW_VER?}
+    image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
     init: true
     user: root
     privileged: true
+    env_file:
+      - ${SN_STACK_ROOT-.}/buildinfo.env
+    volumes:
+      - debs:/debs
+      - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
     entrypoint:
-      - /usr/local/bin/program_card.sh
-      - localhost:3121
-      - "${HW_TARGET_SERIAL:-*}"
-      - /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit
-      #- FORCE
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        dpkg -i \
+          /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb
+        /scripts/program_card.sh \
+          localhost:3121 \
+          "${HW_TARGET_SERIAL:-*}" \
+          /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
+          # FORCE
 
   smartnic-fw:
-    container_name: smartnic-fw
     hostname: smartnic-fw
-    image: smartnic-fw:${SN_FW_VER?}
     build:
-      context: .
-      dockerfile: smartnic-fw/Dockerfile
+      context: ${SN_STACK_ROOT-.}/smartnic-fw
       args:
-        SN_FW_VER: ${SN_FW_VER?}
+        DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
     depends_on:
       smartnic-hw:
         condition: service_completed_successfully
     init: true
     user: root
     privileged: true
+    env_file:
+      - ${SN_STACK_ROOT-.}/buildinfo.env
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
     volumes:
+      - debs:/debs
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
     entrypoint:
       - /bin/bash
       - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
       - |
+        dpkg -i \
+          /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb \
+          /debs/esnet-smartnic1-dbgsym_1.0.0-$${SN_FW_VER}_amd64.ddeb \
+          /debs/esnet-smartnic-dev_1.0.0-$${SN_FW_VER}_amd64.deb
         setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2 &&
         setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2 &&
         sleep infinity
+
+volumes:
+  debs:
+    driver_opts:
+      type: none
+      device: ${SN_STACK_ROOT-${PWD}}/debs/focal
+      o: bind,ro

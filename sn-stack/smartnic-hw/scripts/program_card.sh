@@ -69,7 +69,7 @@ if [ "$#" -gt 0 ] ; then
 fi
 
 # First, check if we are already running the correct FPGA version
-/usr/local/bin/check_fpga_version.sh "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
+/scripts/check_fpga_version.sh "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
 FPGA_VERSION_OK=$?
 
 if [[ $FORCE -eq 0 && $FPGA_VERSION_OK -eq 0 ]] ; then
@@ -87,15 +87,15 @@ else
     done
 
     # Program the bitfile into the FPGA
-    source /opt/Xilinx/Vivado_Lab/2021.2/settings64.sh
-    /opt/Xilinx/Vivado_Lab/2021.2/bin/vivado_lab \
+    source /opt/Xilinx/Vivado_Lab/${VIVADO_VERSION}/settings64.sh
+    /opt/Xilinx/Vivado_Lab/${VIVADO_VERSION}/bin/vivado_lab \
 	-nolog \
 	-nojournal \
 	-tempDir /tmp/ \
 	-mode batch \
 	-notrace \
         -quiet \
-	-source /opt/Xilinx/tcl/program_card.tcl \
+	-source /scripts/program_card.tcl \
 	-tclargs "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
     if [ $? -ne 0 ] ; then
 	echo "Failed to load FPGA, bailing out"
@@ -103,7 +103,7 @@ else
     fi
 
     # Re-check if we have all expected devices on the bus now
-    /usr/local/bin/check_fpga_version.sh "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
+    /scripts/check_fpga_version.sh "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
     FPGA_VERSION_OK=$?
     if [ $FPGA_VERSION_OK -eq 0 ] ; then
 	echo "Running and Target FPGA versions match"

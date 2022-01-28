@@ -5,17 +5,17 @@ HW_TARGET_SERIAL=$2
 BITFILE_PATH=$3
 
 # Set up our vivado runtime env
-source /opt/Xilinx/Vivado_Lab/2021.2/settings64.sh
+source /opt/Xilinx/Vivado_Lab/${VIVADO_VERSION}/settings64.sh
 
 # Collect all of the JTAG register values for the currently loaded FPGA device
-/opt/Xilinx/Vivado_Lab/2021.2/bin/vivado_lab \
+/opt/Xilinx/Vivado_Lab/${VIVADO_VERSION}/bin/vivado_lab \
     -nolog \
     -nojournal \
     -tempDir /tmp/ \
     -mode batch \
     -notrace \
     -quiet \
-    -source /opt/Xilinx/tcl/read_jtag_registers.tcl \
+    -source /scripts/read_jtag_registers.tcl \
     -tclargs "$HW_SERVER_URL" "$HW_TARGET_SERIAL" /tmp/u280.jtag.registers.json
 
 # Grab the USERCODE register value (ie. which FPGA is *currently* loaded)
