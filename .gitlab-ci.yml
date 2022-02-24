@@ -93,7 +93,7 @@ pull_sn_hw:
     # Clean up absolutely everything related to our compose stack *before* we run
     - docker compose down -v --remove-orphans
     # Run the build
-    - docker compose run --rm sn-fw-pkg
+    - docker compose run --no-TTY --rm sn-fw-pkg
     # Clean up absolutely everything related to our compose stack *after* we run
     - docker compose down -v --remove-orphans
   artifacts:
