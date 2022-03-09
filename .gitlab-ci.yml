@@ -15,7 +15,7 @@ variables:
 #   script:
 #     - ls -lhR esnet-smartnic-hwapi
 #   needs:
-#     - project: ht/hightouch-xilinx-dp
+#     - project: ht/esnet-smartnic-ht
 #       job: export_hwapi
 #       ref: $SN_HW_REPO_BRANCH
 #       artifacts: true
@@ -24,7 +24,7 @@ pull_sn_hw:
   stage: pull_sn_hw
   image: ubuntu:focal
   variables:
-    ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fhightouch-xilinx-dp/jobs/artifacts/$SN_HW_REPO_BRANCH/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
+    ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/ht%2Fesnet-smartnic-ht/jobs/artifacts/$SN_HW_REPO_BRANCH/download?job_token=$CI_JOB_TOKEN&job=export_hwapi"
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - apt update -y

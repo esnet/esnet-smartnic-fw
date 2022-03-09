@@ -45,7 +45,7 @@ services:
               --null \
               --no-run-if-empty \
               rm -r
-        SN_HW_API="/sn-hw/artifacts.hightouch-xilinx-dp.export_hwapi.$${SN_HW_VER}.zip"
+        SN_HW_API="/sn-hw/artifacts.esnet-smartnic-ht.export_hwapi.$${SN_HW_VER}.zip"
         [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $${SN_HW_API}" ; exit 1)
         ln -fs \
           $${SN_HW_API} \
