@@ -16,8 +16,9 @@ services:
       DEBEMAIL: "smartnic@es.net"
       DEBFULLNAME: "ESnet SmartNIC Developers"
       DEBIAN_FRONTEND: noninteractive
-      SN_HW_APP_NAME: ${SN_HW_APP_NAME?}
+      SN_HW_REPO: ${SN_HW_REPO-unset}
       SN_HW_BRANCH: ${SN_HW_BRANCH-unset}
+      SN_HW_APP_NAME: ${SN_HW_APP_NAME?}
       SN_HW_VER: ${SN_HW_VER?}
       SN_FW_VER: ${SN_FW_VER?}
       OS_CODENAME: ${OS_CODENAME?}
@@ -47,7 +48,7 @@ services:
               --null \
               --no-run-if-empty \
               rm -r
-        SN_HW_API="/sn-hw/artifacts.$${SN_HW_APP_NAME}.export_hwapi.$${SN_HW_VER}.zip"
+        SN_HW_API="/sn-hw/artifacts.$${SN_HW_APP_NAME}.$${SN_HW_VER}.zip"
         [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $${SN_HW_API}" ; exit 1)
         ln -fs \
           $${SN_HW_API} \
@@ -68,8 +69,9 @@ services:
         find /output/debs -type d -print0 | xargs --no-run-if-empty --null chmod a=rwx
         find /output/debs -type f -print0 | xargs --no-run-if-empty --null chmod a=rw
         cat <<_EOF > /output/buildinfo.env
-        SN_HW_APP_NAME=$${SN_HW_APP_NAME}
+        SN_HW_REPO=$${SN_HW_REPO}
         SN_HW_BRANCH=$${SN_HW_BRANCH}
+        SN_HW_APP_NAME=$${SN_HW_APP_NAME}
         SN_HW_VER=$${SN_HW_VER}
         SN_FW_VER=$${SN_FW_VER}
         OS_CODENAME=$${OS_CODENAME}
