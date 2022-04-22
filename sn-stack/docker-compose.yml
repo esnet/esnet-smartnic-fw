@@ -58,8 +58,8 @@ services:
           /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb \
           /debs/esnet-smartnic1-dbgsym_1.0.0-$${SN_FW_VER}_amd64.ddeb \
           /debs/esnet-smartnic-dev_1.0.0-$${SN_FW_VER}_amd64.deb
-        setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2 &&
-        setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2 &&
+        setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2
+        setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2
         sleep infinity
 
 volumes:
