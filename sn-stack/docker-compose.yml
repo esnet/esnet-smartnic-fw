@@ -46,7 +46,7 @@ services:
         DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
     depends_on:
       smartnic-hw:
-        condition: service_completed_successfully
+        condition: service_healthy
     init: true
     user: root
     privileged: true
