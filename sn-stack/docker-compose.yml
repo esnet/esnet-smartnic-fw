@@ -5,11 +5,20 @@ services:
     init: true
     user: root
     privileged: true
+    restart: unless-stopped
     env_file:
       - ${SN_STACK_ROOT-.}/buildinfo.env
+    tmpfs:
+      - /status
     volumes:
       - debs:/debs
       - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 10s
     entrypoint:
       - /bin/bash
       - -c
@@ -25,6 +34,10 @@ services:
           "${HW_TARGET_SERIAL:-*}" \
           /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
           # FORCE
+        if [ $$? ] ; then
+          touch /status/ok
+          sleep infinity
+        fi
 
   smartnic-fw:
     hostname: smartnic-fw
@@ -34,10 +47,11 @@ services:
         DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
     depends_on:
       smartnic-hw:
-        condition: service_completed_successfully
+        condition: service_healthy
     init: true
     user: root
     privileged: true
+    restart: unless-stopped
     env_file:
       - ${SN_STACK_ROOT-.}/buildinfo.env
     environment:
@@ -58,8 +72,8 @@ services:
           /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb \
           /debs/esnet-smartnic1-dbgsym_1.0.0-$${SN_FW_VER}_amd64.ddeb \
           /debs/esnet-smartnic-dev_1.0.0-$${SN_FW_VER}_amd64.deb
-        setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2 &&
-        setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2 &&
+        setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2
+        setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2
         sleep infinity
 
 volumes:
