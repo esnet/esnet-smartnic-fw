@@ -5,6 +5,7 @@ services:
     init: true
     user: root
     privileged: true
+    restart: unless-stopped
     env_file:
       - ${SN_STACK_ROOT-.}/buildinfo.env
     tmpfs:
@@ -50,6 +51,7 @@ services:
     init: true
     user: root
     privileged: true
+    restart: unless-stopped
     env_file:
       - ${SN_STACK_ROOT-.}/buildinfo.env
     environment:
