@@ -7,9 +7,17 @@ services:
     privileged: true
     env_file:
       - ${SN_STACK_ROOT-.}/buildinfo.env
+    tmpfs:
+      - /status
     volumes:
       - debs:/debs
       - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 10s
     entrypoint:
       - /bin/bash
       - -c
@@ -25,6 +33,10 @@ services:
           "${HW_TARGET_SERIAL:-*}" \
           /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
           # FORCE
+        if [ $$? ] ; then
+          touch /status/ok
+          sleep infinity
+        fi
 
   smartnic-fw:
     hostname: smartnic-fw
