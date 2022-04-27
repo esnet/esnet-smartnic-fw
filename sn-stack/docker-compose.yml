@@ -72,9 +72,12 @@ services:
         #   sleep infinity
         # fi
 
-  smartnic-hw:
-    hostname: smartnic-hw
+  smartnic-bitfile:
+    hostname: smartnic-bitfile
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+    depends_on:
+      smartnic-flash:
+        condition: service_healthy
     init: true
     user: root
     privileged: true
@@ -103,7 +106,7 @@ services:
         dpkg -i \
           /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb
         /scripts/program_card.sh \
-          localhost:3121 \
+          xilinx-hwserver:3121 \
           "${HW_TARGET_SERIAL:-*}" \
           /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
           # FORCE
@@ -119,7 +122,7 @@ services:
       args:
         DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
     depends_on:
-      smartnic-hw:
+      smartnic-bitfile:
         condition: service_healthy
     init: true
     user: root
