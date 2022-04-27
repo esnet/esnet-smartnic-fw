@@ -1,4 +1,7 @@
 ---
+include:
+  - template: 'Workflows/Branch-Pipelines.gitlab-ci.yml'
+
 stages:
   - pull_sn_hw
   - package
