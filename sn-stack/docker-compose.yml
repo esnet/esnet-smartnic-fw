@@ -30,6 +30,48 @@ services:
           -s \
           tcp::3121
 
+  smartnic-flash:
+    hostname: smartnic-flash
+    image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+    init: true
+    user: root
+    privileged: true
+    restart: unless-stopped
+    env_file:
+      - ${SN_STACK_ROOT-.}/buildinfo.env
+    tmpfs:
+      - /status
+    volumes:
+      - debs:/debs:ro
+      - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 10s
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        dpkg -i \
+          /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb
+        touch /status/ok
+        sleep infinity
+        # /scripts/program_card.sh \
+        #   xilinx-hwserver:3121 \
+        #   "${HW_TARGET_SERIAL:-*}" \
+        #   /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
+        #   # FORCE
+        # if [ $$? ] ; then
+        #   touch /status/ok
+        #   sleep infinity
+        # fi
+
   smartnic-hw:
     hostname: smartnic-hw
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
