@@ -136,6 +136,7 @@ services:
       - debs:/debs:ro
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
+      - sn-scratch:/scratch
     entrypoint:
       - /bin/bash
       - -c
@@ -158,3 +159,9 @@ volumes:
       type: none
       device: ${SN_STACK_ROOT-${PWD}}/debs/focal
       o: bind,ro
+
+  sn-scratch:
+    driver_opts:
+      type: none
+      device: ${SN_STACK_ROOT-${PWD}}/scratch
+      o: bind
