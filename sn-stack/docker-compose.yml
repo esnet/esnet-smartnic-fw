@@ -1,4 +1,35 @@
 services:
+  xilinx-hwserver:
+    hostname: xilinx-hwswerver
+    image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+    init: true
+    user: root
+    privileged: true
+    restart: unless-stopped
+    ports:
+      - "3121:3121"
+    volumes:
+      - /dev:/dev
+      - /sys/bus/usb:/sys/bus/usb
+    healthcheck:
+      test: ["/bin/bash", "-c", "-e", "-o", "pipefail", "netstat -nlt | fgrep '0.0.0.0:3121'"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 3s
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        /opt/Xilinx/Vivado_Lab/$${VIVADO_VERSION}/bin/hw_server \
+          -S \
+          -s \
+          tcp::3121
+
   smartnic-hw:
     hostname: smartnic-hw
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
