@@ -8,11 +8,21 @@ stages:
   - trigger_downstream
 
 variables:
-  SN_HW_GROUP: ht
-  SN_HW_REPO: esnet-smartnic-ht
-  SN_HW_BRANCH: main
-  SN_HW_API_JOB: export_hwapi
-  SN_HW_APP_NAME: esnet-smartnic-ht
+  SN_HW_GROUP:
+    value: ht
+    description: group namespace for hwapi artifact
+  SN_HW_REPO:
+    value: esnet-smartnic-ht
+    description: repo name for hwapi artifact
+  SN_HW_BRANCH:
+    value: main
+    description: branch for hwapi artifact
+  SN_HW_API_JOB:
+    value: export_hwapi
+    description: job for hwapi artifact
+  SN_HW_APP_NAME:
+    value: esnet-smartnic-ht
+    description: app name for hwapi artifact
 
 pull_sn_hw:
   stage: pull_sn_hw
