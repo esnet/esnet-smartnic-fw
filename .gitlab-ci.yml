@@ -138,4 +138,4 @@ trigger_downstream:
     project: ht/hightouch-xilinx
     branch: main
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $SN_HW_APP_NAME == "esnet-smartnic-ht")
