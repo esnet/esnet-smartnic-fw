@@ -11,19 +11,6 @@ variables:
   SN_HW_API_JOB: export_hwapi
   SN_HW_APP_NAME: esnet-smartnic-ht
 
-# need_sn_hw:
-#   stage: pull_sn_hw
-#   image: ubuntu:focal
-#   variables:
-#     GIT_STRATEGY: none
-#   script:
-#     - ls -lhR esnet-smartnic-hwapi
-#   needs:
-#     - project: ht/esnet-smartnic-ht
-#       job: export_hwapi
-#       ref: $SN_HW_BRANCH
-#       artifacts: true
-
 pull_sn_hw:
   stage: pull_sn_hw
   image: ubuntu:focal
