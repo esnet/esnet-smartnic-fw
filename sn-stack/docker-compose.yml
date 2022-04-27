@@ -11,7 +11,7 @@ services:
     tmpfs:
       - /status
     volumes:
-      - debs:/debs
+      - debs:/debs:ro
       - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
     healthcheck:
       test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
@@ -57,7 +57,7 @@ services:
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
     volumes:
-      - debs:/debs
+      - debs:/debs:ro
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
     entrypoint:
