@@ -1,6 +1,37 @@
 services:
-  smartnic-hw:
-    hostname: smartnic-hw
+  xilinx-hwserver:
+    hostname: xilinx-hwswerver
+    image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+    init: true
+    user: root
+    privileged: true
+    restart: unless-stopped
+    ports:
+      - "3121:3121"
+    volumes:
+      - /dev:/dev
+      - /sys/bus/usb:/sys/bus/usb
+    healthcheck:
+      test: ["/bin/bash", "-c", "-e", "-o", "pipefail", "netstat -nlt | fgrep '0.0.0.0:3121'"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 3s
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        /opt/Xilinx/Vivado_Lab/$${VIVADO_VERSION}/bin/hw_server \
+          -S \
+          -s \
+          tcp::3121
+
+  smartnic-flash:
+    hostname: smartnic-flash
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
     init: true
     user: root
@@ -11,7 +42,52 @@ services:
     tmpfs:
       - /status
     volumes:
-      - debs:/debs
+      - debs:/debs:ro
+      - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 10s
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        dpkg -i \
+          /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb
+        touch /status/ok
+        sleep infinity
+        # /scripts/program_card.sh \
+        #   xilinx-hwserver:3121 \
+        #   "${HW_TARGET_SERIAL:-*}" \
+        #   /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
+        #   # FORCE
+        # if [ $$? ] ; then
+        #   touch /status/ok
+        #   sleep infinity
+        # fi
+
+  smartnic-bitfile:
+    hostname: smartnic-bitfile
+    image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+    depends_on:
+      smartnic-flash:
+        condition: service_healthy
+    init: true
+    user: root
+    privileged: true
+    restart: unless-stopped
+    env_file:
+      - ${SN_STACK_ROOT-.}/buildinfo.env
+    tmpfs:
+      - /status
+    volumes:
+      - debs:/debs:ro
       - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
     healthcheck:
       test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
@@ -30,7 +106,7 @@ services:
         dpkg -i \
           /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb
         /scripts/program_card.sh \
-          localhost:3121 \
+          xilinx-hwserver:3121 \
           "${HW_TARGET_SERIAL:-*}" \
           /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
           # FORCE
@@ -46,7 +122,7 @@ services:
       args:
         DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
     depends_on:
-      smartnic-hw:
+      smartnic-bitfile:
         condition: service_healthy
     init: true
     user: root
@@ -57,9 +133,10 @@ services:
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
     volumes:
-      - debs:/debs
+      - debs:/debs:ro
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
+      - sn-scratch:/scratch
     entrypoint:
       - /bin/bash
       - -c
@@ -82,3 +159,9 @@ volumes:
       type: none
       device: ${SN_STACK_ROOT-${PWD}}/debs/focal
       o: bind,ro
+
+  sn-scratch:
+    driver_opts:
+      type: none
+      device: ${SN_STACK_ROOT-${PWD}}/scratch
+      o: bind
