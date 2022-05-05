@@ -4,7 +4,7 @@
 #include <string.h>  /* strcmp */
 
 #include "smartnic.h"		/* smartnic_* */
-#include "sdnetapi.h"		/* sdnet_* */
+#include "snp4.h"		/* snp4_* */
 
 const char *argp_program_version = "sn-cli 1.0";
 const char *argp_program_bug_address = "ESnet SmartNIC Developers <smartnic@es.net>";
@@ -13,7 +13,7 @@ const char *argp_program_bug_address = "ESnet SmartNIC Developers <smartnic@es.n
 static char doc[] = "Tool for interacting with an esnet-smartnic based on a Xilinx U280 card.";
 
 /* A description of the arguments we accept. */
-static char args_doc[] = "(sdnet-info | sdnet-config-apply | sdnet-config-check | smartnic-device-info)";
+static char args_doc[] = "(p4-info | p4-config-apply | p4-config-check | smartnic-device-info)";
 
 static struct argp_option argp_options[] = {
 					    { "config", 'c',
@@ -116,10 +116,10 @@ int main(int argc, char *argv[])
   argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
   // Handle all options which do not require actually mapping the FPGA memory
-  if (!strcmp(arguments.command, "sdnet-info")) {
-    sdnet_print_target_config();
+  if (!strcmp(arguments.command, "p4-info")) {
+    snp4_print_target_config();
     return 0;
-  } else if (!strcmp(arguments.command, "sdnet-config-check")) {
+  } else if (!strcmp(arguments.command, "p4-config-check")) {
     if (arguments.config == NULL) {
       fprintf(stderr, "ERROR: config file is required but not provided\n");
       return 1;
@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
 
     switch (arguments.config_format) {
     case CONFIG_FORMAT_P4BM_SIM:
-      cfg_set = sn_cfg_set_load_p4bm(arguments.config);
+      cfg_set = snp4_cfg_set_load_p4bm(arguments.config);
       break;
     default:
       cfg_set = NULL;
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
       return 1;
     }
     printf("Loaded all %u entries.\n", cfg_set->num_entries);
-    sn_cfg_set_free(cfg_set);
+    snp4_cfg_set_free(cfg_set);
     return 0;
   }
 
@@ -165,19 +165,19 @@ int main(int argc, char *argv[])
     printf("\tsystem_status: 0x%08x\n", bar2->syscfg.system_status._v);
     printf("\tshell_status:  0x%08x\n", bar2->syscfg.shell_status._v);
     printf("\tuser_status:   0x%08x\n", bar2->syscfg.user_status);
-  } else if (!strcmp(arguments.command, "sn-config-apply")) {
+  } else if (!strcmp(arguments.command, "p4-config-apply")) {
     if (arguments.config == NULL) {
       fprintf(stderr, "ERROR: config file is required but not provided\n");
       return 1;
     }
 
-    struct sn_cfg_set *cfg_set = sn_cfg_set_load_p4bm(arguments.config);
+    struct sn_cfg_set *cfg_set = snp4_cfg_set_load_p4bm(arguments.config);
     if (cfg_set == NULL) {
-      fprintf(stderr, "ERROR: failed to parse sdnet config file\n");
+      fprintf(stderr, "ERROR: failed to parse snp4 config file\n");
       return 1;
     }
 
-    void * sdnet_handle = sdnet_init((uintptr_t) &bar2->sdnet);
+    void * snp4_handle = snp4_init((uintptr_t) &bar2->sdnet);
     for (uint32_t entry_idx = 0; entry_idx < cfg_set->num_entries; entry_idx++) {
       struct sn_cfg *cfg = cfg_set->entries[entry_idx];
 
@@ -200,22 +200,23 @@ int main(int argc, char *argv[])
       }
       fprintf(stderr, "\n");
       fprintf(stderr, "\tpriority: %u\n", cfg->rule.priority);
-      if (!sdnet_table_insert_kma(sdnet_handle,
-				  cfg->rule.table_name,
-				  cfg->pack.key,
-				  cfg->pack.key_len,
-				  cfg->pack.mask,
-				  cfg->pack.mask_len,
-				  cfg->rule.action_name,
-				  cfg->pack.params,
-				  cfg->pack.params_len,
-				  cfg->rule.priority)) {
+      if (!snp4_table_insert_kma(snp4_handle,
+				 cfg->rule.table_name,
+				 cfg->pack.key,
+				 cfg->pack.key_len,
+				 cfg->pack.mask,
+				 cfg->pack.mask_len,
+				 cfg->rule.action_name,
+				 cfg->pack.params,
+				 cfg->pack.params_len,
+				 cfg->rule.priority)) {
 	fprintf(stderr, "ERROR\n");
       } else {
 	fprintf(stderr, "OK\n");
       }
     }
-    sdnet_deinit(sdnet_handle);
+    snp4_deinit(snp4_handle);
+    snp4_cfg_set_free(cfg_set);
   } else {
     // Unknown command provided
     fprintf(stderr, "ERROR: unknown command provided: '%s'\n", arguments.command);

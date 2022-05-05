@@ -5,10 +5,10 @@
 #include <stdbool.h> /* bool */
 #include <gmp.h>    /* mpz_* */
 
-#include "sdnetapi.h"		/* API */
+#include "snp4.h"		/* API */
 #include "array_size.h"		/* ARRAY_SIZE */
 
-static void sn_cfg_free(struct sn_cfg *cfg)
+static void snp4_cfg_free(struct sn_cfg *cfg)
 {
   if (cfg == NULL) {
     return;
@@ -16,14 +16,14 @@ static void sn_cfg_free(struct sn_cfg *cfg)
 
   // Free the allocated fields contained inside of a config entry
   free((void *)cfg->raw);
-  sn_rule_clear(&cfg->rule);
-  sn_pack_clear(&cfg->pack);
+  snp4_rule_clear(&cfg->rule);
+  snp4_pack_clear(&cfg->pack);
 
   // Free the cfg struct itself
   free(cfg);
 }
 
-void sn_cfg_set_free(struct sn_cfg_set *cfg_set)
+void snp4_cfg_set_free(struct sn_cfg_set *cfg_set)
 {
   if (cfg_set == NULL) {
     return;
@@ -31,7 +31,7 @@ void sn_cfg_set_free(struct sn_cfg_set *cfg_set)
 
   for (uint32_t cfg_idx = 0; cfg_idx < cfg_set->num_entries; cfg_idx++) {
     struct sn_cfg *cfg = cfg_set->entries[cfg_idx];
-    sn_cfg_free(cfg);
+    snp4_cfg_free(cfg);
   }
   free(cfg_set);
 }
@@ -239,11 +239,11 @@ static bool parse_table_add_cmd(struct sn_rule *rule, char *line, unsigned int l
 
   // Find out if the user has provided the optional priority field by detecting if we have one
   // extra parameter than this table requires and assuming the extra field must be the priority.
-  struct sdnet_table_info table_info;
-  struct sdnet_action_info action_info;
-  enum sn_config_status rc;
-  rc = sdnet_config_load_table_and_action_info(rule->table_name, rule->action_name, &table_info, &action_info);
-  if (rc != SN_CONFIG_STATUS_OK) {
+  struct sn_table_info table_info;
+  struct sn_action_info action_info;
+  enum snp4_status rc;
+  rc = snp4_config_load_table_and_action_info(rule->table_name, rule->action_name, &table_info, &action_info);
+  if (rc != SNP4_STATUS_OK) {
     goto out_error;
   }
 
@@ -262,18 +262,18 @@ static bool parse_table_add_cmd(struct sn_rule *rule, char *line, unsigned int l
       return false;
     }
     // Drop the last parameter from the list
-    sn_rule_param_clear(param);
+    snp4_rule_param_clear(param);
     rule->num_params--;
   }
 
   return true;
 
  out_error:
-  sn_rule_clear(rule);
+  snp4_rule_clear(rule);
   return false;
 }
 
-struct sn_cfg_set *sn_cfg_set_load_p4bm(const char *config_file)
+struct sn_cfg_set *snp4_cfg_set_load_p4bm(const char *config_file)
 {
   struct sn_cfg_set *cfg_set = (struct sn_cfg_set *) calloc(1, sizeof(struct sn_cfg_set));
   if (cfg_set == NULL) {
@@ -328,13 +328,13 @@ struct sn_cfg_set *sn_cfg_set_load_p4bm(const char *config_file)
 			     line,
 			     line_no)) {
       // Failed to parse the table add command
-      sn_rule_clear(&cfg->rule);
+      snp4_rule_clear(&cfg->rule);
       goto out_error;
     }
 
-    enum sn_config_status rc;
-    rc = sn_rule_pack(&cfg->rule, &cfg->pack);
-    if (rc != SN_CONFIG_STATUS_OK) {
+    enum snp4_status rc;
+    rc = snp4_rule_pack(&cfg->rule, &cfg->pack);
+    if (rc != SNP4_STATUS_OK) {
       goto out_error;
     }
 
@@ -349,7 +349,7 @@ struct sn_cfg_set *sn_cfg_set_load_p4bm(const char *config_file)
 
  out_error:
   fclose(f);
-  sn_cfg_set_free(cfg_set);
+  snp4_cfg_set_free(cfg_set);
   return NULL;
 }
 

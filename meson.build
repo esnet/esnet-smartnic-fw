@@ -17,6 +17,6 @@ install_data(
 
 subproject('esnet-smartnic-hwapi', default_options: ['default_library=static'])
 subdir('libsnutil')
-subdir('libsdnetapi')
+subdir('libsnp4')
 subdir('libopennic')
 subdir('sn-cli')

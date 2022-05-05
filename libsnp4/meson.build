@@ -1,11 +1,11 @@
 sources = files(
   [
-    'src/sdnet_api.c',
-    'src/sdnet_config.c',
-    'src/sdnet_info.c',
-    'src/sdnet_io.c',
-    'src/sdnet_p4bm_file.c',
-    'src/sdnet_table.c',
+    'src/snp4_api.c',
+    'src/snp4_config.c',
+    'src/snp4_info.c',
+    'src/snp4_io.c',
+    'src/snp4_p4bm_file.c',
+    'src/snp4_table.c',
   ]
 )
 
@@ -15,8 +15,8 @@ int_incdir = include_directories('src/include')
 cc = meson.get_compiler('c')
 libgmp_dep = cc.find_library('gmp')
 
-libsdnetapi = shared_library(
-  'sdnetapi',
+libsnp4 = shared_library(
+  'snp4',
   sources,
   dependencies : [
     libgmp_dep,
@@ -37,20 +37,20 @@ libsdnetapi = shared_library(
 
 install_headers(
   [
-    'include/sdnetapi.h',
+    'include/snp4.h',
   ],
   subdir : 'esnet-smartnic'
 )
 
 pkg = import('pkgconfig')
 pkg.generate(
-  libsdnetapi,
+  libsnp4,
   subdirs : 'esnet-smartnic',
 )
 
-libsdnetapi_dep = declare_dependency(
+libsnp4_dep = declare_dependency(
   include_directories : [ext_incdir],
   link_with : [
-    libsdnetapi,
+    libsnp4,
     libsnutil,
   ])
