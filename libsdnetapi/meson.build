@@ -1,9 +1,11 @@
 sources = files(
   [
-    'src/sdnetapi.c',
-    'src/sdnetconfig.c',
-    'src/sdnetinfo.c',
-    'src/sdnetio.c',
+    'src/sdnet_api.c',
+    'src/sdnet_config.c',
+    'src/sdnet_info.c',
+    'src/sdnet_io.c',
+    'src/sdnet_p4bm_file.c',
+    'src/sdnet_table.c',
   ]
 )
 

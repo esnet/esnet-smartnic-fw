@@ -1,4 +1,4 @@
-#include "sdnetio.h"
+#include "sdnet_io.h"
 #ifdef SDNETIO_DEBUG
 #include <stdio.h>		/* printf */
 #endif

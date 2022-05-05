@@ -125,23 +125,23 @@ int main(int argc, char *argv[])
       return 1;
     }
 
-    struct sdnet_config *sdnet_config;
+    struct sn_cfg_set *cfg_set;
 
     switch (arguments.config_format) {
     case CONFIG_FORMAT_P4BM_SIM:
-      sdnet_config = sdnet_config_load_p4bm(arguments.config);
+      cfg_set = sn_cfg_set_load_p4bm(arguments.config);
       break;
     default:
-      sdnet_config = NULL;
+      cfg_set = NULL;
       break;
     }
 
-    if (sdnet_config == NULL) {
-      fprintf(stderr, "ERROR: failed to parse sdnet config file\n");
+    if (cfg_set == NULL) {
+      fprintf(stderr, "ERROR: failed to parse sn config file\n");
       return 1;
     }
-    printf("Loaded all %u entries.\n", sdnet_config->num_entries);
-    sdnet_config_free(sdnet_config);
+    printf("Loaded all %u entries.\n", cfg_set->num_entries);
+    sn_cfg_set_free(cfg_set);
     return 0;
   }
 
@@ -165,51 +165,51 @@ int main(int argc, char *argv[])
     printf("\tsystem_status: 0x%08x\n", bar2->syscfg.system_status._v);
     printf("\tshell_status:  0x%08x\n", bar2->syscfg.shell_status._v);
     printf("\tuser_status:   0x%08x\n", bar2->syscfg.user_status);
-  } else if (!strcmp(arguments.command, "sdnet-config-apply")) {
+  } else if (!strcmp(arguments.command, "sn-config-apply")) {
     if (arguments.config == NULL) {
       fprintf(stderr, "ERROR: config file is required but not provided\n");
       return 1;
     }
 
-    struct sdnet_config *sdnet_config = sdnet_config_load_p4bm(arguments.config);
-    if (sdnet_config == NULL) {
+    struct sn_cfg_set *cfg_set = sn_cfg_set_load_p4bm(arguments.config);
+    if (cfg_set == NULL) {
       fprintf(stderr, "ERROR: failed to parse sdnet config file\n");
       return 1;
     }
 
     void * sdnet_handle = sdnet_init((uintptr_t) &bar2->sdnet);
-    for (uint32_t entry_idx = 0; entry_idx < sdnet_config->num_entries; entry_idx++) {
-      struct sdnet_config_entry *e = sdnet_config->entries[entry_idx];
+    for (uint32_t entry_idx = 0; entry_idx < cfg_set->num_entries; entry_idx++) {
+      struct sn_cfg *cfg = cfg_set->entries[entry_idx];
 
-      fprintf(stderr, "Inserting line %u (%s)\n", e->line_no, e->raw);
-      fprintf(stderr, "\ttable_name: '%s'\n", e->table_name);
-      fprintf(stderr, "\tkey:  [%02lu bytes]: ", e->key_len);
-      for (uint16_t i = 0; i < e->key_len; i++) {
-	fprintf(stderr, "%02x", e->key[i]);
+      fprintf(stderr, "Inserting line %u (%s)\n", cfg->line_no, cfg->raw);
+      fprintf(stderr, "\ttable_name: '%s'\n", cfg->rule.table_name);
+      fprintf(stderr, "\tkey:  [%02lu bytes]: ", cfg->pack.key_len);
+      for (uint16_t i = 0; i < cfg->pack.key_len; i++) {
+	fprintf(stderr, "%02x", cfg->pack.key[i]);
       }
       fprintf(stderr, "\n");
-      fprintf(stderr, "\tmask: [%02lu bytes]: ", e->mask_len);
-      for (uint16_t i = 0; i < e->mask_len; i++) {
-	fprintf(stderr, "%02x", e->mask[i]);
+      fprintf(stderr, "\tmask: [%02lu bytes]: ", cfg->pack.mask_len);
+      for (uint16_t i = 0; i < cfg->pack.mask_len; i++) {
+	fprintf(stderr, "%02x", cfg->pack.mask[i]);
       }
       fprintf(stderr, "\n");
-      fprintf(stderr, "\taction_name: '%s'\n", e->action_name);
-      fprintf(stderr, "\nparams: [%02lu bytes]: ", e->params_len);
-      for (uint16_t i = 0; i < e->params_len; i++) {
-	fprintf(stderr, "%02x", e->params[i]);
+      fprintf(stderr, "\taction_name: '%s'\n", cfg->rule.action_name);
+      fprintf(stderr, "\nparams: [%02lu bytes]: ", cfg->pack.params_len);
+      for (uint16_t i = 0; i < cfg->pack.params_len; i++) {
+	fprintf(stderr, "%02x", cfg->pack.params[i]);
       }
       fprintf(stderr, "\n");
-      fprintf(stderr, "\tpriority: %u\n", e->priority);
+      fprintf(stderr, "\tpriority: %u\n", cfg->rule.priority);
       if (!sdnet_table_insert_kma(sdnet_handle,
-				  e->table_name,
-				  e->key,
-				  e->key_len,
-				  e->mask,
-				  e->mask_len,
-				  e->action_name,
-				  e->params,
-				  e->params_len,
-				  e->priority)) {
+				  cfg->rule.table_name,
+				  cfg->pack.key,
+				  cfg->pack.key_len,
+				  cfg->pack.mask,
+				  cfg->pack.mask_len,
+				  cfg->rule.action_name,
+				  cfg->pack.params,
+				  cfg->pack.params_len,
+				  cfg->rule.priority)) {
 	fprintf(stderr, "ERROR\n");
       } else {
 	fprintf(stderr, "OK\n");

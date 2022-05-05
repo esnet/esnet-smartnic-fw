@@ -8,7 +8,7 @@
 #include <stdio.h>		/* fprintf */
 #include "sdnetapi.h"		/* API */
 #include "sdnet_0_defs.h"	/* XilVitisNetP4TargetConfig_sdnet_0 */
-#include "sdnetio.h"		/* sdnetio_reg_* */
+#include "sdnet_io.h"		/* sdnetio_reg_* */
 #include "unused.h"		/* UNUSED() */
 
 struct sdnet_user_context {
