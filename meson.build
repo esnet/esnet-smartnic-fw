@@ -22,6 +22,8 @@ install_data(
   install_mode : 'rwxr-xr-x',
 )
 
+subproject('gtest')
+
 subproject('esnet-smartnic-hwapi', default_options: ['default_library=static'])
 subdir('libsnutil')
 subdir('libsnp4')
