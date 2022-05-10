@@ -50,6 +50,8 @@ services:
           --urgency medium debian/changelog
         dpkg-buildpackage --build=binary -us -uc
         mkdir -p /output/debs/$${OS_CODENAME}
+        mkdir -p /output/debs/$${OS_CODENAME}/meson-logs
+        cp obj-x86_64-linux-gnu/meson-logs/* /output/debs/$${OS_CODENAME}/meson-logs
         mv ../*-$${SN_FW_VER}_*.{buildinfo,changes,deb,ddeb} /output/debs/$${OS_CODENAME}
         find /output/debs -type d -print0 | xargs --no-run-if-empty --null chmod a=rwx
         find /output/debs -type f -print0 | xargs --no-run-if-empty --null chmod a=rw
