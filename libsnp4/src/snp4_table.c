@@ -155,7 +155,7 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
     break;
   case 'u':
     // Unused Field: Allowed masks: 0
-    if (!(mpz_cmp(*mask_part, zero_mask) != 0)) {
+    if (!(mpz_cmp(*mask_part, zero_mask) == 0)) {
       // Non-zero mask provided for unused field
       rc = SNP4_STATUS_MATCH_INVALID_UNUSED_MASK;
       goto out_error;
@@ -215,7 +215,7 @@ static enum snp4_status snp4_rule_pack_matches(const struct sn_field_spec field_
   //       discrepancy.
 
   for (unsigned int i = 0; i < num_matches; i++) {
-    const struct sn_field_spec * field_spec = &field_specs[num_matches - i];
+    const struct sn_field_spec * field_spec = &field_specs[num_matches - 1 - i];
 
     rc = pack_partial_key_mask(&key_part, &mask_part, &matches[i], field_spec);
     if (rc != SNP4_STATUS_OK) {
@@ -451,6 +451,12 @@ enum snp4_status snp4_rule_pack(const struct sn_rule * rule, struct sn_pack * pa
   if (pack == NULL) {
     return SNP4_STATUS_NULL_PACK;
   }
+
+  // Ensure that the pointers in the pack struct are initialized to NULL so cleanup
+  // is well defined.
+  pack->key    = NULL;
+  pack->mask   = NULL;
+  pack->params = NULL;
 
   // Load the table and action info required for packing
   struct sn_table_info table_info;
