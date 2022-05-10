@@ -32,28 +32,13 @@ services:
       - |
         cp -a /source /build
         cd /build/source
-        find subprojects \
-          -mindepth 1 \
-          -maxdepth 2 \
-          \( -type f -path 'subprojects/*.wrap' -prune \) \
-          -o \
-          \( -type d -path 'subprojects/packagefiles/*.overlay' -prune \) \
-          -o \
-          \( -type d -path 'subprojects/packagefiles' \) \
-          -o \
-          \( -type d -print0 -prune \) \
-          -o \
-          -print0 \
-          | xargs \
-              --null \
-              --no-run-if-empty \
-              rm -r
+        meson subprojects purge --include-cache --confirm
         SN_HW_API="/sn-hw/artifacts.$${SN_HW_APP_NAME}.$${SN_HW_VER}.zip"
         [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $${SN_HW_API}" ; exit 1)
         ln -fs \
           $${SN_HW_API} \
           subprojects/packagefiles/esnet-smartnic-hwapi.zip
-        cd /build/source
+        meson subprojects download
         mk-build-deps --install \
           --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes' \
           debian/control
