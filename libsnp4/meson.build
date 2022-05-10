@@ -54,3 +54,29 @@ libsnp4_dep = declare_dependency(
     libsnp4,
     libsnutil,
   ])
+
+gtest = dependency('gtest', fallback : ['gtest', 'gtest_main_dep'], main : true, required : true)
+
+snp4_table_ut_src = [
+  'src/snp4_table_ut.cpp',
+  'src/snp4_table_ut.c',
+  'src/snp4_table.c',
+]
+
+snp4_table_ut = executable(
+  'snp4-table-ut',
+  snp4_table_ut_src,
+  cpp_args : [
+    #'-std=c++2a',
+  ],
+  dependencies : [
+    libgmp_dep,
+    libsnutil_dep,
+    gtest,
+  ],
+  include_directories : [
+    ext_incdir,
+    int_incdir,
+  ],
+)
+test('snp4 table tests', snp4_table_ut)
