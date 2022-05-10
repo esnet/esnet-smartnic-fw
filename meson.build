@@ -1,4 +1,11 @@
-project('esnet-smartnic', 'c', default_options : ['warning_level=2', 'werror=true'])
+project(
+  'esnet-smartnic',
+  'c',
+  default_options : [
+    'warning_level=2',
+    'werror=true',
+  ],
+)
 
 meson.override_find_program('regio-generate', find_program('regio/regio-generate'))
 meson.override_find_program('regio-elaborate', find_program('regio/regio-elaborate'))
