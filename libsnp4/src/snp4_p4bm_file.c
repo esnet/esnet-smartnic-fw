@@ -66,6 +66,10 @@ static bool parse_match_fields(struct sn_rule *rule, char *match_str, unsigned i
 
     // Read one key/mask field
     match_token = strsep(match_cursor, " ");
+    while ((match_token != NULL) && (strlen(match_token) == 0)) {
+      // Skip past blocks of delimiters without consuming match slots
+      match_token = strsep(match_cursor, " ");
+    }
     if (match_token == NULL) {
       // Finished processing the matches
       break;
@@ -174,10 +178,15 @@ static bool parse_param_fields(struct sn_rule *rule, char *param_str, unsigned i
 
     // Read one param field
     param_token = strsep(param_cursor, " ");
+    while ((param_token != NULL) && (strlen(param_token) == 0)) {
+      // Skip past blocks of delimiters without consuming parameter slots
+      param_token = strsep(param_cursor, " ");
+    }
     if (param_token == NULL) {
       // Finished processing params
       break;
     }
+
 #ifdef SDNETCONFIG_DEBUG
     fprintf(stderr, "[%3u] param: '%s'\n", line_no, param_token);
 #endif
