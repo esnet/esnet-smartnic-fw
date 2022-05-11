@@ -421,23 +421,40 @@ void snp4_rule_match_clear(struct sn_match *match)
 
 void snp4_rule_clear(struct sn_rule * rule)
 {
-  if (rule->table_name)  free(rule->table_name);
-  if (rule->action_name) free(rule->action_name);
+  if (rule->table_name) {
+    free(rule->table_name);
+    rule->table_name = NULL;
+  }
+  if (rule->action_name) {
+    free(rule->action_name);
+    rule->action_name = NULL;
+  }
 
   for (unsigned int i = 0; i < rule->num_matches; i++) {
     snp4_rule_match_clear(&rule->matches[i]);
+    rule->matches[i].t = SN_MATCH_FORMAT_UNUSED;
   }
 
   for (unsigned int i = 0; i < rule->num_params; i++) {
     snp4_rule_param_clear(&rule->params[i]);
+    rule->params[i].t = SN_PARAM_FORMAT_UI;
   }
 }
 
 void snp4_pack_clear(struct sn_pack * pack)
 {
-  if (pack->key)    free(pack->key);
-  if (pack->mask)   free(pack->mask);
-  if (pack->params) free(pack->params);
+  if (pack->key) {
+    free(pack->key);
+    pack->key = NULL;
+  }
+  if (pack->mask) {
+    free(pack->mask);
+    pack->mask = NULL;
+  }
+  if (pack->params) {
+    free(pack->params);
+    pack->params = NULL;
+  }
 }
 
 enum snp4_status snp4_rule_pack(const struct sn_rule * rule, struct sn_pack * pack)

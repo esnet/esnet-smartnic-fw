@@ -15,7 +15,10 @@ static void snp4_cfg_free(struct sn_cfg *cfg)
   }
 
   // Free the allocated fields contained inside of a config entry
-  free((void *)cfg->raw);
+  if (cfg->raw) {
+    free((void *)cfg->raw);
+    cfg->raw = NULL;
+  }
   snp4_rule_clear(&cfg->rule);
   snp4_pack_clear(&cfg->pack);
 
