@@ -115,32 +115,61 @@ int main(int argc, char *argv[])
 
   argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
-  // Handle all options which do not require actually mapping the FPGA memory
-  if (!strcmp(arguments.command, "p4-info")) {
-    snp4_print_target_config();
-    return 0;
-  } else if (!strcmp(arguments.command, "p4-config-check")) {
-    if (arguments.config == NULL) {
-      fprintf(stderr, "ERROR: config file is required but not provided\n");
+  // Load any config file provided on the command line
+  struct sn_cfg_set *cfg_set = NULL;
+  if (arguments.config) {
+    FILE * config_file = fopen(arguments.config, "r");
+    if (config_file == NULL) {
+      fprintf(stderr, "ERROR: cannot open sn config file (%s) for reading\n", arguments.config);
       return 1;
     }
 
-    struct sn_cfg_set *cfg_set;
-
     switch (arguments.config_format) {
     case CONFIG_FORMAT_P4BM_SIM:
-      cfg_set = snp4_cfg_set_load_p4bm(arguments.config);
+      cfg_set = snp4_cfg_set_load_p4bm(config_file);
       break;
     default:
       cfg_set = NULL;
       break;
     }
 
+    // We're done reading the config file, close it
+    fclose(config_file);
+
     if (cfg_set == NULL) {
-      fprintf(stderr, "ERROR: failed to parse sn config file\n");
+      fprintf(stderr, "ERROR: failed to parse provided sn config file (%s)\n", arguments.config);
       return 1;
     }
-    printf("Loaded all %u entries.\n", cfg_set->num_entries);
+    printf("OK: Parsed all %u entries from (%s).\n", cfg_set->num_entries, arguments.config);
+
+    // Pack the entries
+    bool cfg_set_valid = true;
+    for (unsigned int entry_idx = 0; entry_idx < cfg_set->num_entries; entry_idx++) {
+      struct sn_cfg *cfg = cfg_set->entries[entry_idx];
+
+      enum snp4_status rc = snp4_rule_pack(&cfg->rule, &cfg->pack);
+      if (rc == SNP4_STATUS_OK) {
+	fprintf(stderr, "[%03u] OK\n", cfg->line_no);
+      } else {
+	fprintf(stderr, "[%03u] ERROR %3d packing: %s\n", cfg->line_no, rc, cfg->raw);
+	cfg_set_valid = false;
+      }
+    }
+
+    if (!cfg_set_valid) {
+      fprintf(stderr, "ERROR: failed to pack one or more sn config file entries\n");
+      return 1;
+    }
+
+    fprintf(stderr, "OK: Packed all %u entries\n", cfg_set->num_entries);
+  }
+
+  // Handle all steps which do not require actually mapping the FPGA memory
+  if (!strcmp(arguments.command, "p4-info")) {
+    snp4_print_target_config();
+    return 0;
+  } else if (!strcmp(arguments.command, "p4-config-check")) {
+    // We've already done all validation steps as we processed the config file above, clean up and exit
     snp4_cfg_set_free(cfg_set);
     return 0;
   }
@@ -166,17 +195,7 @@ int main(int argc, char *argv[])
     printf("\tshell_status:  0x%08x\n", bar2->syscfg.shell_status._v);
     printf("\tuser_status:   0x%08x\n", bar2->syscfg.user_status);
   } else if (!strcmp(arguments.command, "p4-config-apply")) {
-    if (arguments.config == NULL) {
-      fprintf(stderr, "ERROR: config file is required but not provided\n");
-      return 1;
-    }
-
-    struct sn_cfg_set *cfg_set = snp4_cfg_set_load_p4bm(arguments.config);
-    if (cfg_set == NULL) {
-      fprintf(stderr, "ERROR: failed to parse snp4 config file\n");
-      return 1;
-    }
-
+    // Insert the packed cfg_set entries into the sdnet block
     void * snp4_handle = snp4_init((uintptr_t) &bar2->sdnet);
     for (uint32_t entry_idx = 0; entry_idx < cfg_set->num_entries; entry_idx++) {
       struct sn_cfg *cfg = cfg_set->entries[entry_idx];

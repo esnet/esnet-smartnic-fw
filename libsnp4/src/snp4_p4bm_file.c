@@ -273,19 +273,13 @@ static bool parse_table_add_cmd(struct sn_rule *rule, char *line, unsigned int l
   return false;
 }
 
-struct sn_cfg_set *snp4_cfg_set_load_p4bm(const char *config_file)
+struct sn_cfg_set *snp4_cfg_set_load_p4bm(FILE * f)
 {
   struct sn_cfg_set *cfg_set = (struct sn_cfg_set *) calloc(1, sizeof(struct sn_cfg_set));
   if (cfg_set == NULL) {
     return NULL;
   }
-
   cfg_set->num_entries = 0;
-
-  FILE *f = fopen(config_file, "r");
-  if (f == NULL) {
-    return NULL;
-  }
 
   #define TABLE_ADD_CMD "table_add "
   char *line = NULL;
@@ -332,23 +326,14 @@ struct sn_cfg_set *snp4_cfg_set_load_p4bm(const char *config_file)
       goto out_error;
     }
 
-    enum snp4_status rc;
-    rc = snp4_rule_pack(&cfg->rule, &cfg->pack);
-    if (rc != SNP4_STATUS_OK) {
-      goto out_error;
-    }
-
     // Add this entry to the list of table entries
     cfg_set->entries[cfg_set->num_entries] = cfg;
     cfg_set->num_entries++;
   }
 
-  fclose(f);
-
   return cfg_set;
 
  out_error:
-  fclose(f);
   snp4_cfg_set_free(cfg_set);
   return NULL;
 }

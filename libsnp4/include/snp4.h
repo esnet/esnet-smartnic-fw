@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>		/* FILE */
 #include <gmp.h>		/* mpz_* */
 
 extern void * snp4_init(uintptr_t snp4_base_addr);
@@ -202,5 +203,5 @@ struct sn_cfg_set {
   struct sn_cfg *entries[1024];
 };
 
-extern struct sn_cfg_set *snp4_cfg_set_load_p4bm(const char *config_file);
+extern struct sn_cfg_set *snp4_cfg_set_load_p4bm(FILE * f);
 extern void snp4_cfg_set_free(struct sn_cfg_set *cfg_set);
