@@ -79,7 +79,11 @@ snp4_table_ut = executable(
     int_incdir,
   ],
 )
-test('snp4 table tests', snp4_table_ut)
+test(
+  'snp4 table tests',
+  snp4_table_ut,
+  protocol : 'gtest',
+)
 
 snp4_p4bm_file_ut_src = [
   'src/snp4_p4bm_file_ut.cpp',
@@ -102,4 +106,8 @@ snp4_p4bm_file_ut = executable(
   ],
 )
 
-test('snp4 p4bm file tests', snp4_p4bm_file_ut)
+test(
+  'snp4 p4bm file tests',
+  snp4_p4bm_file_ut,
+  protocol : 'gtest',
+)
