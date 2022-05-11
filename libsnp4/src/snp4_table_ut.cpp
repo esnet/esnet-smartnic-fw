@@ -1,13 +1,11 @@
 #include "gtest/gtest.h"
 #include <gmp.h>
-#include <sstream>		// stringstream
-#include <iomanip>
+#include <string.h>
 
 extern "C" {
 #include "snp4.h"		/* API */
 }
 
-#include "string.h"
 
 static void display_pack(struct sn_pack * pack)
 {
