@@ -80,3 +80,26 @@ snp4_table_ut = executable(
   ],
 )
 test('snp4 table tests', snp4_table_ut)
+
+snp4_p4bm_file_ut_src = [
+  'src/snp4_p4bm_file_ut.cpp',
+  'src/snp4_p4bm_file.c',
+  'src/snp4_table_ut.c',
+  'src/snp4_table.c',
+]
+
+snp4_p4bm_file_ut = executable(
+  'snp4-p4bm-file-ut',
+  snp4_p4bm_file_ut_src,
+  dependencies : [
+    libgmp_dep,
+    libsnutil_dep,
+    gtest,
+  ],
+  include_directories : [
+    ext_incdir,
+    int_incdir,
+  ],
+)
+
+test('snp4 p4bm file tests', snp4_p4bm_file_ut)
