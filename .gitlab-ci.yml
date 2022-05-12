@@ -122,6 +122,9 @@ pull_sn_hw:
     reports:
       dotenv:
         fwapi.env
+    reports:
+      junit:
+        - sn-stack/debs/${OS_CODENAME}/meson-logs/testlog.junit.xml
   needs:
     - pull_sn_hw
 

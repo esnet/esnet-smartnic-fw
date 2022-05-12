@@ -4,7 +4,7 @@
 #include <string.h>  /* strcmp */
 
 #include "smartnic.h"		/* smartnic_* */
-#include "sdnetapi.h"		/* sdnet_* */
+#include "snp4.h"		/* snp4_* */
 
 const char *argp_program_version = "sn-cli 1.0";
 const char *argp_program_bug_address = "ESnet SmartNIC Developers <smartnic@es.net>";
@@ -13,7 +13,7 @@ const char *argp_program_bug_address = "ESnet SmartNIC Developers <smartnic@es.n
 static char doc[] = "Tool for interacting with an esnet-smartnic based on a Xilinx U280 card.";
 
 /* A description of the arguments we accept. */
-static char args_doc[] = "(sdnet-info | sdnet-config-apply | sdnet-config-check | smartnic-device-info)";
+static char args_doc[] = "(p4-info | p4-config-apply | p4-config-check | smartnic-device-info)";
 
 static struct argp_option argp_options[] = {
 					    { "config", 'c',
@@ -115,33 +115,62 @@ int main(int argc, char *argv[])
 
   argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
-  // Handle all options which do not require actually mapping the FPGA memory
-  if (!strcmp(arguments.command, "sdnet-info")) {
-    sdnet_print_target_config();
-    return 0;
-  } else if (!strcmp(arguments.command, "sdnet-config-check")) {
-    if (arguments.config == NULL) {
-      fprintf(stderr, "ERROR: config file is required but not provided\n");
+  // Load any config file provided on the command line
+  struct sn_cfg_set *cfg_set = NULL;
+  if (arguments.config) {
+    FILE * config_file = fopen(arguments.config, "r");
+    if (config_file == NULL) {
+      fprintf(stderr, "ERROR: cannot open sn config file (%s) for reading\n", arguments.config);
       return 1;
     }
-
-    struct sdnet_config *sdnet_config;
 
     switch (arguments.config_format) {
     case CONFIG_FORMAT_P4BM_SIM:
-      sdnet_config = sdnet_config_load_p4bm(arguments.config);
+      cfg_set = snp4_cfg_set_load_p4bm(config_file);
       break;
     default:
-      sdnet_config = NULL;
+      cfg_set = NULL;
       break;
     }
 
-    if (sdnet_config == NULL) {
-      fprintf(stderr, "ERROR: failed to parse sdnet config file\n");
+    // We're done reading the config file, close it
+    fclose(config_file);
+
+    if (cfg_set == NULL) {
+      fprintf(stderr, "ERROR: failed to parse provided sn config file (%s)\n", arguments.config);
       return 1;
     }
-    printf("Loaded all %u entries.\n", sdnet_config->num_entries);
-    sdnet_config_free(sdnet_config);
+    printf("OK: Parsed all %u entries from (%s).\n", cfg_set->num_entries, arguments.config);
+
+    // Pack the entries
+    bool cfg_set_valid = true;
+    for (unsigned int entry_idx = 0; entry_idx < cfg_set->num_entries; entry_idx++) {
+      struct sn_cfg *cfg = cfg_set->entries[entry_idx];
+
+      enum snp4_status rc = snp4_rule_pack(&cfg->rule, &cfg->pack);
+      if (rc == SNP4_STATUS_OK) {
+	fprintf(stderr, "[%03u] OK\n", cfg->line_no);
+      } else {
+	fprintf(stderr, "[%03u] ERROR %3d packing: %s\n", cfg->line_no, rc, cfg->raw);
+	cfg_set_valid = false;
+      }
+    }
+
+    if (!cfg_set_valid) {
+      fprintf(stderr, "ERROR: failed to pack one or more sn config file entries\n");
+      return 1;
+    }
+
+    fprintf(stderr, "OK: Packed all %u entries\n", cfg_set->num_entries);
+  }
+
+  // Handle all steps which do not require actually mapping the FPGA memory
+  if (!strcmp(arguments.command, "p4-info")) {
+    snp4_print_target_config();
+    return 0;
+  } else if (!strcmp(arguments.command, "p4-config-check")) {
+    // We've already done all validation steps as we processed the config file above, clean up and exit
+    snp4_cfg_set_free(cfg_set);
     return 0;
   }
 
@@ -165,57 +194,48 @@ int main(int argc, char *argv[])
     printf("\tsystem_status: 0x%08x\n", bar2->syscfg.system_status._v);
     printf("\tshell_status:  0x%08x\n", bar2->syscfg.shell_status._v);
     printf("\tuser_status:   0x%08x\n", bar2->syscfg.user_status);
-  } else if (!strcmp(arguments.command, "sdnet-config-apply")) {
-    if (arguments.config == NULL) {
-      fprintf(stderr, "ERROR: config file is required but not provided\n");
-      return 1;
-    }
+  } else if (!strcmp(arguments.command, "p4-config-apply")) {
+    // Insert the packed cfg_set entries into the sdnet block
+    void * snp4_handle = snp4_init((uintptr_t) &bar2->sdnet);
+    for (uint32_t entry_idx = 0; entry_idx < cfg_set->num_entries; entry_idx++) {
+      struct sn_cfg *cfg = cfg_set->entries[entry_idx];
 
-    struct sdnet_config *sdnet_config = sdnet_config_load_p4bm(arguments.config);
-    if (sdnet_config == NULL) {
-      fprintf(stderr, "ERROR: failed to parse sdnet config file\n");
-      return 1;
-    }
-
-    void * sdnet_handle = sdnet_init((uintptr_t) &bar2->sdnet);
-    for (uint32_t entry_idx = 0; entry_idx < sdnet_config->num_entries; entry_idx++) {
-      struct sdnet_config_entry *e = sdnet_config->entries[entry_idx];
-
-      fprintf(stderr, "Inserting line %u (%s)\n", e->line_no, e->raw);
-      fprintf(stderr, "\ttable_name: '%s'\n", e->table_name);
-      fprintf(stderr, "\tkey:  [%02lu bytes]: ", e->key_len);
-      for (uint16_t i = 0; i < e->key_len; i++) {
-	fprintf(stderr, "%02x", e->key[i]);
+      fprintf(stderr, "Inserting line %u (%s)\n", cfg->line_no, cfg->raw);
+      fprintf(stderr, "\ttable_name: '%s'\n", cfg->rule.table_name);
+      fprintf(stderr, "\tkey:  [%02lu bytes]: ", cfg->pack.key_len);
+      for (uint16_t i = 0; i < cfg->pack.key_len; i++) {
+	fprintf(stderr, "%02x", cfg->pack.key[i]);
       }
       fprintf(stderr, "\n");
-      fprintf(stderr, "\tmask: [%02lu bytes]: ", e->mask_len);
-      for (uint16_t i = 0; i < e->mask_len; i++) {
-	fprintf(stderr, "%02x", e->mask[i]);
+      fprintf(stderr, "\tmask: [%02lu bytes]: ", cfg->pack.mask_len);
+      for (uint16_t i = 0; i < cfg->pack.mask_len; i++) {
+	fprintf(stderr, "%02x", cfg->pack.mask[i]);
       }
       fprintf(stderr, "\n");
-      fprintf(stderr, "\taction_name: '%s'\n", e->action_name);
-      fprintf(stderr, "\nparams: [%02lu bytes]: ", e->params_len);
-      for (uint16_t i = 0; i < e->params_len; i++) {
-	fprintf(stderr, "%02x", e->params[i]);
+      fprintf(stderr, "\taction_name: '%s'\n", cfg->rule.action_name);
+      fprintf(stderr, "\nparams: [%02lu bytes]: ", cfg->pack.params_len);
+      for (uint16_t i = 0; i < cfg->pack.params_len; i++) {
+	fprintf(stderr, "%02x", cfg->pack.params[i]);
       }
       fprintf(stderr, "\n");
-      fprintf(stderr, "\tpriority: %u\n", e->priority);
-      if (!sdnet_table_insert_kma(sdnet_handle,
-				  e->table_name,
-				  e->key,
-				  e->key_len,
-				  e->mask,
-				  e->mask_len,
-				  e->action_name,
-				  e->params,
-				  e->params_len,
-				  e->priority)) {
+      fprintf(stderr, "\tpriority: %u\n", cfg->rule.priority);
+      if (!snp4_table_insert_kma(snp4_handle,
+				 cfg->rule.table_name,
+				 cfg->pack.key,
+				 cfg->pack.key_len,
+				 cfg->pack.mask,
+				 cfg->pack.mask_len,
+				 cfg->rule.action_name,
+				 cfg->pack.params,
+				 cfg->pack.params_len,
+				 cfg->rule.priority)) {
 	fprintf(stderr, "ERROR\n");
       } else {
 	fprintf(stderr, "OK\n");
       }
     }
-    sdnet_deinit(sdnet_handle);
+    snp4_deinit(snp4_handle);
+    snp4_cfg_set_free(cfg_set);
   } else {
     // Unknown command provided
     fprintf(stderr, "ERROR: unknown command provided: '%s'\n", arguments.command);

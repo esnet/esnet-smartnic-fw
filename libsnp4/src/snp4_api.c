@@ -6,13 +6,13 @@
 //
 
 #include <stdio.h>		/* fprintf */
-#include "sdnetapi.h"		/* API */
+#include "snp4.h"		/* API */
 #include "sdnet_0_defs.h"	/* XilVitisNetP4TargetConfig_sdnet_0 */
-#include "sdnetio.h"		/* sdnetio_reg_* */
+#include "snp4_io.h"		/* snp4_io_reg_* */
 #include "unused.h"		/* UNUSED() */
 
-struct sdnet_user_context {
-  uintptr_t sdnet_base_addr;
+struct snp4_user_context {
+  uintptr_t base_addr;
 };
 
 static XilVitisNetP4ReturnType device_write(XilVitisNetP4EnvIf *EnvIfPtr, XilVitisNetP4AddressType address, uint32_t data) {
@@ -25,11 +25,11 @@ static XilVitisNetP4ReturnType device_write(XilVitisNetP4EnvIf *EnvIfPtr, XilVit
     }
 
     // Recover virtual base address from user context
-    struct sdnet_user_context * user_ctx;
-    user_ctx = (struct sdnet_user_context *)EnvIfPtr->UserCtx;
+    struct snp4_user_context * user_ctx;
+    user_ctx = (struct snp4_user_context *)EnvIfPtr->UserCtx;
 
     // Do the operation
-    sdnetio_reg_write(user_ctx->sdnet_base_addr, address, data);
+    snp4_io_reg_write(user_ctx->base_addr, address, data);
 
     return XIL_VITIS_NET_P4_SUCCESS;
 }
@@ -47,11 +47,11 @@ static XilVitisNetP4ReturnType device_read(XilVitisNetP4EnvIf *EnvIfPtr, XilViti
     }
 
     // Recover virtual base address from user context
-    struct sdnet_user_context * user_ctx;
-    user_ctx = (struct sdnet_user_context *)EnvIfPtr->UserCtx;
+    struct snp4_user_context * user_ctx;
+    user_ctx = (struct snp4_user_context *)EnvIfPtr->UserCtx;
 
     // Do the operation
-    sdnetio_reg_read(user_ctx->sdnet_base_addr, address, dataPtr);
+    snp4_io_reg_read(user_ctx->base_addr, address, dataPtr);
 
     return XIL_VITIS_NET_P4_SUCCESS;
 }
@@ -70,79 +70,79 @@ static XilVitisNetP4ReturnType log_error(XilVitisNetP4EnvIf *UNUSED(EnvIfPtr), c
   return XIL_VITIS_NET_P4_SUCCESS;
 }
 
-void * sdnet_init(uintptr_t sdnet_base_addr)
+void * snp4_init(uintptr_t snp4_base_addr)
 {
-  struct sdnet_user_context * sdnet_user;
-  sdnet_user = (struct sdnet_user_context *) calloc(1, sizeof(struct sdnet_user_context));
-  if (sdnet_user == NULL) {
+  struct snp4_user_context * snp4_user;
+  snp4_user = (struct snp4_user_context *) calloc(1, sizeof(struct snp4_user_context));
+  if (snp4_user == NULL) {
     goto out_fail;
   }
-  sdnet_user->sdnet_base_addr = sdnet_base_addr;
+  snp4_user->base_addr = snp4_base_addr;
 
-  XilVitisNetP4EnvIf * sdnet_env;
-  sdnet_env = (XilVitisNetP4EnvIf *) calloc(1, sizeof(XilVitisNetP4EnvIf));
-  if (sdnet_env == NULL) {
+  XilVitisNetP4EnvIf * vitisnetp4_env;
+  vitisnetp4_env = (XilVitisNetP4EnvIf *) calloc(1, sizeof(XilVitisNetP4EnvIf));
+  if (vitisnetp4_env == NULL) {
     goto out_fail_user;
   }
 
-  XilVitisNetP4TargetCtx * sdnet_target;
-  sdnet_target = (XilVitisNetP4TargetCtx *) calloc(1, sizeof(XilVitisNetP4EnvIf));
-  if (sdnet_target == NULL) {
+  XilVitisNetP4TargetCtx * vitisnetp4_target;
+  vitisnetp4_target = (XilVitisNetP4TargetCtx *) calloc(1, sizeof(XilVitisNetP4EnvIf));
+  if (vitisnetp4_target == NULL) {
     goto out_fail_env;
   }
 
-  // Initialize the sdnet env
-  if (XilVitisNetP4StubEnvIf(sdnet_env) != XIL_VITIS_NET_P4_SUCCESS) {
+  // Initialize the vitisnetp4 env
+  if (XilVitisNetP4StubEnvIf(vitisnetp4_env) != XIL_VITIS_NET_P4_SUCCESS) {
     goto out_fail_target;
   }
-  sdnet_env->WordWrite32 = (XilVitisNetP4WordWrite32Fp) &device_write;
-  sdnet_env->WordRead32  = (XilVitisNetP4WordRead32Fp)  &device_read;
-  sdnet_env->UserCtx     = (XilVitisNetP4UserCtxType)   sdnet_user;
-  sdnet_env->LogError    = (XilVitisNetP4LogFp)         &log_error;
-  sdnet_env->LogInfo     = (XilVitisNetP4LogFp)         &log_info;
+  vitisnetp4_env->WordWrite32 = (XilVitisNetP4WordWrite32Fp) &device_write;
+  vitisnetp4_env->WordRead32  = (XilVitisNetP4WordRead32Fp)  &device_read;
+  vitisnetp4_env->UserCtx     = (XilVitisNetP4UserCtxType)   snp4_user;
+  vitisnetp4_env->LogError    = (XilVitisNetP4LogFp)         &log_error;
+  vitisnetp4_env->LogInfo     = (XilVitisNetP4LogFp)         &log_info;
 
-  // Initialize the sdnet target
-  if (XilVitisNetP4TargetInit(sdnet_target, sdnet_env, &XilVitisNetP4TargetConfig_sdnet_0) != XIL_VITIS_NET_P4_SUCCESS) {
+  // Initialize the vitisnetp4 target
+  if (XilVitisNetP4TargetInit(vitisnetp4_target, vitisnetp4_env, &XilVitisNetP4TargetConfig_sdnet_0) != XIL_VITIS_NET_P4_SUCCESS) {
     goto out_fail_target;
   }
 
-  return (void *) sdnet_target;
+  return (void *) vitisnetp4_target;
 
  out_fail_target:
-  free(sdnet_target);
+  free(vitisnetp4_target);
  out_fail_env:
-  free(sdnet_env);
+  free(vitisnetp4_env);
  out_fail_user:
-  free(sdnet_user);
+  free(snp4_user);
  out_fail:
   return NULL;
 }
 
-bool sdnet_deinit(void * sdnet_handle)
+bool snp4_deinit(void * snp4_handle)
 {
-  XilVitisNetP4TargetCtx * sdnet_target = (XilVitisNetP4TargetCtx *) sdnet_handle;
+  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
 
-  if (XilVitisNetP4TargetExit(sdnet_target) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (XilVitisNetP4TargetExit(vitisnetp4_target) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
   return true;
 }
 
-bool sdnet_reset_all_tables(void * sdnet_handle)
+bool snp4_reset_all_tables(void * snp4_handle)
 {
-  XilVitisNetP4TargetCtx * sdnet_target = (XilVitisNetP4TargetCtx *) sdnet_handle;
+  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
 
   // Look up the number of tables in the design
   uint32_t num_tables;
-  if (XilVitisNetP4TargetGetTableCount(sdnet_target, &num_tables) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (XilVitisNetP4TargetGetTableCount(vitisnetp4_target, &num_tables) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
   // Reset all of the tables in the design
   for (uint32_t i = 0; i < num_tables; i++) {
     XilVitisNetP4TableCtx * table;
-    if (XilVitisNetP4TargetGetTableByIndex(sdnet_target, i, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+    if (XilVitisNetP4TargetGetTableByIndex(vitisnetp4_target, i, &table) != XIL_VITIS_NET_P4_SUCCESS) {
       return false;
     }
     if (XilVitisNetP4TableReset(table) != XIL_VITIS_NET_P4_SUCCESS) {
@@ -153,22 +153,22 @@ bool sdnet_reset_all_tables(void * sdnet_handle)
   return true;
 }
 
-bool sdnet_table_insert_kma(void * sdnet_handle,
-			    const char * table_name,
-			    uint8_t * key,
-			    size_t UNUSED(key_len),
-			    uint8_t * mask,
-			    size_t UNUSED(mask_len),
-			    const char * action_name,
-			    uint8_t * params,
-			    size_t UNUSED(params_len),
-			    uint32_t priority)
+bool snp4_table_insert_kma(void * snp4_handle,
+			   const char * table_name,
+			   uint8_t * key,
+			   size_t UNUSED(key_len),
+			   uint8_t * mask,
+			   size_t UNUSED(mask_len),
+			   const char * action_name,
+			   uint8_t * params,
+			   size_t UNUSED(params_len),
+			   uint32_t priority)
 {
-  XilVitisNetP4TargetCtx * sdnet_target = (XilVitisNetP4TargetCtx *) sdnet_handle;
+  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
 
   // Get a handle for the target table
   XilVitisNetP4TableCtx * table;
-  if (XilVitisNetP4TargetGetTableByName(sdnet_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (XilVitisNetP4TargetGetTableByName(vitisnetp4_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
@@ -203,18 +203,18 @@ bool sdnet_table_insert_kma(void * sdnet_handle,
   return true;
 }
 
-bool sdnet_table_delete_k(void * sdnet_handle,
-			  const char * table_name,
-			  uint8_t * key,
-			  size_t    UNUSED(key_len),
-			  uint8_t * mask,
-			  size_t    UNUSED(mask_len))
+bool snp4_table_delete_k(void * snp4_handle,
+			 const char * table_name,
+			 uint8_t * key,
+			 size_t    UNUSED(key_len),
+			 uint8_t * mask,
+			 size_t    UNUSED(mask_len))
 {
-  XilVitisNetP4TargetCtx * sdnet_target = (XilVitisNetP4TargetCtx *) sdnet_handle;
+  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
 
   // Get a handle for the target table
   XilVitisNetP4TableCtx * table;
-  if (XilVitisNetP4TargetGetTableByName(sdnet_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (XilVitisNetP4TargetGetTableByName(vitisnetp4_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 

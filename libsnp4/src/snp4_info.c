@@ -15,7 +15,7 @@ static const char * tabs(unsigned int indent)
   }
 }
 
-static const char * sdnet_endian_str(XilVitisNetP4Endian endian)
+static const char * vitisnetp4_endian_str(XilVitisNetP4Endian endian)
 {
   switch (endian) {
   case XIL_VITIS_NET_P4_LITTLE_ENDIAN: return "Little Endian";
@@ -24,7 +24,7 @@ static const char * sdnet_endian_str(XilVitisNetP4Endian endian)
   }
 }
 
-static const char * sdnet_table_mode_str(XilVitisNetP4TableMode mode)
+static const char * vitisnetp4_table_mode_str(XilVitisNetP4TableMode mode)
 {
   switch (mode) {
   case XIL_VITIS_NET_P4_TABLE_MODE_BCAM:      return "BCAM";
@@ -37,7 +37,7 @@ static const char * sdnet_table_mode_str(XilVitisNetP4TableMode mode)
   }
 }
 
-static const char * sdnet_cam_optimization_type(XilVitisNetP4CamOptimizationType opt_type)
+static const char * vitisnetp4_cam_optimization_type(XilVitisNetP4CamOptimizationType opt_type)
 {
   switch (opt_type) {
   case XIL_VITIS_NET_P4_CAM_OPTIMIZE_NONE:    return "None";
@@ -49,7 +49,7 @@ static const char * sdnet_cam_optimization_type(XilVitisNetP4CamOptimizationType
   }
 }
 
-static const char * sdnet_cam_mem_type(XilVitisNetP4CamMemType mem_type)
+static const char * vitisnetp4_cam_mem_type(XilVitisNetP4CamMemType mem_type)
 {
   switch (mem_type) {
   case XIL_VITIS_NET_P4_CAM_MEM_AUTO: return "Auto";
@@ -61,7 +61,7 @@ static const char * sdnet_cam_mem_type(XilVitisNetP4CamMemType mem_type)
   }
 }
 
-static void print_cam_config(XilVitisNetP4CamConfig *cc, unsigned int indent)
+static void vitisnetp4_print_cam_config(XilVitisNetP4CamConfig *cc, unsigned int indent)
 {
   printf("%sBaseAddr: 0x%08lx\n", tabs(indent), cc->BaseAddr);
   printf("%sFormatString: %s\n", tabs(indent), cc->FormatStringPtr);
@@ -72,59 +72,59 @@ static void print_cam_config(XilVitisNetP4CamConfig *cc, unsigned int indent)
   printf("%sResponseSizeBits: %u\n", tabs(indent), cc->ResponseSizeBits);
   printf("%sPrioritySizeBits: %u\n", tabs(indent), cc->PrioritySizeBits);
   printf("%sNumMasks: %u\n", tabs(indent), cc->NumMasks);
-  printf("%sEndian: %s\n", tabs(indent), sdnet_endian_str(cc->Endian));
-  printf("%sMemType: %s\n", tabs(indent), sdnet_cam_mem_type(cc->MemType));
+  printf("%sEndian: %s\n", tabs(indent), vitisnetp4_endian_str(cc->Endian));
+  printf("%sMemType: %s\n", tabs(indent), vitisnetp4_cam_mem_type(cc->MemType));
   printf("%sRamSizeKbytes: %u\n", tabs(indent), cc->RamSizeKbytes);
-  printf("%sOptimizationType: %s\n", tabs(indent), sdnet_cam_optimization_type(cc->OptimizationType));
+  printf("%sOptimizationType: %s\n", tabs(indent), vitisnetp4_cam_optimization_type(cc->OptimizationType));
 }
 
-static void print_param(XilVitisNetP4Attribute *attr, unsigned int indent)
+static void vitisnetp4_print_param(XilVitisNetP4Attribute *attr, unsigned int indent)
 {
   printf("%s%3u %s\n", tabs(indent), attr->Value, attr->NameStringPtr);
 }
 
-static void print_action(XilVitisNetP4Action *a, unsigned int indent)
+static void vitisnetp4_print_action(XilVitisNetP4Action *a, unsigned int indent)
 {
   printf("%sName: %s\n", tabs(indent), a->NameStringPtr);
   printf("%sParameters: [n=%u]\n", tabs(indent), a->ParamListSize);
   for (unsigned int pidx = 0; pidx < a->ParamListSize; pidx++) {
     XilVitisNetP4Attribute *attr = &a->ParamListPtr[pidx];
-    print_param(attr, indent+1);
+    vitisnetp4_print_param(attr, indent+1);
   }
 }
 
-static void print_table_config(XilVitisNetP4TableConfig *tc, unsigned int indent)
+static void vitisnetp4_print_table_config(XilVitisNetP4TableConfig *tc, unsigned int indent)
 {
-  printf("%sEndian: %s\n", tabs(indent), sdnet_endian_str(tc->Endian));
-  printf("%sMode: %s\n", tabs(indent), sdnet_table_mode_str(tc->Mode));
+  printf("%sEndian: %s\n", tabs(indent), vitisnetp4_endian_str(tc->Endian));
+  printf("%sMode: %s\n", tabs(indent), vitisnetp4_table_mode_str(tc->Mode));
   printf("%sKeySizeBits: %u\n", tabs(indent), tc->KeySizeBits);
   printf("%sCamConfig:\n", tabs(indent));
-  print_cam_config(&tc->CamConfig, indent+1);
+  vitisnetp4_print_cam_config(&tc->CamConfig, indent+1);
   printf("%sActionIdWidthBits: %u\n", tabs(indent), tc->ActionIdWidthBits);
 
   printf("%sActions: [n=%u]\n", tabs(indent), tc->ActionListSize);
   for (unsigned int aidx = 0; aidx < tc->ActionListSize; aidx++) {
     XilVitisNetP4Action *a = tc->ActionListPtr[aidx];
-    print_action(a, indent+1);
+    vitisnetp4_print_action(a, indent+1);
   }
 }
 
-static void print_target_table_config(XilVitisNetP4TargetTableConfig *ttc, unsigned int indent)
+static void vitisnetp4_print_target_table_config(XilVitisNetP4TargetTableConfig *ttc, unsigned int indent)
 {
   printf("%sName: %s\n", tabs(indent), ttc->NameStringPtr);
 
   printf("%sConfig:\n", tabs(indent));
-  print_table_config(&ttc->Config, indent+1);
+  vitisnetp4_print_table_config(&ttc->Config, indent+1);
 }
 
-void sdnet_print_target_config (void)
+void snp4_print_target_config (void)
 {
   struct XilVitisNetP4TargetConfig *tcfg = &XilVitisNetP4TargetConfig_sdnet_0;
 
-  printf("Endian: %s\n", sdnet_endian_str(tcfg->Endian));
+  printf("Endian: %s\n", vitisnetp4_endian_str(tcfg->Endian));
   printf("Tables: [n=%u]\n", tcfg->TableListSize);
   for (unsigned int tidx = 0; tidx < tcfg->TableListSize; tidx++) {
     XilVitisNetP4TargetTableConfig *t = tcfg->TableListPtr[tidx];
-    print_target_table_config(t, 0);
+    vitisnetp4_print_target_table_config(t, 0);
   }
 }

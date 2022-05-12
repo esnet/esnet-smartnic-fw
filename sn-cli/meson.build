@@ -18,7 +18,7 @@ sn_cli_bin = executable(
   dependencies : [
     libgmp_dep,
     libopennic_dep,
-    libsdnetapi_dep,
+    libsnp4_dep,
     dependency('regmap'),
   ],
   install : true,
