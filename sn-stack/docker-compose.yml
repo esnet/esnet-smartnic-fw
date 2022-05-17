@@ -12,7 +12,7 @@ services:
       - /dev:/dev
       - /sys/bus/usb:/sys/bus/usb
     healthcheck:
-      test: ["/bin/bash", "-c", "-e", "-o", "pipefail", "netstat -nlt | fgrep '0.0.0.0:3121'"]
+      test: ["CMD", "/bin/bash", "-c", "-e", "-o", "pipefail", "netstat -nlt | fgrep '0.0.0.0:3121'"]
       interval: 10s
       timeout: 10s
       retries: 6
@@ -33,6 +33,9 @@ services:
   smartnic-flash:
     hostname: smartnic-flash
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+    depends_on:
+     xilinx-hwserver:
+       condition: service_healthy
     init: true
     user: root
     privileged: true
@@ -76,6 +79,8 @@ services:
     hostname: smartnic-bitfile
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
     depends_on:
+      xilinx-hwserver:
+        condition: service_healthy
       smartnic-flash:
         condition: service_healthy
     init: true
