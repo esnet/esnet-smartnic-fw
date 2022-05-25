@@ -12,7 +12,7 @@ services:
       - /dev:/dev
       - /sys/bus/usb:/sys/bus/usb
     healthcheck:
-      test: ["/bin/bash", "-c", "-e", "-o", "pipefail", "netstat -nlt | fgrep '0.0.0.0:3121'"]
+      test: ["CMD", "/bin/bash", "-c", "-e", "-o", "pipefail", "netstat -nlt | fgrep '0.0.0.0:3121'"]
       interval: 10s
       timeout: 10s
       retries: 6
@@ -33,12 +33,17 @@ services:
   smartnic-flash:
     hostname: smartnic-flash
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+    depends_on:
+     xilinx-hwserver:
+       condition: service_healthy
     init: true
     user: root
     privileged: true
     restart: unless-stopped
     env_file:
       - ${SN_STACK_ROOT-.}/buildinfo.env
+    environment:
+      - SMARTNIC_UPDATE_FLASH=${SMARTNIC_UPDATE_FLASH-}
     tmpfs:
       - /status
     volumes:
@@ -47,8 +52,8 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
       interval: 10s
-      timeout: 10s
-      retries: 6
+      timeout: 25m
+      retries: 150
       start_period: 10s
     entrypoint:
       - /bin/bash
@@ -60,22 +65,29 @@ services:
       - |
         dpkg -i \
           /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb
-        touch /status/ok
+        if [ ! -z "$${SMARTNIC_UPDATE_FLASH}" ] ; then
+          /scripts/program_flash.sh \
+            xilinx-hwserver:3121 \
+            "${HW_TARGET_SERIAL:-*}" \
+            /usr/lib/firmware/esnet-smartnic/esnet-smartnic.mcs
+          if [ $$? ] ; then
+            # Flash update has succeeded, all OK
+            touch /status/ok
+          else
+            echo "Flash Update Attempted and Failed, Not Healthy!"
+          fi
+        else
+          # No request to update flash, assume everything is ok
+          touch /status/ok
+        fi
         sleep infinity
-        # /scripts/program_card.sh \
-        #   xilinx-hwserver:3121 \
-        #   "${HW_TARGET_SERIAL:-*}" \
-        #   /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
-        #   # FORCE
-        # if [ $$? ] ; then
-        #   touch /status/ok
-        #   sleep infinity
-        # fi
 
   smartnic-bitfile:
     hostname: smartnic-bitfile
     image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
     depends_on:
+      xilinx-hwserver:
+        condition: service_healthy
       smartnic-flash:
         condition: service_healthy
     init: true
