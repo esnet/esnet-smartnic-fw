@@ -1,6 +1,5 @@
 sources = files(
   [
-    'src/iov.c',
   ]
 )
 
@@ -19,7 +18,6 @@ libsnutil = shared_library(
 install_headers(
   [
     'include/array_size.h',
-    'include/iov.h',
     'include/memory-barriers.h',
     'include/unused.h',
   ],
