@@ -101,7 +101,7 @@ pull_sn_hw:
     - docker volume    ls | grep "$COMPOSE_PROJECT_NAME" || /bin/true
     - echo -e "\e[0Ksection_end:`date +%s`:section_002\r\e[0K"
     - echo -e "\e[0Ksection_start:`date +%s`:section_003[collapsed=true]\r\e[0KContainer Build"
-    - docker compose build sn-fw-pkg
+    - docker compose build --no-cache sn-fw-pkg
     - echo -e "\e[0Ksection_end:`date +%s`:section_003\r\e[0K"
     # Clean up absolutely everything related to our compose stack *before* we run
     - docker compose down -v --remove-orphans
