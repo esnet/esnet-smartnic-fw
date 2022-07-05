@@ -1,6 +1,6 @@
 project(
   'esnet-smartnic',
-  'c',
+  ['c', 'cpp'],
   default_options : [
     'warning_level=2',
     'werror=true',
