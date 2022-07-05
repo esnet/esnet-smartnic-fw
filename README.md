@@ -71,6 +71,8 @@ docker compose run --rm sn-fw-pkg
 docker compose down -v
 ```
 
+Note: to pick up the very latest Ubuntu packages used in the build environment, you may wish to occasionally run `docker compose build --no-cache` to force the build env to be refreshed rather than (potentially) using the previously cached docker image.
+
 The firmware build produces its output files in the `sn-stack/debs` directory where you'll find files similar to these
 ```
 cd $(git rev-parse --show-toplevel)
