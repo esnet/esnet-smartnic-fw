@@ -38,6 +38,29 @@ Verifying the bitfile download
 docker compose logs smartnic-hw
 ```
 
+Writing the bitfile to the FPGA card persistent flash (Optional)
+----------------------------------------------------------------
+
+Ensure that any running `sn-stack` instances have been stopped so that they don't interfere with the flash programming operation.
+
+```
+docker compose down -v
+```
+
+Start up the separate flash-programming service like this
+
+```
+docker compose -f docker-compose-flash.yml run --rm smartnic-flash
+```
+
+This will:
+* Use JTAG to write a small flash-programing helper bitfile into the FPGA
+* Use JTAG to write the current version of the bitfile into the U280 card's flash
+  * Only the "user" partition of the flash is overwritten by this step
+  * The "gold" partition is left untouched
+
+**Note:** the flash programming sequence takes about 19 minutes to complete.
+
 Inspecting registers and interacting with the firmware
 ------------------------------------------------------
 
