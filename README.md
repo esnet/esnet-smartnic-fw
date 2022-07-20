@@ -65,10 +65,8 @@ The firmware build happens inside of a docker container which manages all of the
 
 ```
 cd $(git rev-parse --show-toplevel)
-docker compose down -v
 docker compose build
 docker compose run --rm sn-fw-pkg
-docker compose down -v
 ```
 
 Note: to pick up the very latest Ubuntu packages used in the build environment, you may wish to occasionally run `docker compose build --no-cache` to force the build env to be refreshed rather than (potentially) using the previously cached docker image.

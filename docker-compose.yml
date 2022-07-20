@@ -9,9 +9,10 @@ services:
       # Note: Meson requires that it can execute code from its build dir for a sanity check
       - /build:exec
     volumes:
-      - source:/source
-      - sn-hw:/sn-hw
-      - output:/output
+      - ${PWD}:/source:ro
+      - ${PWD}/sn-hw:/sn-hw:ro
+      - ${PWD}/sn-stack:/output
+    network_mode: host
     environment:
       DEBEMAIL: "smartnic@es.net"
       DEBFULLNAME: "ESnet SmartNIC Developers"
@@ -64,20 +65,3 @@ services:
         OS_CODENAME=$${OS_CODENAME}
         _EOF
         file subprojects/esnet-smartnic-hwapi/firmware/esnet-smartnic.bit
-
-volumes:
-  source:
-    driver_opts:
-      type: none
-      device: ${PWD}
-      o: bind,ro
-  sn-hw:
-    driver_opts:
-      type: none
-      device: ${PWD}/sn-hw
-      o: bind,ro
-  output:
-    driver_opts:
-      type: none
-      device: ${PWD}/sn-stack
-      o: bind
