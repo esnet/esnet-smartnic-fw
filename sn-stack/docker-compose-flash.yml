@@ -20,7 +20,7 @@ services:
       - -x
       - |
         dpkg -i \
-          /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb
+          /debs/esnet-smartnic-hw_1.0.0-$${SN_FW_VER}_amd64.deb
         /scripts/program_flash.sh \
           localhost:3121 \
           "${HW_TARGET_SERIAL:-*}" \
