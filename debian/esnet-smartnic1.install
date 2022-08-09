@@ -1,7 +1,5 @@
-usr/lib/firmware/esnet-smartnic/*
 usr/lib/*/lib*.so.*
-usr/share/esnet-smartnic/**
 usr/lib/*/wireshark/plugins/*
+usr/share/esnet-smartnic/**
 usr/bin/regio
 usr/bin/sn-cli
-
