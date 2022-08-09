@@ -1,5 +1,5 @@
 x-labtools-service: &labtools-service
-  image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+  image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2022.1-latest}
   restart: unless-stopped
 
 services:
