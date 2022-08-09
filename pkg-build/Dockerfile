@@ -12,7 +12,7 @@ ARG OS_CODENAME
 COPY sources.${OS_CODENAME}.list /etc/apt/sources.list
 
 RUN \
-  ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime && \
+  ln -fs /usr/share/zoneinfo/UTC /etc/localtime && \
   apt-get update -y && \
   apt-get upgrade -y && \
   apt-get install -y --no-install-recommends \
