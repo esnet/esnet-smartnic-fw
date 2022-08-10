@@ -1,11 +1,18 @@
+x-labtools-service: &labtools-service
+  image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2022.1-latest}
+  restart: unless-stopped
+
+x-smartnic-dpdk-service: &smartnic-dpdk-service
+  image: ${SMARTNIC_DPDK_REGISTRY-}smartnic-dpdk-docker:${SMARTNIC_DPDK_TAG-$USER-dev}
+  restart: unless-stopped
+
 services:
   xilinx-hwserver:
+    <<: *labtools-service
     hostname: xilinx-hwswerver
-    image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
     init: true
     user: root
     privileged: true
-    restart: unless-stopped
     ports:
       - "3121:3121"
     volumes:
@@ -30,16 +37,15 @@ services:
           -s \
           tcp::3121
 
-  smartnic-bitfile:
-    hostname: smartnic-bitfile
-    image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2021.2-latest}
+  smartnic-hw:
+    <<: *labtools-service
+    hostname: smartnic-hw
     depends_on:
       xilinx-hwserver:
         condition: service_healthy
     init: true
     user: root
     privileged: true
-    restart: unless-stopped
     env_file:
       - ${SN_STACK_ROOT-.}/buildinfo.env
     tmpfs:
@@ -73,6 +79,85 @@ services:
           sleep infinity
         fi
 
+  smartnic-devbind:
+    <<: *smartnic-dpdk-service
+    hostname: smartnic-devbind
+    depends_on:
+      smartnic-hw:
+        condition: service_healthy
+    init: true
+    user: root
+    privileged: true
+    env_file:
+      - ${SN_STACK_ROOT-.}/buildinfo.env
+    tmpfs:
+      - /status
+    volumes:
+      - /sys/bus/pci:/sys/bus/pci
+      - /sys/bus/pci/drivers:/sys/bus/pci/drivers
+      - /dev:/dev
+      - /lib/modules:/lib/modules
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 5s
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        echo 1 > /sys/bus/pci/rescan
+        sleep 1
+        lspci -d 10ee: -Dmm \
+          | cut -d ' ' -f 1 \
+          | xargs dpdk-devbind.py -b vfio-pci
+        if [ $$(lspci -D -v -d 10ee: | grep vfio-pci | wc -l) -eq 2 ] ; then
+          touch /status/ok
+          sleep infinity
+        fi
+    profiles:
+      - smartnic-dpdk
+
+  smartnic-dpdk:
+    hostname: smartnic-dpdk
+    <<: *smartnic-dpdk-service
+    init: true
+    user: root
+    privileged: true
+    depends_on:
+      smartnic-devbind:
+        condition: service_healthy
+    env_file:
+      - ${SN_STACK_ROOT-.}/buildinfo.env
+    environment:
+      - SN_PCIE_DEV=$FPGA_PCIE_DEV
+    volumes:
+      - /sys/bus/pci:/sys/bus/pci
+      - /var/run/dpdk:/var/run/dpdk
+      - /sys/devices/system/node:/sys/devices/system/node
+      - /sys/bus/pci/drivers:/sys/bus/pci/drivers
+      - /dev:/dev
+      - /sys/kernel/mm/hugepages:/sys/kernel/mm/hugepages
+      - /lib/modules:/lib/modules
+      - sn-scratch:/scratch
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        dpdk-devbind.py --status
+        sleep infinity
+    profiles:
+      - smartnic-dpdk
+
   smartnic-fw:
     hostname: smartnic-fw
     build:
@@ -80,7 +165,7 @@ services:
       args:
         DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
     depends_on:
-      smartnic-bitfile:
+      smartnic-hw:
         condition: service_healthy
     init: true
     user: root
