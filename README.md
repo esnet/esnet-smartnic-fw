@@ -2,10 +2,10 @@
 Setting up the build environment
 ================================
 
-Docker and Docker Compose
--------------------------
-
 The smartnic firmware build depends on `docker` and the `docker compose` plugin.
+
+Docker
+------
 
 Install Docker on your system following the instructions found here for the **linux** variant that you are using
 * https://docs.docker.com/engine/install/
@@ -18,12 +18,30 @@ Verify your docker setup by running this as an ordinary (non-root) user without 
 docker run hello-world
 ```
 
-Install Docker Compose on your system following the instructions found here
-* https://docs.docker.com/compose/cli-command/#install-on-linux
+Docker Compose
+==============
 
-Verify your docker compose installation by running this as an ordinary (non-root) user without using `sudo`
+The `docker-compose.yml` file for the smartnic build and the sn-stack depends on features that are only supported in the compose v2 plugin.
+
+Install the `docker compose` plugin like this for a single user:
+
 ```
-docker compose version
+mkdir -p ~/.docker/cli-plugins/
+curl -SL https://github.com/docker/compose/releases/download/v2.10.1/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+chmod +x ~/.docker/cli-plugins/docker-compose
+```
+
+Alternatively, you can install the `docker compose` plugin system-wide like this:
+```
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl  -o /usr/local/lib/docker/cli-plugins/docker-compose -SL https://github.com/docker/compose/releases/download/v2.10.1/docker-compose-linux-x86_64
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+```
+
+Verify your docker compose installation by running this as an ordinary (non-root) user without using `sudo`.  For this install, the version output should be
+```
+$ docker compose version
+Docker Compose version v2.10.1
 ```
 
 Git Submodules
@@ -44,7 +62,7 @@ Install Smartnic Hardware Build Artifact
 
 The firmware build depends on the result of a smartnic hardware (FPGA) build.  This file must be available prior to invoking the firmware build.
 
-This file will be called `artifacts.esnet-smartnic-hw.export_hwapi.<version>.zip` and should be placed in the `sn-hw` directory in your source tree before starting the firmware build.
+This file will be called `artifacts.esnet-smartnic-hw.<version>.zip` and should be placed in the `sn-hw` directory in your source tree before starting the firmware build.
 
 Set up your .env file for building a new firmware image
 -------------------------------------------------------
