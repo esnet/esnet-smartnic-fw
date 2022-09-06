@@ -5,7 +5,7 @@
 
 #include "esnet_smartnic_toplevel.h" /* ESNET_SMARTNIC_BAR2_* */
 
-volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_pciaddr(char *addr) {
+volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_pciaddr(const char *addr) {
   char dev_resource_path[80];
   snprintf(dev_resource_path, sizeof(dev_resource_path), "/sys/bus/pci/devices/%s/resource2", addr);
 

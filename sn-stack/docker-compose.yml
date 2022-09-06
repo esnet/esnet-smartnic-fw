@@ -175,6 +175,7 @@ services:
       - ${SN_STACK_ROOT-.}/buildinfo.env
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
+      - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
     volumes:
       - debs:/debs:ro
       - /sys/bus/pci:/sys/bus/pci

@@ -1,6 +1,11 @@
 sources = files(
   [
     'src/sn-cli.c',
+    'src/sub-cmac.c',
+    'src/sub-dev.c',
+    'src/sub-p4.c',
+    'src/sub-probe.c',
+    'src/sub-qdma.c',
   ]
 )
 
@@ -19,6 +24,7 @@ sn_cli_bin = executable(
     libgmp_dep,
     libopennic_dep,
     libsnp4_dep,
+    libsnutil_dep,
     dependency('regmap'),
   ],
   install : true,
