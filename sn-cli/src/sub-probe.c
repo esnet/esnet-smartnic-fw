@@ -8,6 +8,7 @@
 #include "smartnic.h"		/* smartnic_* */
 #include "axi4s_probe_block.h"	/* axi4s_probe_block */
 #include "array_size.h"		/* ARRAY_SIZE */
+#include "memory-barriers.h"	/* barrier */
 #include "arguments_common.h"	/* arguments_global, cmd_* */
 
 static char doc_probe[] =
@@ -147,10 +148,19 @@ static void print_probe_stats(volatile struct axi4s_probe_block * probe, const c
 {
   probe->halt_counters = 0;
 
-  printf("\tPackets: %20lu  Bytes: %20lu  %s\n",
-	 ((uint64_t)probe->pkt_count_upper << 32) | probe->pkt_count_lower,
-	 ((uint64_t)probe->byte_count_upper << 32) | probe->byte_count_lower,
-	 suffix);
+  uint64_t pkt_count;
+  uint64_t byte_count;
+
+  pkt_count = (uint64_t)probe->pkt_count_upper << 32;
+  pkt_count += probe->pkt_count_lower;
+
+  byte_count = (uint64_t)probe->byte_count_upper << 32;
+  // Force memory barrier to ensure that the byte_count_lower is read last since it
+  // triggers a clear of all of the other probe counters when read.
+  barrier();
+  byte_count += probe->byte_count_lower;
+
+  printf("\tPackets: %20lu  Bytes: %20lu  %s\n", pkt_count, byte_count, suffix);
   return;
 }
 
