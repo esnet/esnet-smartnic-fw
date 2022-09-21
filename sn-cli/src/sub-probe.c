@@ -227,6 +227,7 @@ void cmd_probe(struct argp_state *state)
       printf("From CMAC 0\n");
       print_probe_stats(&bar2->probe_from_cmac_0, "ok");
       print_probe_stats(&bar2->drops_err_from_cmac_0, "error/drop");
+      print_probe_stats(&bar2->drops_ovfl_from_cmac_0, "ovfl/drop");
       printf("\n");
     }
 
@@ -234,6 +235,7 @@ void cmd_probe(struct argp_state *state)
       printf("From CMAC 1\n");
       print_probe_stats(&bar2->probe_from_cmac_1, "ok");
       print_probe_stats(&bar2->drops_err_from_cmac_1, "error/drop");
+      print_probe_stats(&bar2->drops_ovfl_from_cmac_1, "ovfl/drop");
       printf("\n");
     }
 
