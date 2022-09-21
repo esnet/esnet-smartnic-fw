@@ -271,7 +271,9 @@ void cmd_probe(struct argp_state *state)
     if (arguments.probes & PROBE_SELECT_TO_HOST_0) {
       printf("To HOST PF 0 (c2h)\n");
       print_probe_stats(&bar2->probe_to_host_0, "ok");
-      print_probe_stats(&bar2->drops_ovfl_to_host_0, "ovfl/drop");
+      // Host PF 0 doesn't (yet) implement this probe since PF0 is somewhat
+      // special purpose rather than general purpose.  This may change in the future.
+      //print_probe_stats(&bar2->drops_ovfl_to_host_0, "ovfl/drop");
       printf("\n");
     }
 
