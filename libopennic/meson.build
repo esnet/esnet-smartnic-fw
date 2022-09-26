@@ -1,6 +1,7 @@
 sources = files(
   [
     'src/cmac.c',
+    'src/smartnic_probe.c',
     'src/sysmon.c',
     'src/pcie.c',
   ]
