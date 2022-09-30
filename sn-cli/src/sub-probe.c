@@ -6,7 +6,6 @@
 #include <inttypes.h>		/* strtoumax */
 
 #include "smartnic.h"		/* smartnic_* */
-#include "axi4s_probe_block.h"	/* axi4s_probe_block */
 #include "array_size.h"		/* ARRAY_SIZE */
 #include "memory-barriers.h"	/* barrier */
 #include "arguments_common.h"	/* arguments_global, cmd_* */
@@ -144,23 +143,16 @@ static error_t parse_opt_probe (int key, char *arg, struct argp_state *state)
   return 0;
 }
 
-static void print_probe_stats(volatile struct axi4s_probe_block * probe, const char * suffix)
+static void print_probe_stats(volatile struct axi4s_probe_block * probe, const char * suffix, bool clear)
 {
-  probe->halt_counters = 0;
-
-  uint64_t pkt_count;
+  uint64_t packet_count;
   uint64_t byte_count;
 
-  pkt_count = (uint64_t)probe->pkt_count_upper << 32;
-  pkt_count += probe->pkt_count_lower;
-
-  byte_count = (uint64_t)probe->byte_count_upper << 32;
-  // Force memory barrier to ensure that the byte_count_lower is read last since it
-  // triggers a clear of all of the other probe counters when read.
-  barrier();
-  byte_count += probe->byte_count_lower;
-
-  printf("\tPackets: %20lu  Bytes: %20lu  %s\n", pkt_count, byte_count, suffix);
+  if (smartnic_probe_read_counters(probe, &packet_count, &byte_count, clear)) {
+    printf("\tPackets: %20lu  Bytes: %20lu  %s\n", packet_count, byte_count, suffix);
+  } else {
+    printf("\tPackets: %20s  Bytes: %20s  %s\n", "? READ FAIL ?", "? READ FAIL ?", suffix);
+  }
   return;
 }
 
@@ -225,35 +217,35 @@ void cmd_probe(struct argp_state *state)
 
     if (arguments.probes & PROBE_SELECT_FROM_CMAC_0) {
       printf("From CMAC 0\n");
-      print_probe_stats(&bar2->probe_from_cmac_0, "ok");
-      print_probe_stats(&bar2->drops_err_from_cmac_0, "error/drop");
-      print_probe_stats(&bar2->drops_ovfl_from_cmac_0, "ovfl/drop");
+      print_probe_stats(&bar2->probe_from_cmac_0, "ok", false);
+      print_probe_stats(&bar2->drops_err_from_cmac_0, "error/drop", false);
+      print_probe_stats(&bar2->drops_ovfl_from_cmac_0, "ovfl/drop", false);
       printf("\n");
     }
 
     if (arguments.probes & PROBE_SELECT_FROM_CMAC_1) {
       printf("From CMAC 1\n");
-      print_probe_stats(&bar2->probe_from_cmac_1, "ok");
-      print_probe_stats(&bar2->drops_err_from_cmac_1, "error/drop");
-      print_probe_stats(&bar2->drops_ovfl_from_cmac_1, "ovfl/drop");
+      print_probe_stats(&bar2->probe_from_cmac_1, "ok", false);
+      print_probe_stats(&bar2->drops_err_from_cmac_1, "error/drop", false);
+      print_probe_stats(&bar2->drops_ovfl_from_cmac_1, "ovfl/drop", false);
       printf("\n");
     }
 
     if (arguments.probes & PROBE_SELECT_FROM_HOST_0) {
       printf("From HOST PF 0 (h2c)\n");
-      print_probe_stats(&bar2->probe_from_host_0, "ok");
+      print_probe_stats(&bar2->probe_from_host_0, "ok", false);
       printf("\n");
     }
 
     if (arguments.probes & PROBE_SELECT_FROM_HOST_1) {
       printf("From HOST PF 1 (h2c)\n");
-      print_probe_stats(&bar2->probe_from_host_1, "ok");
+      print_probe_stats(&bar2->probe_from_host_1, "ok", false);
       printf("\n");
     }
 
     if (arguments.probes & PROBE_SELECT_CORE_TO_APP) {
       printf("Smartnic Platform to P4 App Input\n");
-      print_probe_stats(&bar2->probe_core_to_app, "ok");
+      print_probe_stats(&bar2->probe_core_to_app, "ok", false);
       printf("\n");
     }
 
@@ -264,13 +256,13 @@ void cmd_probe(struct argp_state *state)
 
     if (arguments.probes & PROBE_SELECT_APP_TO_CORE) {
       printf("P4 App Output to Smartnic Platform\n");
-      print_probe_stats(&bar2->probe_app_to_core, "ok");
+      print_probe_stats(&bar2->probe_app_to_core, "ok", false);
       printf("\n");
     }
 
     if (arguments.probes & PROBE_SELECT_TO_HOST_0) {
       printf("To HOST PF 0 (c2h)\n");
-      print_probe_stats(&bar2->probe_to_host_0, "ok");
+      print_probe_stats(&bar2->probe_to_host_0, "ok", false);
       // Host PF 0 doesn't (yet) implement this probe since PF0 is somewhat
       // special purpose rather than general purpose.  This may change in the future.
       //print_probe_stats(&bar2->drops_ovfl_to_host_0, "ovfl/drop");
@@ -279,22 +271,22 @@ void cmd_probe(struct argp_state *state)
 
     if (arguments.probes & PROBE_SELECT_TO_HOST_1) {
       printf("To HOST PF 1 (c2h)\n");
-      print_probe_stats(&bar2->probe_to_host_1, "ok");
-      print_probe_stats(&bar2->drops_ovfl_to_host_1, "ovfl/drop");
+      print_probe_stats(&bar2->probe_to_host_1, "ok", false);
+      print_probe_stats(&bar2->drops_ovfl_to_host_1, "ovfl/drop", false);
       printf("\n");
     }
 
     if (arguments.probes & PROBE_SELECT_TO_CMAC_0) {
       printf("To CMAC 0\n");
-      print_probe_stats(&bar2->probe_to_cmac_0, "ok");
-      print_probe_stats(&bar2->drops_ovfl_to_cmac_0, "ovfl/drop");
+      print_probe_stats(&bar2->probe_to_cmac_0, "ok", false);
+      print_probe_stats(&bar2->drops_ovfl_to_cmac_0, "ovfl/drop", false);
       printf("\n");
     }
 
     if (arguments.probes & PROBE_SELECT_TO_CMAC_1) {
       printf("To CMAC 1\n");
-      print_probe_stats(&bar2->probe_to_cmac_1, "ok");
-      print_probe_stats(&bar2->drops_ovfl_to_cmac_1, "ovfl/drop");
+      print_probe_stats(&bar2->probe_to_cmac_1, "ok", false);
+      print_probe_stats(&bar2->drops_ovfl_to_cmac_1, "ovfl/drop", false);
       printf("\n");
     }
 
