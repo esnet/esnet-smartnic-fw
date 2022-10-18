@@ -14,7 +14,7 @@ services:
     user: root
     privileged: true
     ports:
-      - "3121:3121"
+      - "${HW_SERVER_PORT-3121}:3121"
     volumes:
       - /dev:/dev
       - /sys/bus/usb:/sys/bus/usb
