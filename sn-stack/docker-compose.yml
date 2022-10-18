@@ -90,6 +90,8 @@ services:
     privileged: true
     env_file:
       - ${SN_STACK_ROOT-.}/buildinfo.env
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
     tmpfs:
       - /status
     volumes:
@@ -113,13 +115,14 @@ services:
       - |
         echo 1 > /sys/bus/pci/rescan
         sleep 1
-        lspci -d 10ee: -Dmm \
-          | cut -d ' ' -f 1 \
-          | xargs dpdk-devbind.py -b vfio-pci
-        if [ $$(lspci -D -v -d 10ee: | grep vfio-pci | wc -l) -eq 2 ] ; then
-          touch /status/ok
-          sleep infinity
-        fi
+        # Bind the vfio-pci driver to each FPGA PF
+        dpdk-devbind.py -b vfio-pci $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
+        # Confirm that the driver is properly bound to each FPGA PF
+        # Note the <TAB> before vfio-pci in the grep command
+        lspci -D -kvm -s $$FPGA_PCIE_DEV.0 | grep '^Driver:	vfio-pci'
+        lspci -D -kvm -s $$FPGA_PCIE_DEV.1 | grep '^Driver:	vfio-pci'
+        touch /status/ok
+        sleep infinity
     profiles:
       - smartnic-dpdk
 
