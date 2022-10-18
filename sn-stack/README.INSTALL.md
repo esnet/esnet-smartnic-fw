@@ -234,3 +234,92 @@ When we're finished using the smartnic runtime environment, we can stop and remo
 ```
 docker compose down -v
 ```
+
+Using the smartnic-dpdk container
+=================================
+
+The `sn-stack` environment can be started in a mode where the FPGA can be controlled by a DPDK application.  Running in this mode requires a few carefully ordered steps.
+
+Broadly speaking, the steps required to bring up a DPDK application are as follows:
+* Bind the `vfio-pci` kernel driver to each FPGA PCIe physical function (PF)
+  * This is handled automatically by the sn-stack when `COMPOSE_PROFILES=smartnic-dpdk` is set in the `.env` file.
+* Run a DPDK application with appropriate DPDK Environment Abstraction Layer (EAL) settings
+  * Use `-a $SN_PCIE_DEV.0` to allow control of one or more specific FPGA PCIe PFs
+  * Use `-d librte_net_qdma.so` to dynamically link the correct Userspace Polled-Mode Driver (PMD) for the smartnic QDMA engine
+  * The EAL will
+    * Open the PCIe PFs using the kernel's `vfio-pci` driver
+	* Take the FPGA device out of reset
+	* Open and map large memory regions for DMA using the kernel's `hugepages` driver
+  * The application is responsible for assigning buffers to one or more of the FPGA's DMA queues
+* Use the `sn-cli` tool to configure some of the low-level hardware components in the FPGA
+  * Configure the set of valid DMA queues in the FPGA (must match what is set in the DPDK application)
+  * Bring up the physical ethernet ports
+
+In the examples below, we will be running the `pktgen-dpdk` application to control packet tx/rx via the FPGA's PCIe physical functions.  This can be very useful for injecting packets into a design for testing behaviour on real hardware.
+
+For more information about DPDK in general, see:
+* http://core.dpdk.org/doc/
+
+For more information about the `pktgen-dpdk` application, see:
+* https://pktgen-dpdk.readthedocs.io/en/latest/index.html
+
+Before you bring up the `sn-stack`, please ensure that you have uncommented this line in your `.env` file
+```
+COMPOSE_PROFILES=smartnic-dpdk
+```
+
+If you changed this while the stack was already running, you'll need to restart the stack with down/up.
+
+First, you'll need to start up the `pktgen` application to open the vfio-pci device for PF0 and PF1 and take the FPGA out of reset.
+```
+$ docker compose exec smartnic-dpdk bash
+root@smartnic-dpdk:/# pktgen -a $SN_PCIE_DEV.0 -a $SN_PCIE_DEV.1 -l 4-8 -n 4 -d librte_net_qdma.so --file-prefix $SN_PCIE_DEV- -- -v -m [5:6].0 -m [7:8].1
+Pktgen:/> help
+```
+NOTE: Leave this application running while doing the remaining setup steps.  The setup steps below must be re-run after each time you restart the pktgen application since the FPGA gets reset between runs.
+
+Open a **separate** shell window which you will use for doing the low-level smartnic platform configuration.
+
+Configure the Queue mappings for host PF0 and PF1 interfaces and bring up the physical ethernet ports using the `smartnic-fw` container.
+
+```
+$ docker compose exec smartnic-fw bash
+root@smartnic-fw:/# sn-cli qdma setqs 1 1
+root@smartnic-fw:/# sn-cli qdma status
+root@smartnic-fw:/# sn-cli cmac enable
+root@smartnic-fw:/# sn-cli cmac status
+```
+Setting up the queue mappings tells the smartnic platform which QDMA queues to use for h2c and c2h packets.  Enabling the CMACs allows Rx and Tx packets to flow (look for `MAC ENABLED/PHY UP`).
+
+Advanced usage of the pktgen-dpdk application
+=============================================
+
+Example of streaming packets out of an interface from a pcap file rather than generating the packets within the UI.
+Note the `-s <P>:file.pcap` option where `P` refers to the port number to bind the pcap file to.
+
+```
+root@smartnic-dpdk:/# pktgen -a $SN_PCIE_DEV.0 -a $SN_PCIE_DEV.1 -l 4-8 -n 4 -d librte_net_qdma.so --file-prefix $SN_PCIE_DEV- -- -v -m [5:6].0 -m [7:8].1 -s 1:your_custom.pcap
+Pktgen:/> port 1
+Pktgen:/> page pcap
+Pktgen:/> page main
+Pktgen:/> start 1
+Pktgen:/> stop 1
+Pktgen:/> clr
+```
+
+Example of running a particular test case via a script rather than typing at the UI
+
+```
+cat <<_EOF > /tmp/test.pkt
+clr
+set 1 size 1400
+set 1 count 1000000
+enable 0 capture
+start 1
+disable 0 capture
+_EOF
+```
+
+```
+root@smartnic-dpdk:/# pktgen -a $SN_PCIE_DEV.0 -a SN_PCIE_DEV.1 -l 4-8 -n 4 -d librte_net_qdma.so --file-prefix $SN_PCIE_DEV- -- -v -m [5:6].0 -m [7:8].1 -f /tmp/test.pkt
+```
