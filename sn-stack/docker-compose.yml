@@ -35,7 +35,9 @@ services:
         /opt/Xilinx/Vivado_Lab/$${VIVADO_VERSION}/bin/hw_server \
           -S \
           -s \
-          tcp::3121
+          tcp::3121 \
+          -e "set auto-open-ports 0" \
+          -e "set jtag-port-filter ${HW_TARGET_SERIAL:-Xilinx/}"
 
   smartnic-hw:
     <<: *labtools-service
