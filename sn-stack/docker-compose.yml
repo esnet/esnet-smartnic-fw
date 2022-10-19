@@ -73,6 +73,7 @@ services:
           xilinx-hwserver:3121 \
           "${HW_TARGET_SERIAL:-*}" \
           /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
+          $FPGA_PCIE_DEV \
           # FORCE
         if [ $$? ] ; then
           touch /status/ok

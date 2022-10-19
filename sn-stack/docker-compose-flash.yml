@@ -27,7 +27,8 @@ services:
         /scripts/program_flash.sh \
           localhost:3121 \
           "${HW_TARGET_SERIAL:-*}" \
-          /usr/lib/firmware/esnet-smartnic/esnet-smartnic.mcs
+          /usr/lib/firmware/esnet-smartnic/esnet-smartnic.mcs \
+          $FPGA_PCIE_DEV
         if [ $$? ] ; then
           # Flash update has succeeded, all OK
           echo "Flash Update Successful"
