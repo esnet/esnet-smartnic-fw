@@ -2,18 +2,19 @@
 
 function usage() {
     echo ""
-    echo "Usage: $(basename $0) <hw_server_url> <hw_target_serial> <bitfile_path> [FORCE]"
+    echo "Usage: $(basename $0) <hw_server_url> <hw_target_serial> <bitfile_path> <pcie_device_addr> [FORCE]"
     echo "  hw_server_url: host:port for xilinx hw_server (e.g. xilinx-hwserver:3121)"
     echo "  hw_target_serial: serial number of serial JTAG device (e.g. 21770205K01Y)"
     echo "     can be discovered with: lsusb -v -d 0403:6011 | grep iSerial"
     echo "     can be set to '*' to select the first serial JTAG device that is found"
     echo "  bitfile_path: full path to the .bit file to be loaded into the fpga"
+    echo "  pcie_device_addr: pcie domain:bus:device (e.g. 0000:81:00)"
     echo "  FORCE: optionally force a reload even if the USERCODE/UserID fields match"
     echo ""
 }
 
 # Make sure the caller has provided the required parameters
-if [ "$#" -lt 3 ] ; then
+if [ "$#" -lt 4 ] ; then
     echo "ERROR: Missing required parameter(s)"
     usage
     exit 1
@@ -53,6 +54,11 @@ echo "    $(file -b $1)"
 BITFILE_PATH=$1
 shift
 
+# Grab the FPGA device address
+echo "Expecting to reprogram PCIe device: $1"
+FPGA_PCIE_DEV=$1
+shift
+
 # Check for the optional FORCE parameter
 FORCE=0
 if [ "$#" -ge 1 ] ; then
@@ -82,7 +88,7 @@ else
     fi
 
     # Disconnect any devices from the kernel
-    for i in $(lspci -d 10ee: -Dmm | cut -d' ' -f 1) ; do
+    for i in $(lspci -Dmm -s $FPGA_PCIE_DEV | cut -d' ' -f 1) ; do
 	echo 1 > /sys/bus/pci/devices/$i/remove
     done
 
