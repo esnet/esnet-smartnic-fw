@@ -85,8 +85,10 @@ pull_sn_hw:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     OS_CODENAME: focal
+    SN_FW_REPO: ${CI_PROJECT_NAME}
+    SN_FW_BRANCH: ${CI_COMMIT_BRANCH}
     SN_FW_VER: ${CI_PIPELINE_ID}
-    DOCKER_COMPOSE_URL: https://dispense.es.net/Linux/github-mirrors/docker/compose/v2.10.2/docker-compose-linux-x86_64
+    DOCKER_COMPOSE_URL: https://dispense.es.net/Linux/github-mirrors/docker/compose/v2.12.2/docker-compose-linux-x86_64
     # Give our docker compose stack a unique prefix in case multiple concurrent jobs run on the same gitlab-ci runner
     COMPOSE_PROJECT_NAME: ${CI_PROJECT_NAME}-pipe${CI_PIPELINE_ID}-job${CI_JOB_ID}
   before_script:
@@ -102,6 +104,9 @@ pull_sn_hw:
       SN_HW_BRANCH=${SN_HW_BRANCH}
       SN_HW_APP_NAME=${SN_HW_APP_NAME}
       SN_HW_VER=${SN_HW_VER}
+
+      SN_FW_REPO=${SN_FW_REPO}
+      SN_FW_BRANCH=${SN_FW_BRANCH}
       SN_FW_VER=${SN_FW_VER}
       OS_CODENAME=${OS_CODENAME}
       _EOF
