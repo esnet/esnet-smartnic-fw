@@ -21,6 +21,8 @@ services:
       SN_HW_BRANCH: ${SN_HW_BRANCH-unset}
       SN_HW_APP_NAME: ${SN_HW_APP_NAME?}
       SN_HW_VER: ${SN_HW_VER?}
+      SN_FW_REPO: ${SN_FW_REPO-unset}
+      SN_FW_BRANCH: ${SN_FW_BRANCH-unset}
       SN_FW_VER: ${SN_FW_VER?}
       OS_CODENAME: ${OS_CODENAME?}
     entrypoint:
@@ -57,11 +59,15 @@ services:
         find /output/debs -type d -print0 | xargs --no-run-if-empty --null chmod a=rwx
         find /output/debs -type f -print0 | xargs --no-run-if-empty --null chmod a=rw
         cat <<_EOF > /output/buildinfo.env
+        # FW
+        SN_FW_REPO=$${SN_FW_REPO}
+        SN_FW_BRANCH=$${SN_FW_BRANCH}
+        SN_FW_VER=$${SN_FW_VER}
+        OS_CODENAME=$${OS_CODENAME}
+        # HW
         SN_HW_REPO=$${SN_HW_REPO}
         SN_HW_BRANCH=$${SN_HW_BRANCH}
         SN_HW_APP_NAME=$${SN_HW_APP_NAME}
         SN_HW_VER=$${SN_HW_VER}
-        SN_FW_VER=$${SN_FW_VER}
-        OS_CODENAME=$${OS_CODENAME}
         _EOF
         file subprojects/esnet-smartnic-hwapi/firmware/esnet-smartnic.bit
