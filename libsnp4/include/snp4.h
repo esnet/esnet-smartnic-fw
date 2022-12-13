@@ -5,11 +5,20 @@
 // reserved.
 //
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <stdio.h>		/* FILE */
+#ifndef SNP4_H
+#define SNP4_H
+
 #include <gmp.h>		/* mpz_* */
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+#include <stdbool.h>		/* bool */
+#include <stdint.h>		/* uint16_t, uint8_t */
+#include <stddef.h>		/* size_t */
+#include <stdio.h>		/* FILE */
 
 extern void * snp4_init(uintptr_t snp4_base_addr);
 extern bool snp4_deinit(void * snp4_handle);
@@ -206,3 +215,9 @@ struct sn_cfg_set {
 
 extern struct sn_cfg_set *snp4_cfg_set_load_p4bm(FILE * f);
 extern void snp4_cfg_set_free(struct sn_cfg_set *cfg_set);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* SNP4_H */
