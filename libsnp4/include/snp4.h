@@ -14,6 +14,7 @@
 extern void * snp4_init(uintptr_t snp4_base_addr);
 extern bool snp4_deinit(void * snp4_handle);
 extern bool snp4_reset_all_tables(void * snp4_handle);
+extern bool snp4_reset_one_table(void * snp4_handle, const char * table_name);
 extern bool snp4_table_insert_kma(void * snp4_handle,
 				  const char * table_name,
 				  uint8_t * key,

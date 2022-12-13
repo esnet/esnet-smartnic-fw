@@ -153,6 +153,22 @@ bool snp4_reset_all_tables(void * snp4_handle)
   return true;
 }
 
+bool snp4_reset_one_table(void * snp4_handle, const char * table_name)
+{
+  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
+
+  XilVitisNetP4TableCtx * table;
+  if (XilVitisNetP4TargetGetTableByName(vitisnetp4_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  if (XilVitisNetP4TableReset(table) != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  return true;
+}
+
 bool snp4_table_insert_kma(void * snp4_handle,
 			   const char * table_name,
 			   uint8_t * key,
