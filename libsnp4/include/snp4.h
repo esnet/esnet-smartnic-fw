@@ -42,38 +42,117 @@ extern bool snp4_table_delete_k(void * snp4_handle,
 				size_t    mask_len);
 extern void snp4_print_target_config (void);
 
-#define SN_RULE_MAX_MATCHES 64
-#define SN_RULE_MAX_PARAMS  64
+// Define some limits for the supported pipeline properties handled by this library
+// NOTE: These are not necessarily related to the limits of the underlying hardware
+#define SNP4_MAX_PIPELINE_TABLES 64
+#define SNP4_MAX_TABLE_MATCHES 64
+#define SNP4_MAX_TABLE_ACTIONS 64
+#define SNP4_MAX_ACTION_PARAMS 64
 
-struct sn_field_spec {
-  unsigned int size;
-  char         type;
+struct snp4_info_param {
+  const char * name;
+
+  uint16_t bits;
 };
 
-struct sn_param_spec {
-  unsigned int size;
+struct snp4_info_action {
+  const char * name;
+
+  uint16_t param_bits;
+  struct snp4_info_param params[SNP4_MAX_ACTION_PARAMS];
+  uint16_t num_params;
 };
 
-enum table_endian {
-  TABLE_ENDIAN_BIG,
-  TABLE_ENDIAN_LITTLE,
+enum snp4_info_match_type {
+  SNP4_INFO_MATCH_TYPE_INVALID,
+  SNP4_INFO_MATCH_TYPE_BITFIELD,
+  SNP4_INFO_MATCH_TYPE_CONSTANT,
+  SNP4_INFO_MATCH_TYPE_PREFIX,
+  SNP4_INFO_MATCH_TYPE_RANGE,
+  SNP4_INFO_MATCH_TYPE_TERNARY,
+  SNP4_INFO_MATCH_TYPE_UNUSED,
 };
 
-struct sn_table_info {
-  enum table_endian endian;
-  uint16_t key_size_bits;
-  uint16_t action_id_size_bits;
-  uint16_t response_size_bits;
-  uint16_t priority_size_bits;
-  struct sn_field_spec field_specs[SN_RULE_MAX_MATCHES];
-  size_t num_fields;
+struct snp4_info_match {
+  const char * name;
+
+  enum snp4_info_match_type type;
+  uint16_t bits;
 };
 
-struct sn_action_info {
-  uint16_t param_size_bits;
-  struct sn_param_spec param_specs[SN_RULE_MAX_PARAMS];
-  size_t num_params;
+enum snp4_info_table_endian {
+  SNP4_INFO_TABLE_ENDIAN_LITTLE = 0,
+  SNP4_INFO_TABLE_ENDIAN_BIG = 1,
 };
+
+struct snp4_info_table {
+  const char * name;
+
+  enum snp4_info_table_endian endian;
+
+  uint16_t key_bits;
+  struct snp4_info_match matches[SNP4_MAX_TABLE_MATCHES];
+  uint16_t num_matches;
+
+  uint16_t response_bits;
+  uint16_t actionid_bits;
+  struct snp4_info_action actions[SNP4_MAX_TABLE_ACTIONS];
+  uint16_t num_actions;
+
+  bool priority_required;
+  uint16_t priority_bits;
+};
+
+struct snp4_info_pipeline {
+  struct snp4_info_table tables[SNP4_MAX_PIPELINE_TABLES];
+  uint16_t num_tables;
+};
+
+enum snp4_status {
+  SNP4_STATUS_OK,
+  SNP4_STATUS_NULL_PIPELINE,
+  SNP4_STATUS_NULL_ENTRY,
+  SNP4_STATUS_NULL_PACK,
+  SNP4_STATUS_MALLOC_FAIL,
+  SNP4_STATUS_NULL_RULE,
+  SNP4_STATUS_FIELD_SPEC_OVERFLOW,
+  SNP4_STATUS_FIELD_SPEC_FORMAT_INVALID,
+  SNP4_STATUS_FIELD_SPEC_UNKNOWN_TYPE,
+  SNP4_STATUS_FIELD_SPEC_SIZE_MISMATCH,
+
+  SNP4_STATUS_PACK_KEY_TOO_BIG,
+  SNP4_STATUS_PACK_MASK_TOO_BIG,
+  SNP4_STATUS_PACK_PARAMS_TOO_BIG,
+
+  SNP4_STATUS_MATCH_INVALID_FORMAT,
+  SNP4_STATUS_MATCH_MASK_TOO_WIDE,
+  SNP4_STATUS_MATCH_INVALID_BITFIELD_MASK,
+  SNP4_STATUS_MATCH_INVALID_CONSTANT_MASK,
+  SNP4_STATUS_MATCH_INVALID_PREFIX_MASK,
+  SNP4_STATUS_MATCH_INVALID_RANGE_MASK,
+  SNP4_STATUS_MATCH_INVALID_UNUSED_MASK,
+  SNP4_STATUS_MATCH_KEY_TOO_BIG,
+  SNP4_STATUS_MATCH_MASK_TOO_BIG,
+
+  SNP4_STATUS_INVALID_TABLE_NAME,
+  SNP4_STATUS_INVALID_TABLE_CONFIG,
+  SNP4_STATUS_INVALID_ACTION_FOR_TABLE,
+
+  SNP4_STATUS_PARAM_INVALID_FORMAT,
+  SNP4_STATUS_PARAM_SPEC_OVERFLOW,
+  SNP4_STATUS_PARAM_SPEC_SIZE_MISMATCH,
+  SNP4_STATUS_PARAM_TOO_BIG,
+
+  SNP4_STATUS_INFO_TOO_MANY_TABLES,
+  SNP4_STATUS_INFO_TOO_MANY_MATCHES,
+  SNP4_STATUS_INFO_TOO_MANY_ACTIONS,
+  SNP4_STATUS_INFO_TOO_MANY_PARAMS,
+  SNP4_STATUS_INFO_INVALID_ENDIAN,
+};
+
+extern enum snp4_status snp4_info_get_pipeline(struct snp4_info_pipeline * pipeline);
+extern const struct snp4_info_table * snp4_info_get_table_by_name(const struct snp4_info_pipeline * pipeline, const char * table_name);
+extern const struct snp4_info_action * snp4_info_get_action_by_name(const struct snp4_info_table * table, const char * action_name);
 
 enum sn_match_format {
   SN_MATCH_FORMAT_KEY_MASK,
@@ -127,11 +206,11 @@ struct sn_param {
 struct sn_rule {
   char * table_name;
   
-  struct sn_match matches[SN_RULE_MAX_MATCHES];
+  struct sn_match matches[SNP4_MAX_TABLE_MATCHES];
   size_t num_matches;
 
   char * action_name;
-  struct sn_param params[SN_RULE_MAX_PARAMS];
+  struct sn_param params[SNP4_MAX_ACTION_PARAMS];
   size_t num_params;
 
   uint32_t priority;
@@ -148,44 +227,9 @@ struct sn_pack {
   size_t    params_len;
 };
 
-enum snp4_status {
-  SNP4_STATUS_OK,
-  SNP4_STATUS_NULL_ENTRY,
-  SNP4_STATUS_NULL_PACK,
-  SNP4_STATUS_MALLOC_FAIL,
-  SNP4_STATUS_NULL_RULE,
-  SNP4_STATUS_FIELD_SPEC_OVERFLOW,
-  SNP4_STATUS_FIELD_SPEC_FORMAT_INVALID,
-  SNP4_STATUS_FIELD_SPEC_UNKNOWN_TYPE,
-  SNP4_STATUS_FIELD_SPEC_SIZE_MISMATCH,
-
-  SNP4_STATUS_PACK_KEY_TOO_BIG,
-  SNP4_STATUS_PACK_MASK_TOO_BIG,
-  SNP4_STATUS_PACK_PARAMS_TOO_BIG,
-
-  SNP4_STATUS_MATCH_INVALID_FORMAT,
-  SNP4_STATUS_MATCH_MASK_TOO_WIDE,
-  SNP4_STATUS_MATCH_INVALID_BITFIELD_MASK,
-  SNP4_STATUS_MATCH_INVALID_CONSTANT_MASK,
-  SNP4_STATUS_MATCH_INVALID_PREFIX_MASK,
-  SNP4_STATUS_MATCH_INVALID_RANGE_MASK,
-  SNP4_STATUS_MATCH_INVALID_UNUSED_MASK,
-  SNP4_STATUS_MATCH_KEY_TOO_BIG,
-  SNP4_STATUS_MATCH_MASK_TOO_BIG,
-
-  SNP4_STATUS_INVALID_TABLE_NAME,
-  SNP4_STATUS_INVALID_TABLE_CONFIG,
-  SNP4_STATUS_INVALID_ACTION_FOR_TABLE,
-
-  SNP4_STATUS_PARAM_INVALID_FORMAT,
-  SNP4_STATUS_PARAM_SPEC_OVERFLOW,
-  SNP4_STATUS_PARAM_SPEC_SIZE_MISMATCH,
-  SNP4_STATUS_PARAM_TOO_BIG,
-};
-
-extern enum snp4_status snp4_config_load_table_and_action_info(const char *table_name, const char *action_name, struct sn_table_info *table_info, struct sn_action_info *action_info);
-
-extern enum snp4_status snp4_rule_pack(const struct sn_rule * rule, struct sn_pack * pack);
+extern enum snp4_status snp4_rule_pack(const struct snp4_info_pipeline * pipeline, const struct sn_rule * rule, struct sn_pack * pack);
+extern enum snp4_status snp4_rule_pack_matches(const struct snp4_info_match match_info_specs[], unsigned int key_size_bits, const struct sn_match matches[], size_t num_matches, struct sn_pack * pack);
+extern enum snp4_status snp4_rule_pack_params(const struct snp4_info_param param_info_specs[], unsigned int table_param_size_bits, unsigned int action_param_size_bits, const struct sn_param params[], size_t num_params, struct sn_pack * pack);
 extern void snp4_rule_clear(struct sn_rule * rule);
 extern void snp4_pack_clear(struct sn_pack * pack);
 extern void snp4_rule_param_clear(struct sn_param *param);

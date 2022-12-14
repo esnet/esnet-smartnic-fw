@@ -5,7 +5,7 @@
 
 #include "snp4.h"		/* API */
 
-static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part, const struct sn_match *match, const struct sn_field_spec *field_spec) {
+static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part, const struct sn_match *match, const struct snp4_info_match *match_info_spec) {
   enum snp4_status rc;
   
   // Set up an all-zeros mask for this field
@@ -15,7 +15,7 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
   // Set up an all-ones mask for this field
   mpz_t ones_mask;
   mpz_init_set_ui(ones_mask, 1);
-  mpz_mul_2exp(ones_mask, ones_mask, field_spec->size);
+  mpz_mul_2exp(ones_mask, ones_mask, match_info_spec->bits);
   mpz_sub_ui(ones_mask, ones_mask, 1);
 
   // Default mask will be set to a reasonable default for this field
@@ -39,7 +39,7 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
     break;
   case SN_MATCH_FORMAT_PREFIX:
     mpz_set(*key_part, match->v.prefix.key);
-    if (match->v.prefix.prefix_len > field_spec->size) {
+    if (match->v.prefix.prefix_len > match_info_spec->bits) {
       // Mask prefix length is out of range
       rc = SNP4_STATUS_MATCH_MASK_TOO_WIDE;
       goto out_error;
@@ -49,7 +49,7 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
     mpz_mul_2exp(*mask_part, *mask_part, match->v.prefix.prefix_len);
     mpz_sub_ui(*mask_part, *mask_part, 1);
     // mask_field = mask_field << (field_size_bits - prefix_len)
-    mpz_mul_2exp(*mask_part, *mask_part, field_spec->size - match->v.prefix.prefix_len);
+    mpz_mul_2exp(*mask_part, *mask_part, match_info_spec->bits - match->v.prefix.prefix_len);
     has_mask = true;
     break;
   case SN_MATCH_FORMAT_RANGE:
@@ -72,29 +72,29 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
   // Provide a field-type-specific default value for the mask field
   // Note: The default mask is computed based on the type of the field *as defined in p4*
   // This will be used IFF the caller has not provided an encoding that includes a mask
-  switch (field_spec->type) {
-  case 'b':
+  switch (match_info_spec->type) {
+  case SNP4_INFO_MATCH_TYPE_BITFIELD:
     // Bit Field
     mpz_set(mask_default, ones_mask);
     break;
-  case 'c':
+  case SNP4_INFO_MATCH_TYPE_CONSTANT:
     // Constant Field
     mpz_set(mask_default, ones_mask);
     break;
-  case 'p':
+  case SNP4_INFO_MATCH_TYPE_PREFIX:
     // Prefix Field
     mpz_set(mask_default, ones_mask);
     break;
-  case 'r':
+  case SNP4_INFO_MATCH_TYPE_RANGE:
     // Range Field
     // Set the upper limit of the range == lower limit of the range (ie. exactly match the lower value)
     mpz_set(mask_default, *key_part);
     break;
-  case 't':
+  case SNP4_INFO_MATCH_TYPE_TERNARY:
     // Ternary Field
     mpz_set(mask_default, ones_mask);
     break;
-  case 'u':
+  case SNP4_INFO_MATCH_TYPE_UNUSED:
     // Unused Field
     mpz_set(mask_default, zero_mask);
     break;
@@ -112,8 +112,8 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
   }
   
   // Validate the provided or default mask for this field based on the field type
-  switch (field_spec->type) {
-  case 'b':
+  switch (match_info_spec->type) {
+  case SNP4_INFO_MATCH_TYPE_BITFIELD:
     // Bit Field: Allowed masks: 0 / -1
     if (!((mpz_cmp(*mask_part, zero_mask) == 0) ||
 	  (mpz_cmp(*mask_part, ones_mask) == 0))) {
@@ -122,7 +122,7 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
       goto out_error;
     }
     break;
-  case 'c':
+  case SNP4_INFO_MATCH_TYPE_CONSTANT:
     // Constant Field: Allowed masks: -1
     if (!((mpz_cmp(*mask_part, ones_mask) == 0))) {
       // Invalid mask value
@@ -130,19 +130,19 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
       goto out_error;
     }
     break;
-  case 'p':
+  case SNP4_INFO_MATCH_TYPE_PREFIX:
     // Prefix Field: Allowed masks: mask must be contiguous 1's in msbs
     if (!(mpz_cmp(*mask_part, zero_mask) == 0)) {
       // Check if we have a zero bit above the lowest one bit
       mp_bitcnt_t lowest_one_pos = mpz_scan1(*mask_part, 0);
-      if (mpz_scan0(*mask_part, lowest_one_pos) < field_spec->size) {
+      if (mpz_scan0(*mask_part, lowest_one_pos) < match_info_spec->bits) {
 	// Found a zero above the lowest one bit.  Mask is not in prefix form.
 	rc = SNP4_STATUS_MATCH_INVALID_PREFIX_MASK;
 	goto out_error;
       }
     }
     break;
-  case 'r':
+  case SNP4_INFO_MATCH_TYPE_RANGE:
     // Range Field: Allowed masks: mask must be >= key (ie. includes 1 or more values)
     if (mpz_cmp(*mask_part, *key_part) < 0) {
       // upper limit of the range is < lower limit of range
@@ -150,10 +150,10 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
       goto out_error;
     }
     break;
-  case 't':
+  case SNP4_INFO_MATCH_TYPE_TERNARY:
     // Ternary Field: Allowed masks: any
     break;
-  case 'u':
+  case SNP4_INFO_MATCH_TYPE_UNUSED:
     // Unused Field: Allowed masks: 0
     if (!(mpz_cmp(*mask_part, zero_mask) == 0)) {
       // Non-zero mask provided for unused field
@@ -169,14 +169,14 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
   }
 
   // Ensure that the key is not wider than the field
-  if (mpz_sizeinbase(*key_part, 2) > field_spec->size) {
+  if (mpz_sizeinbase(*key_part, 2) > match_info_spec->bits) {
     // Key is too large for field
     rc = SNP4_STATUS_MATCH_KEY_TOO_BIG;
     goto out_error;
   }
 
   // Ensure that the mask is not wider than the field
-  if (mpz_sizeinbase(*mask_part, 2) > field_spec->size) {
+  if (mpz_sizeinbase(*mask_part, 2) > match_info_spec->bits) {
     // Mask is too large for field
     rc = SNP4_STATUS_MATCH_MASK_TOO_BIG;
     goto out_error;
@@ -193,7 +193,7 @@ static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part,
   return rc;
 }
 
-static enum snp4_status snp4_rule_pack_matches(const struct sn_field_spec field_specs[], unsigned int key_size_bits, const struct sn_match matches[], size_t num_matches, struct sn_pack * pack)
+enum snp4_status snp4_rule_pack_matches(const struct snp4_info_match match_info_specs[], unsigned int key_size_bits, const struct sn_match matches[], size_t num_matches, struct sn_pack * pack)
 {
   enum snp4_status rc;
 
@@ -208,33 +208,33 @@ static enum snp4_status snp4_rule_pack_matches(const struct sn_field_spec field_
   mpz_init(key_part);
   mpz_init(mask_part);
 
-  // NOTE: The field_spec describes the fields of the key from lsbs up to msbs.
+  // NOTE: The match_info spec describes the fields of the key from lsbs up to msbs.
   //       The matches array describes the fields of the key from msbs down to lsbs.
   //
-  //       The field_spec array will be consumed in reverse order to account for this
+  //       The match_info spec array will be consumed in reverse order to account for this
   //       discrepancy.
 
   for (unsigned int i = 0; i < num_matches; i++) {
-    const struct sn_field_spec * field_spec = &field_specs[num_matches - 1 - i];
+    const struct snp4_info_match * match_info_spec = &match_info_specs[num_matches - 1 - i];
 
-    rc = pack_partial_key_mask(&key_part, &mask_part, &matches[i], field_spec);
+    rc = pack_partial_key_mask(&key_part, &mask_part, &matches[i], match_info_spec);
     if (rc != SNP4_STATUS_OK) {
       goto out_key_mask_extend_fail;
     }
 
 #ifdef SDNETCONFIG_DEBUG
-    gmp_fprintf(stderr, "key part:  %#0*Zx\n", (field_spec->size + 3) / 4 + 2, key_part);
-    gmp_fprintf(stderr, "mask part: %#0*Zx\n", (field_spec->size + 3) / 4 + 2, mask_part);
+    gmp_fprintf(stderr, "key part:  %#0*Zx\n", (match_info_spec->bits + 3) / 4 + 2, key_part);
+    gmp_fprintf(stderr, "mask part: %#0*Zx\n", (match_info_spec->bits + 3) / 4 + 2, mask_part);
 #endif
 
     // Extend the current key to include this field
     // by shifting all previous fields to the left and inclusive-or the new key field into the lsbs
-    mpz_mul_2exp(key, key, field_spec->size);
+    mpz_mul_2exp(key, key, match_info_spec->bits);
     mpz_ior(key, key, key_part);
 
     // Extend the current mask to include this field
     // by shifting all previous fields to the left and inclusive-or the new mask field into the lsbs
-    mpz_mul_2exp(mask, mask, field_spec->size);
+    mpz_mul_2exp(mask, mask, match_info_spec->bits);
     mpz_ior(mask, mask, mask_part);
   }
 
@@ -289,7 +289,7 @@ static enum snp4_status snp4_rule_pack_matches(const struct sn_field_spec field_
   return rc;
 }
 
-static enum snp4_status pack_partial_param(mpz_t *param_part, const struct sn_param *param, const struct sn_param_spec *param_spec)
+static enum snp4_status pack_partial_param(mpz_t *param_part, const struct sn_param *param, const struct snp4_info_param *param_spec)
 {
   // Fill in the param based on the information provided by the user
   switch (param->t) {
@@ -304,7 +304,7 @@ static enum snp4_status pack_partial_param(mpz_t *param_part, const struct sn_pa
   }
 
   // Ensure that the param is not wider than it should be
-  if (mpz_sizeinbase(*param_part, 2) > param_spec->size) {
+  if (mpz_sizeinbase(*param_part, 2) > param_spec->bits) {
     // Param is too large for field
     return SNP4_STATUS_PARAM_TOO_BIG;
   }
@@ -312,7 +312,7 @@ static enum snp4_status pack_partial_param(mpz_t *param_part, const struct sn_pa
   return SNP4_STATUS_OK;
 }
 
-static enum snp4_status snp4_rule_pack_params(const struct sn_param_spec param_specs[], unsigned int table_param_size_bits, unsigned int action_param_size_bits, const struct sn_param params[], size_t num_params, struct sn_pack * pack) {
+enum snp4_status snp4_rule_pack_params(const struct snp4_info_param param_info_specs[], unsigned int table_param_size_bits, unsigned int action_param_size_bits, const struct sn_param params[], size_t num_params, struct sn_pack * pack) {
   enum snp4_status rc;
   
   // Check if we even require parameters for this action
@@ -330,7 +330,7 @@ static enum snp4_status snp4_rule_pack_params(const struct sn_param_spec param_s
   mpz_t param_part;
   mpz_init(param_part);
   for (unsigned int i = 0; i < num_params; i++) {
-    const struct sn_param_spec * param_spec = &param_specs[i];
+    const struct snp4_info_param * param_spec = &param_info_specs[i];
 
     rc = pack_partial_param(&param_part, &params[i], param_spec);
     if (rc != SNP4_STATUS_OK) {
@@ -338,12 +338,12 @@ static enum snp4_status snp4_rule_pack_params(const struct sn_param_spec param_s
     }
 
 #ifdef SDNETCONFIG_DEBUG
-    gmp_fprintf(stderr, "param part:  %#0*Zx\n", (param_spec->size + 3) / 4 + 2, param_part);
+    gmp_fprintf(stderr, "param part:  %#0*Zx\n", (param_spec->bits + 3) / 4 + 2, param_part);
 #endif
 
     // Extend the current param to include this field
     // by shifting all previous params to the left and inclusive-or the new partial param into the lsbs
-    mpz_mul_2exp(params_all, params_all, param_spec->size);
+    mpz_mul_2exp(params_all, params_all, param_spec->bits);
     mpz_ior(params_all, params_all, param_part);
   }
 
@@ -457,9 +457,13 @@ void snp4_pack_clear(struct sn_pack * pack)
   }
 }
 
-enum snp4_status snp4_rule_pack(const struct sn_rule * rule, struct sn_pack * pack)
+enum snp4_status snp4_rule_pack(const struct snp4_info_pipeline * pipeline, const struct sn_rule * rule, struct sn_pack * pack)
 {
   enum snp4_status rc;
+
+  if (pipeline == NULL) {
+    return SNP4_STATUS_NULL_PIPELINE;
+  }
 
   if (rule == NULL) {
     return SNP4_STATUS_NULL_RULE;
@@ -476,42 +480,45 @@ enum snp4_status snp4_rule_pack(const struct sn_rule * rule, struct sn_pack * pa
   pack->params = NULL;
 
   // Load the table and action info required for packing
-  struct sn_table_info table_info;
-  struct sn_action_info action_info;
-  rc = snp4_config_load_table_and_action_info(rule->table_name, rule->action_name, &table_info, &action_info);
-  if (rc != SNP4_STATUS_OK) {
-    return rc;
+  const struct snp4_info_table * table_info = snp4_info_get_table_by_name(pipeline, rule->table_name);
+  if (!table_info) {
+    return SNP4_STATUS_INVALID_TABLE_NAME;
+  }
+
+  const struct snp4_info_action * action_info = snp4_info_get_action_by_name(table_info, rule->action_name);
+  if (!action_info) {
+    return SNP4_STATUS_INVALID_ACTION_FOR_TABLE;
   }
 
   // Ensure that the caller has provided exactly the right number of matches for this table
-  if (rule->num_matches != table_info.num_fields) {
+  if (rule->num_matches != table_info->num_matches) {
     // Wrong number of fields provided for this table
     return SNP4_STATUS_FIELD_SPEC_SIZE_MISMATCH;
   }
 
   // Ensure that the caller has provided exactly the right number of parameters for this action
-  if (rule->num_params != action_info.num_params) {
+  if (rule->num_params != action_info->num_params) {
     // Wrong number of params provided for this action
     return SNP4_STATUS_PARAM_SPEC_SIZE_MISMATCH;
   }
   
   // Pack the key and mask
-  rc = snp4_rule_pack_matches(table_info.field_specs,
-			    table_info.key_size_bits,
-			    rule->matches,
-			    rule->num_matches,
-			    pack);
+  rc = snp4_rule_pack_matches(table_info->matches,
+			      table_info->key_bits,
+			      rule->matches,
+			      rule->num_matches,
+			      pack);
   if (rc != SNP4_STATUS_OK) {
     goto out_error;
   }
 
   // Pack the params
-  rc = snp4_rule_pack_params(action_info.param_specs,
-			   table_info.response_size_bits - table_info.action_id_size_bits,
-			   action_info.param_size_bits,
-			   rule->params,
-			   rule->num_params,
-			   pack);
+  rc = snp4_rule_pack_params(action_info->params,
+			     table_info->response_bits - table_info->actionid_bits,
+			     action_info->param_bits,
+			     rule->params,
+			     rule->num_params,
+			     pack);
   if (rc != SNP4_STATUS_OK) {
     goto out_error;
   }

@@ -6,7 +6,6 @@ extern "C" {
 #include "snp4.h"		/* API */
 }
 
-
 static void display_pack(struct sn_pack * pack)
 {
   std::cout << std::hex << std::setfill('0');
@@ -49,6 +48,8 @@ protected:
     rule.priority = 0;
 
     rule.num_params = 0;
+
+    snp4_info_get_pipeline(&pipeline);
   }
 
   void TearDown() override {
@@ -59,6 +60,8 @@ protected:
   struct sn_pack pack;
 
   enum snp4_status rc;
+
+  struct snp4_info_pipeline pipeline;
 };
 
 class SNP4TablePrefixTest : public ::SNP4TableTest {
@@ -77,7 +80,7 @@ TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsKeyMask) {
   mpz_init_set_str(m->v.key_mask.key,  "0x000aabbccddeeff00112233445566778", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0xffffe000000000000000000000000000", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsPrefixMin) {
@@ -88,7 +91,7 @@ TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsPrefixMin) {
   mpz_init_set_str(m->v.prefix.key,  "0xaabbccddeeff00112233445566778", 0);
   m->v.prefix.prefix_len = 0;
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsPrefixMax) {
@@ -99,7 +102,7 @@ TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsPrefixMax) {
   mpz_init_set_str(m->v.prefix.key,  "0xaabbccddeeff00112233445566778", 0);
   m->v.prefix.prefix_len = 128;
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsPrefixMid) {
@@ -110,7 +113,7 @@ TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsPrefixMid) {
   mpz_init_set_str(m->v.prefix.key,  "0xaabbccddeeff00112233445566778", 0);
   m->v.prefix.prefix_len = 19;
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsKeyMaskTooWide) {
@@ -121,7 +124,7 @@ TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsKeyMaskTooWide) {
   mpz_init_set_str(m->v.key_mask.key,  "0x000aabbccddeeff00112233445566778", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x1ffffe000000000000000000000000000", 0);
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_MASK_TOO_BIG, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_MASK_TOO_BIG, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsKey) {
@@ -131,7 +134,7 @@ TEST_F(SNP4TablePrefixTest, PackPrefixFieldAsKey) {
   m->t = SN_MATCH_FORMAT_KEY_ONLY;
   mpz_init_set_str(m->v.key_only.key,  "0xaabbccddeeff00112233445566778", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 TEST_F(SNP4TablePrefixTest, PackPrefixWithSparseMask) {
@@ -142,7 +145,7 @@ TEST_F(SNP4TablePrefixTest, PackPrefixWithSparseMask) {
   mpz_init_set_str(m->v.key_mask.key,  "0x000aabbccddeeff00112233445566778", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0xffffe00000000000ffff000000000000", 0);
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_PREFIX_MASK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_PREFIX_MASK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 TEST_F(SNP4TablePrefixTest, PackPrefixWithInvalidPrefixLen) {
@@ -153,7 +156,7 @@ TEST_F(SNP4TablePrefixTest, PackPrefixWithInvalidPrefixLen) {
   mpz_init_set_str(m->v.prefix.key,  "0xaabbccddeeff00112233445566778", 0);
   m->v.prefix.prefix_len = 999;
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_MASK_TOO_WIDE, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_MASK_TOO_WIDE, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 class SNP4TableBitfieldTest : public ::SNP4TableTest {
@@ -172,7 +175,7 @@ TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsKeyMaskOnes) {
   mpz_init_set_str(m->v.key_mask.key,  "0x0103e", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x1ffff", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsKeyMaskZero) {
@@ -183,7 +186,7 @@ TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsKeyMaskZero) {
   mpz_init_set_str(m->v.key_mask.key,  "0x0103e", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x00000", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsKeyTooWide) {
@@ -193,7 +196,7 @@ TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsKeyTooWide) {
   m->t = SN_MATCH_FORMAT_KEY_ONLY;
   mpz_init_set_str(m->v.key_only.key,  "0x3e0fe", 0);
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_KEY_TOO_BIG, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_KEY_TOO_BIG, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsSparseKeyMask) {
@@ -204,7 +207,7 @@ TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsSparseKeyMask) {
   mpz_init_set_str(m->v.key_mask.key,  "0x0103e", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x0ff00", 0);
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_BITFIELD_MASK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_BITFIELD_MASK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsKey) {
@@ -214,7 +217,7 @@ TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsKey) {
   m->t = SN_MATCH_FORMAT_KEY_ONLY;
   mpz_init_set_str(m->v.key_only.key,  "0xee", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsPrefixOnes) {
@@ -225,7 +228,7 @@ TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsPrefixOnes) {
   mpz_init_set_str(m->v.prefix.key,  "0x1111", 0);
   m->v.prefix.prefix_len = 17;
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsPrefixZero) {
@@ -236,7 +239,7 @@ TEST_F(SNP4TableBitfieldTest, PackBitfieldFieldAsPrefixZero) {
   mpz_init_set_str(m->v.prefix.key,  "0x1111", 0);
   m->v.prefix.prefix_len = 0;
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 class SNP4TableConstantTest : public ::SNP4TableTest {
@@ -254,7 +257,7 @@ TEST_F(SNP4TableConstantTest, PackConstantFieldAsKey) {
   m->t = SN_MATCH_FORMAT_KEY_ONLY;
   mpz_init_set_str(m->v.key_only.key,  "0x7bcdef01", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 };
 
 TEST_F(SNP4TableConstantTest, PackConstantFieldAsSparseKeyMask) {
@@ -265,7 +268,7 @@ TEST_F(SNP4TableConstantTest, PackConstantFieldAsSparseKeyMask) {
   mpz_init_set_str(m->v.key_mask.key,  "0x7bcdef01", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x00ffff00", 0);
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_CONSTANT_MASK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_CONSTANT_MASK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableConstantTest, PackConstantFieldAsKeyMaskZero) {
@@ -276,7 +279,7 @@ TEST_F(SNP4TableConstantTest, PackConstantFieldAsKeyMaskZero) {
   mpz_init_set_str(m->v.key_mask.key,  "0x7bcdef01", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x00000000", 0);
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_CONSTANT_MASK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_CONSTANT_MASK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 class SNP4TableRangeTest : public ::SNP4TableTest {
@@ -295,7 +298,7 @@ TEST_F(SNP4TableRangeTest, PackRangeFieldAsRange) {
   m->v.range.lower = 0x1234;
   m->v.range.upper = 0x1239;
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableRangeTest, PackRangeFieldAsKeyMask) {
@@ -306,7 +309,7 @@ TEST_F(SNP4TableRangeTest, PackRangeFieldAsKeyMask) {
   mpz_init_set_str(m->v.key_mask.key,  "0x1234", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x1239", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableRangeTest, PackRangeFieldAsKey) {
@@ -316,7 +319,7 @@ TEST_F(SNP4TableRangeTest, PackRangeFieldAsKey) {
   m->t = SN_MATCH_FORMAT_KEY_ONLY;
   mpz_init_set_str(m->v.key_only.key,  "0x1234", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableRangeTest, PackRangeFieldAsRangeEqual) {
@@ -327,7 +330,7 @@ TEST_F(SNP4TableRangeTest, PackRangeFieldAsRangeEqual) {
   m->v.range.lower = 0x1234;
   m->v.range.upper = 0x1234;
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableRangeTest, PackRangeFieldAsRangeFlipped) {
@@ -338,7 +341,7 @@ TEST_F(SNP4TableRangeTest, PackRangeFieldAsRangeFlipped) {
   m->v.range.lower = 0x1239;
   m->v.range.upper = 0x1234;
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_RANGE_MASK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_RANGE_MASK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableRangeTest, PackRangeFieldAsKeyMaskTooBig) {
@@ -349,7 +352,7 @@ TEST_F(SNP4TableRangeTest, PackRangeFieldAsKeyMaskTooBig) {
   mpz_init_set_str(m->v.key_mask.key,  "0x1234", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0xf1239", 0);
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_MASK_TOO_BIG, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_MASK_TOO_BIG, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 class SNP4TableTernaryTest : public ::SNP4TableTest {
@@ -368,7 +371,7 @@ TEST_F(SNP4TableTernaryTest, PackTernaryFieldAsKeyMask) {
   mpz_init_set_str(m->v.key_mask.key,  "0x030", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x101", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 class SNP4TableUnusedTest : public ::SNP4TableTest {
@@ -386,7 +389,7 @@ TEST_F(SNP4TableUnusedTest, PackUnusedFieldAsKey) {
   m->t = SN_MATCH_FORMAT_KEY_ONLY;
   mpz_init_set_str(m->v.key_only.key,  "0x2", 0);
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableUnusedTest, PackUnusedFieldUnused) {
@@ -395,7 +398,7 @@ TEST_F(SNP4TableUnusedTest, PackUnusedFieldUnused) {
   m = &rule.matches[rule.num_matches++];
   m->t = SN_MATCH_FORMAT_UNUSED;
 
-  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_OK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
 TEST_F(SNP4TableUnusedTest, PackUnusedFieldAsKeyMaskNonZero) {
@@ -406,6 +409,6 @@ TEST_F(SNP4TableUnusedTest, PackUnusedFieldAsKeyMaskNonZero) {
   mpz_init_set_str(m->v.key_mask.key,  "0x2", 0);
   mpz_init_set_str(m->v.key_mask.mask, "0x3", 0);
 
-  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_UNUSED_MASK, snp4_rule_pack(&rule, &pack));
+  ASSERT_EQ(SNP4_STATUS_MATCH_INVALID_UNUSED_MASK, snp4_rule_pack(&pipeline, &rule, &pack));
 }
 
