@@ -23,6 +23,7 @@ install_data(
 )
 
 subproject('gtest')
+subproject('cli11')
 
 subproject('esnet-smartnic-hwapi', default_options: ['default_library=static'])
 subdir('libsnutil')
