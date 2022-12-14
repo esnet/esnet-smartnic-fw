@@ -16,6 +16,8 @@ RUN \
     coreutils \
     jq \
     libgmp10 \
+    libgrpc++1 \
+    libprotobuf17 \
     locales \
     lsb-release \
     pciutils \
