@@ -33,7 +33,8 @@ extern bool snp4_table_insert_kma(void * snp4_handle,
 				  const char * action_name,
 				  uint8_t * params,
 				  size_t params_len,
-				  uint32_t priority);
+				  uint32_t priority,
+				  bool replace);
 extern bool snp4_table_delete_k(void * snp4_handle,
 				const char * table_name,
 				uint8_t * key,
