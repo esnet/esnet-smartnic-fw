@@ -255,7 +255,7 @@ struct sn_cfg {
 
 struct sn_cfg_set {
   uint32_t num_entries;
-  struct sn_cfg *entries[1024];
+  struct sn_cfg *entries[10240];
 };
 
 extern struct sn_cfg_set *snp4_cfg_set_load_p4bm(FILE * f);
