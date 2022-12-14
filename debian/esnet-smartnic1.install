@@ -3,3 +3,4 @@ usr/lib/*/wireshark/plugins/*
 usr/share/esnet-smartnic/**
 usr/bin/regio
 usr/bin/sn-cli
+usr/bin/sn-p4-agent
