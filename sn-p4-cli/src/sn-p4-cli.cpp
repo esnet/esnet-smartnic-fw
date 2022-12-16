@@ -139,7 +139,7 @@ public:
     return true;
   }
 
-  bool InsertRule(std::string table_name, std::vector<std::string> matches, std::string action_name, std::vector<std::string> params, uint32_t priority, bool replace) {
+  bool InsertRule(std::string table_name, std::vector<std::string> matches, std::string action_name, std::vector<std::string> params, std::optional<uint32_t> priority, bool replace) {
     MatchActionRule ma_rule;
 
     assert(pi_valid);
@@ -165,6 +165,19 @@ public:
     if (params.size() != (unsigned)action.parameter_specs_size()) {
       std::cout << "Incorrect number of parameters.  " << params.size() << " provided, " << action.parameter_specs_size() << " required." << std::endl;
       return false;
+    }
+    if (table.priority_required() && !replace) {
+      // Priority is required
+      if (!priority.has_value()) {
+	std::cout << "Priority value is required for this table but not provided." << std::endl;
+	return false;
+      }
+    } else {
+      // Priority not allowed
+      if (priority.has_value()) {
+	std::cout << "Priority value provided but not allowed for this table." << std::endl;
+	return false;
+      }
     }
 
     ma_rule.set_table_name(table_name);
@@ -206,7 +219,10 @@ public:
       param->set_value(param_str);
     }
 
-    ma_rule.set_priority(priority);
+    // Only provide the priority if it is required for this table
+    if (table.priority_required() && !replace) {
+      ma_rule.set_priority(priority.value());
+    }
 
     ma_rule.set_replace(replace);
 
@@ -345,7 +361,7 @@ int main(int argc, char* argv[]) {
 
   std::string action_name;
   std::vector<std::string> param_strings;
-  uint32_t priority;
+  std::optional<uint32_t> priority;
   CLI::App* table_insert = app.add_subcommand("table-insert", "Insert a single rule into the specified table");
   table_insert->add_option("table", table_name, "Name of the table to operate on")->required();
   table_insert->add_option("action", action_name, "Name of the action to invoke")->required();
