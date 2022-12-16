@@ -208,14 +208,8 @@ enum snp4_status snp4_rule_pack_matches(const struct snp4_info_match match_info_
   mpz_init(key_part);
   mpz_init(mask_part);
 
-  // NOTE: The match_info spec describes the fields of the key from lsbs up to msbs.
-  //       The matches array describes the fields of the key from msbs down to lsbs.
-  //
-  //       The match_info spec array will be consumed in reverse order to account for this
-  //       discrepancy.
-
   for (unsigned int i = 0; i < num_matches; i++) {
-    const struct snp4_info_match * match_info_spec = &match_info_specs[num_matches - 1 - i];
+    const struct snp4_info_match * match_info_spec = &match_info_specs[i];
 
     rc = pack_partial_key_mask(&key_part, &mask_part, &matches[i], match_info_spec);
     if (rc != SNP4_STATUS_OK) {

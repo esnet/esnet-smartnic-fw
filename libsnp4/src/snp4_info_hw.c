@@ -215,8 +215,14 @@ static enum snp4_status snp4_info_get_matches(struct snp4_info_match * matches, 
   // Assume no priority field is required
   *priority_required = false;
 
+  // NOTE: The HW format string describes the fields of the key from lsbs up to msbs.
+  //       The p4 table definitions (which the user sees) describe the fields from msbs down to lsbs.
+  //       We want the user to provide the fields in the same order that they occur in the p4 table
+  //       since that is most natural to the user *and* the code in snp4_table.c that packs the matches
+  //       also wants to pack the fields from the user from msbs down to lsbs.  Pack the matches[] array
+  //       in reverse order relative to the HW format string.
   for (unsigned int i = 0; i < *num_matches; i++) {
-    struct snp4_info_match * match = &matches[i];
+    struct snp4_info_match * match = &matches[*num_matches - 1 - i];
 
     char * field_fmt = strsep(&table_fmt_cursor, ":");
     if (field_fmt == NULL) {
