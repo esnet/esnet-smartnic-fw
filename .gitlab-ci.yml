@@ -147,12 +147,6 @@ pull_sn_hw:
   needs:
     - pull_sn_hw
 
-package_bionic:
-  extends:
-    - .compose_package
-  variables:
-    OS_CODENAME: bionic
-
 package_focal:
   extends:
     - .compose_package
