@@ -1,3 +1,4 @@
+#include <deque>
 #include <iostream>
 #include <assert.h>		// assert
 #include <stdio.h>
@@ -309,6 +310,114 @@ public:
     return true;
   }
 
+  bool P4BMFileApply(std::string file_name) {
+    // Open the file for reading
+    std::ifstream f(file_name);
+    if (!(f.is_open())) {
+	std::cout << "Failed to open file: " << file_name << std::endl;
+	return false;
+    }
+
+    // Read and process each line of the file
+    std::string raw;
+    size_t line_no = 0;
+    while (std::getline(f, raw)) {
+      line_no++;
+      std::cout << "[" << line_no << "] " << "Raw Line: '" << raw << "'" << std::endl;
+
+      // Split the raw line on whitespace into a vector of tokens
+      std::istringstream line(raw);
+      std::deque<std::string> tokens{
+	std::istream_iterator<std::string>(line),
+	std::istream_iterator<std::string>()
+      };
+      // Drop all tokens after a comment character
+      auto comment = std::find_if(tokens.begin(), tokens.end(),
+				  [](const auto& x){ return x.starts_with("#"); });
+      if (comment != tokens.end()) {
+	// Drop the comment token and all following tokens
+	tokens.erase(comment, tokens.end());
+      }
+
+      if (tokens.size() == 0) {
+	// Blank line, skip
+	continue;
+      }
+
+      // Identify the operation
+      auto op = tokens.front();
+      tokens.pop_front();
+
+      if (op == "table_add") {
+	// format: table_name action_name m0 m1 ... mn => p0 p1 ... pn [priority]
+	if (tokens.size() < 2) {
+	  std::cout << "[" << line_no << "] " << "Missing table and or action" << std::endl;
+	  continue;
+	}
+
+	auto table_name = tokens.front();
+	tokens.pop_front();
+	bool found;
+	auto table = GetTableInfoByName(table_name, &found);
+	if (!found) {
+	  std::cout << "[" << line_no << "] " << "Invalid table name: " << table_name << std::endl;
+	  continue;
+	}
+
+	auto action_name = tokens.front();
+	tokens.pop_front();
+	auto action = GetTableActionInfoByName(table, action_name, &found);
+	if (!found) {
+	  std::cout << "[" << line_no << "] " << "Invalid action name: " << action_name << std::endl;
+	  continue;
+	}
+
+	// Split the remaining tokens on the "=>" token
+	auto div = std::find_if(tokens.begin(), tokens.end(),
+				[](const auto& x){ return (x == "=>"); });
+	if (div == tokens.end()) {
+	  // Missing match/action divider
+	  std::cout << "[" << line_no << "] " << "Missing divider '=>'" << std::endl;
+	  continue;
+	}
+	std::vector<std::string> matches;
+	std::copy(tokens.begin(), div, std::back_inserter(matches));
+	std::vector<std::string> params;
+
+	// Check if this table requires a priority, if so, steal the last parameter and
+	// treat it as the required priority.
+	std::optional<uint32_t> priority;
+	if (table.priority_required()) {
+	  // Assume that the last token is the priority
+	  priority = stoi(tokens.back());
+	  tokens.pop_back();
+	}
+	std::copy(div+1, tokens.end(), std::back_inserter(params));
+
+	InsertRule(table_name, matches, action_name, params, priority, false);
+      } else if (op == "table_clear") {
+	// format: table_name
+	if (tokens.size() < 1) {
+	  std::cout << "[" << line_no << "] " << "Missing table name" << std::endl;
+	  continue;
+	}
+	auto table = tokens.front();
+	tokens.pop_front();
+
+	ClearOneTable(table);
+      } else if (op == "clear_all") {
+	if (tokens.size() > 0) {
+	  std::cout << "[" << line_no << "] " << "Garbage after clear_all" << std::endl;
+	}
+	ClearAllTables();
+      } else {
+	// Unhandled operation
+	std::cout << "[" << line_no << "] " << "Skipping unknown operation: " << op << std::endl;
+      }
+    }
+    return true;
+  }
+
 private:
   std::unique_ptr<SmartnicP4::Stub> stub_;
   bool pi_valid = false;
@@ -376,9 +485,6 @@ int main(int argc, char* argv[]) {
   table_update->add_option("--param", param_strings, "One or more values for action parameters")->required()->delimiter(' ');
 
   std::string file_name;
-  CLI::App* p4bm_check = app.add_subcommand("p4bm-check", "Check the syntax of a p4bm simulator rules file");
-  p4bm_check->add_option("file", file_name, "File to be checked");
-
   CLI::App* p4bm_apply = app.add_subcommand("p4bm-apply", "Apply the rules described in a p4bm simulator rules file");
   p4bm_apply->add_option("file", file_name, "File to be applied");
 
@@ -410,10 +516,8 @@ int main(int argc, char* argv[]) {
     snp4.InsertRule(table_name, match_strings, action_name, param_strings, priority, true);
   } else if (app.got_subcommand(table_delete)) {
     snp4.DeleteRule(table_name, match_strings);
-  } else if (app.got_subcommand(p4bm_check)) {
-    std::cout << "Not implemented yet" << std::endl;
   } else if (app.got_subcommand(p4bm_apply)) {
-    std::cout << "Not implemented yet" << std::endl;
+    snp4.P4BMFileApply(file_name);
   } else {
     // Unexpected subcommand
     std::cout << "Unhandled subcommand" << std::endl;
