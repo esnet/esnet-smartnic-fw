@@ -225,7 +225,7 @@ int main(int argc, char* argv[]) {
   std::vector<std::string> match_strings;
   CLI::App* table_delete = app.add_subcommand("table-delete", "Delete a single rule from the specified table");
   table_delete->add_option("table", table_name, "Name of the table to operate on")->required();
-  table_delete->add_option("--match", match_strings, "Key and value for an individual key field")->required()->delimiter(',');
+  table_delete->add_option("--match", match_strings, "Key and value for an individual key field")->required()->delimiter(' ');
 
   std::string action_name;
   std::vector<std::string> param_strings;
@@ -233,15 +233,15 @@ int main(int argc, char* argv[]) {
   CLI::App* table_insert = app.add_subcommand("table-insert", "Insert a single rule into the specified table");
   table_insert->add_option("table", table_name, "Name of the table to operate on")->required();
   table_insert->add_option("action", action_name, "Name of the action to invoke")->required();
-  table_insert->add_option("--match", match_strings, "One or more value-mask pairs used in the key")->required()->delimiter(',');
-  table_insert->add_option("--param", param_strings, "One or more values for action parameters")->required()->delimiter(',');
+  table_insert->add_option("--match", match_strings, "One or more value-mask pairs used in the key")->required()->delimiter(' ');
+  table_insert->add_option("--param", param_strings, "One or more values for action parameters")->required()->delimiter(' ');
   table_insert->add_option("--priority", priority, "Priority for the rule");
 
   CLI::App* table_update = app.add_subcommand("table-update", "Update a single rule in the specified table");
   table_update->add_option("table", table_name, "Name of the table to operate on")->required();
   table_update->add_option("action", action_name, "Name of the action to invoke")->required();
-  table_update->add_option("--match", match_strings, "One or more value-mask pairs used in the key")->required()->delimiter(',');
-  table_update->add_option("--param", param_strings, "One or more values for action parameters")->required()->delimiter(',');
+  table_update->add_option("--match", match_strings, "One or more value-mask pairs used in the key")->required()->delimiter(' ');
+  table_update->add_option("--param", param_strings, "One or more values for action parameters")->required()->delimiter(' ');
 
   std::string file_name;
   CLI::App* p4bm_check = app.add_subcommand("p4bm-check", "Check the syntax of a p4bm simulator rules file");
