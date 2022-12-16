@@ -114,6 +114,13 @@ public:
     ClearResponse clr_rsp;
     ClearOneTableRequest clr_one;
 
+    bool found;
+    auto table = GetTableInfoByName(table_name, &found);
+    if (!found) {
+      std::cout << "Invalid table name: " << table_name << std::endl;
+      return false;
+    }
+
     clr_one.set_table_name(table_name);
 
     Status status = stub_->ClearOneTable(&context, clr_one, &clr_rsp);
@@ -134,6 +141,31 @@ public:
 
   bool InsertRule(std::string table_name, std::vector<std::string> matches, std::string action_name, std::vector<std::string> params, uint32_t priority, bool replace) {
     MatchActionRule ma_rule;
+
+    assert(pi_valid);
+
+    bool found;
+    auto table = GetTableInfoByName(table_name, &found);
+    if (!found) {
+      std::cout << "Invalid table name: " << table_name << std::endl;
+      return false;
+    }
+
+    if (matches.size() != (unsigned)table.match_specs_size()) {
+      std::cout << "Incorrect number of matches.  " << matches.size() << " provided, " << table.match_specs_size() << " required." << std::endl;
+      return false;
+    }
+
+    auto action = GetTableActionInfoByName(table, action_name, &found);
+    if (!found) {
+      std::cout << "Invalid action name for table: " << action_name << std::endl;
+      return false;
+    }
+
+    if (params.size() != (unsigned)action.parameter_specs_size()) {
+      std::cout << "Incorrect number of parameters.  " << params.size() << " provided, " << action.parameter_specs_size() << " required." << std::endl;
+      return false;
+    }
 
     ma_rule.set_table_name(table_name);
     for (auto & match_str : matches) {
@@ -198,6 +230,18 @@ public:
 
   bool DeleteRule(std::string table_name, std::vector<std::string> matches) {
     MatchOnlyRule mo_rule;
+
+    bool found;
+    auto table = GetTableInfoByName(table_name, &found);
+    if (!found) {
+      std::cout << "Invalid table name: " << table_name << std::endl;
+      return false;
+    }
+
+    if (matches.size() != (unsigned)table.match_specs_size()) {
+      std::cout << "Incorrect number of matches.  " << matches.size() << " provided, " << table.match_specs_size() << " required." << std::endl;
+      return false;
+    }
 
     mo_rule.set_table_name(table_name);
     for (auto & match_str : matches) {
