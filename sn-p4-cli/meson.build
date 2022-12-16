@@ -11,6 +11,9 @@ sn_p4_cli = executable(
     [
     ]
   ),
+  cpp_args : [
+    '-std=c++2a',
+  ],
   dependencies : [
     CLI11_dep,
     libgmp_dep,
