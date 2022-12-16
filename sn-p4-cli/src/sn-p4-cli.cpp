@@ -1,4 +1,5 @@
 #include <iostream>
+#include <assert.h>		// assert
 #include <stdio.h>
 #include <stdlib.h>		// exit, EXIT_FAILURE
 
@@ -25,21 +26,68 @@ public:
     : stub_(SmartnicP4::NewStub(channel)) {
   }
 
+  bool DisplayPipelineInfo() {
+    assert(pi_valid);
+
+    std::cout << "Tables: " << pi.tables_size() << std::endl;
+    for (auto &table : pi.tables()) {
+      std::cout << "\t" << table.name() << std::endl;
+      std::cout << "\t\tEndian: " << table_endian_to_string(table.endian()) << std::endl;
+      std::cout << "\t\tMatches: " << table.match_specs_size() << std::endl;
+      for (auto &match : table.match_specs()) {
+	std::cout << "\t\t\t" << std::setw(3) << match.bits() << "   " << match_type_to_string(match.type()) << std::endl;
+      }
+      std::cout << "\t\tActions: " << table.action_specs_size() << std::endl;
+      for (auto &action : table.action_specs()) {
+	std::cout << "\t\t\t" << action.name() << ": Params: " << action.parameter_specs_size() << std::endl;
+	for (auto &param : action.parameter_specs()) {
+	  std::cout << "\t\t\t\t" <<  std::setw(3) << param.bits() << "   " << param.name() << std::endl;
+	}
+      }
+      std::cout << "\t\tMasks: " << table.num_masks() << std::endl;
+      std::cout << "\t\tPriority bits: " << table.priority_bits() << " (" << (table.priority_required() ? "Required" : "Optional") << ")" << std::endl;
+    }
+
+    return true;
+  }
+
   bool GetPipelineInfo() {
     ClientContext context;
-    PipelineInfo pi;
     Status status = stub_->GetPipelineInfo(&context, google::protobuf::Empty(), &pi);
     if (!status.ok()) {
       std::cout << status.error_code() << ": GetPipelineInfo rpc failed: " <<status.error_message() << std::endl;
       return false;
     }
-
-    std::cout << "Number of tables: " << pi.tables_size() << std::endl;
-    for (auto &table : pi.tables()) {
-      std::cout << "\tName: " << table.name() << std::endl;
-    }
-
+    pi_valid = true;
     return true;
+  }
+
+  const PipelineInfo::TableInfo GetTableInfoByName(const std::string table_name, bool * found) {
+    assert(pi_valid);
+
+    auto table = std::find_if(pi.tables().begin(), pi.tables().end(),
+			      [table_name](const auto& x){ return x.name() == table_name; });
+    if (table != pi.tables().end()) {
+      // Found the table
+      *found = true;
+    } else {
+      *found = false;
+    }
+    return *table;
+  }
+
+  const PipelineInfo::TableInfo::ActionSpec GetTableActionInfoByName(const PipelineInfo::TableInfo& table, const std::string action_name, bool * found) {
+    assert(pi_valid);
+
+    auto action = std::find_if(table.action_specs().begin(), table.action_specs().end(),
+			       [action_name](const auto& x){ return x.name() == action_name; });
+    if (action != table.action_specs().end()) {
+      // Found the action
+      *found = true;
+    } else {
+      *found = false;
+    }
+    return *action;
   }
 
   bool ClearAllTables() {
@@ -203,7 +251,31 @@ public:
 
 private:
   std::unique_ptr<SmartnicP4::Stub> stub_;
+  bool pi_valid = false;
   PipelineInfo pi;
+
+  const std::string table_endian_to_string(PipelineInfo::TableInfo::Endian e) {
+    switch (e) {
+    case PipelineInfo_TableInfo_Endian_LITTLE: return "Little";
+    case PipelineInfo_TableInfo_Endian_BIG: return "Big";
+    case PipelineInfo_TableInfo_Endian_ENDIAN_UNSPECIFIED: return "Unspecified";
+    default: return "Invalid";
+    }
+  }
+
+  const std::string match_type_to_string(PipelineInfo::TableInfo::MatchSpec::MatchType t) {
+    switch (t) {
+    case PipelineInfo_TableInfo_MatchSpec_MatchType_BITFIELD: return "Bitfield / field_mask";
+    case PipelineInfo_TableInfo_MatchSpec_MatchType_CONSTANT: return "Constant / exact";
+    case PipelineInfo_TableInfo_MatchSpec_MatchType_PREFIX:   return "Prefix   / lpm";
+    case PipelineInfo_TableInfo_MatchSpec_MatchType_RANGE:    return "Range    / range";
+    case PipelineInfo_TableInfo_MatchSpec_MatchType_TERNARY:  return "Ternary  / ternary";
+    case PipelineInfo_TableInfo_MatchSpec_MatchType_UNUSED:   return "Unused   / unused";
+    case PipelineInfo_TableInfo_MatchSpec_MatchType_MATCH_TYPE_UNSPECIFIED: return "Unspecified";
+    default: return "Invalid";
+    }
+  }
+
 };
 
 int main(int argc, char* argv[]) {
@@ -253,13 +325,21 @@ int main(int argc, char* argv[]) {
   // Require a subcommand
   app.require_subcommand(1,1);
 
+  // Parse the command line options
   CLI11_PARSE(app, argc, argv);
 
+  // Set up a channel to the remote p4 agent and load the pipeline specification from the agent
+  // NOTE: Most methods in the SmartnicP4Client class depend on having an accurate pipeline spec loaded
   SmartnicP4Client snp4(grpc::CreateChannel(server + ":" + std::to_string(port), grpc::InsecureChannelCredentials()));
+  if (!snp4.GetPipelineInfo()) {
+    std::cout << "Error: Unable to load p4 pipeline structure from remote agent" << std::endl;
+    std::exit(EXIT_FAILURE);
+    return 1;
+  }
 
+  // Process the subcommand
   if (app.got_subcommand(info)) {
-    std::cout << "------ Get PipelineInfo -------" << std::endl;
-    snp4.GetPipelineInfo();
+    snp4.DisplayPipelineInfo();
   } else if (app.got_subcommand(clear_all)) {
     snp4.ClearAllTables();
   } else if (app.got_subcommand(table_clear)) {
