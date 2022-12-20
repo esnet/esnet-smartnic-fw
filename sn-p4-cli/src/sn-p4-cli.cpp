@@ -451,10 +451,10 @@ int main(int argc, char* argv[]) {
   CLI::App app{"Smartnic P4 Client"};
 
   std::string server = "localhost";
-  app.add_option("-s,--server", server, "The name of the server to connect to");
+  app.add_option("-s,--server", server, "The name of the server to connect to")->envname("SN_P4_CLI_SERVER");
 
   uint16_t port = 50051;
-  app.add_option("-p,--port", port, "The port number to connect to");
+  app.add_option("-p,--port", port, "The port number to connect to")->envname("SN_P4_CLI_PORT");
 
   CLI::App* info = app.add_subcommand("info", "Display pipeline information obtained from the server");
   CLI::App* clear_all = app.add_subcommand("clear-all", "Clear the contents of all tables");
