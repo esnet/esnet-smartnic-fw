@@ -196,14 +196,14 @@ public:
 	// key/prefix format
 	auto key = match_str.substr(0, p);
 	auto prefix = match_str.substr(p + 1);
-	auto prefix_len = stoi(prefix);
+	auto prefix_len = stoi(prefix, nullptr, 0);
 
 	match->mutable_prefix()->set_key(key);
 	match->mutable_prefix()->set_prefix_len(prefix_len);
       } else if ((p = match_str.find("->")) != std::string::npos) {
 	// lower-upper range format
-	auto lower = stoi(match_str.substr(0, p));
-	auto upper = stoi(match_str.substr(p + 2));
+	auto lower = stoi(match_str.substr(0, p), nullptr, 0);
+	auto upper = stoi(match_str.substr(p + 2), nullptr, 0);
 
 	match->mutable_range()->set_lower(lower);
 	match->mutable_range()->set_upper(upper);
@@ -275,14 +275,14 @@ public:
 	// key/prefix format
 	auto key = match_str.substr(0, p);
 	auto prefix = match_str.substr(p + 1);
-	auto prefix_len = stoi(prefix);
+	auto prefix_len = stoi(prefix, nullptr, 0);
 
 	match->mutable_prefix()->set_key(key);
 	match->mutable_prefix()->set_prefix_len(prefix_len);
       } else if ((p = match_str.find("->")) != std::string::npos) {
 	// lower-upper range format
-	auto lower = stoi(match_str.substr(0, p));
-	auto upper = stoi(match_str.substr(p + 2));
+	auto lower = stoi(match_str.substr(0, p), nullptr, 0);
+	auto upper = stoi(match_str.substr(p + 2), nullptr, 0);
 
 	match->mutable_range()->set_lower(lower);
 	match->mutable_range()->set_upper(upper);
@@ -389,7 +389,7 @@ public:
 	std::optional<uint32_t> priority;
 	if (table.priority_required()) {
 	  // Assume that the last token is the priority
-	  priority = stoi(tokens.back());
+	  priority = stoi(tokens.back(), nullptr, 0);
 	  tokens.pop_back();
 	}
 	std::copy(div+1, tokens.end(), std::back_inserter(params));
