@@ -203,6 +203,46 @@ services:
         setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2
         sleep infinity
 
+  smartnic-p4:
+    hostname: smartnic-p4
+    build:
+      context: ${SN_STACK_ROOT-.}/smartnic-fw
+      args:
+        DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
+    depends_on:
+      smartnic-hw:
+        condition: service_healthy
+    init: true
+    user: root
+    privileged: true
+    restart: unless-stopped
+    env_file:
+      - ${SN_STACK_ROOT-.}/buildinfo.env
+    environment:
+      - REGIO_SELECT=$FPGA_PCIE_DEV.0
+      - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
+      - SN_P4_AGENT_SLOTADDR=$FPGA_PCIE_DEV.0
+    volumes:
+      - debs:/debs:ro
+      - /sys/bus/pci:/sys/bus/pci
+      - /dev:/dev
+      - sn-scratch:/scratch
+      ## [debug] Uncomment the next line to include the source code in your container to debug with gdb
+      #- ${PWD}/..:/source
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        dpkg -i \
+          /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb \
+          /debs/esnet-smartnic1-dbgsym_1.0.0-$${SN_FW_VER}_amd64.ddeb \
+          /debs/esnet-smartnic-dev_1.0.0-$${SN_FW_VER}_amd64.deb
+        sn-p4-agent $$SN_P4_AGENT_SLOTADDR
+
 volumes:
   debs:
     driver_opts:
