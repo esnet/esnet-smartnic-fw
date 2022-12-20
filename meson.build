@@ -23,9 +23,13 @@ install_data(
 )
 
 subproject('gtest')
+subproject('cli11')
 
 subproject('esnet-smartnic-hwapi', default_options: ['default_library=static'])
 subdir('libsnutil')
 subdir('libsnp4')
 subdir('libopennic')
+subdir('sn-p4-proto')
+subdir('sn-p4-agent')
+subdir('sn-p4-cli')
 subdir('sn-cli')

@@ -1,10 +1,9 @@
 sources = files(
   [
     'src/snp4_api.c',
-    'src/snp4_config.c',
-    'src/snp4_info.c',
+    'src/snp4_info_hw.c',
+    'src/snp4_info_util.c',
     'src/snp4_io.c',
-    'src/snp4_p4bm_file.c',
     'src/snp4_table.c',
   ]
 )
@@ -58,8 +57,9 @@ libsnp4_dep = declare_dependency(
 gtest = dependency('gtest', fallback : ['gtest', 'gtest_main_dep'], main : true, required : true)
 
 snp4_table_ut_src = [
+  'src/snp4_info_ut.c',
+  'src/snp4_info_util.c',
   'src/snp4_table_ut.cpp',
-  'src/snp4_table_ut.c',
   'src/snp4_table.c',
 ]
 
@@ -85,29 +85,3 @@ test(
   protocol : 'gtest',
 )
 
-snp4_p4bm_file_ut_src = [
-  'src/snp4_p4bm_file_ut.cpp',
-  'src/snp4_p4bm_file.c',
-  'src/snp4_table_ut.c',
-  'src/snp4_table.c',
-]
-
-snp4_p4bm_file_ut = executable(
-  'snp4-p4bm-file-ut',
-  snp4_p4bm_file_ut_src,
-  dependencies : [
-    libgmp_dep,
-    libsnutil_dep,
-    gtest,
-  ],
-  include_directories : [
-    ext_incdir,
-    int_incdir,
-  ],
-)
-
-test(
-  'snp4 p4bm file tests',
-  snp4_p4bm_file_ut,
-  protocol : 'gtest',
-)

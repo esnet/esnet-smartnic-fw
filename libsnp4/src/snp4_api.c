@@ -153,6 +153,22 @@ bool snp4_reset_all_tables(void * snp4_handle)
   return true;
 }
 
+bool snp4_reset_one_table(void * snp4_handle, const char * table_name)
+{
+  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
+
+  XilVitisNetP4TableCtx * table;
+  if (XilVitisNetP4TargetGetTableByName(vitisnetp4_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  if (XilVitisNetP4TableReset(table) != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  return true;
+}
+
 bool snp4_table_insert_kma(void * snp4_handle,
 			   const char * table_name,
 			   uint8_t * key,
@@ -162,7 +178,8 @@ bool snp4_table_insert_kma(void * snp4_handle,
 			   const char * action_name,
 			   uint8_t * params,
 			   size_t UNUSED(params_len),
-			   uint32_t priority)
+			   uint32_t priority,
+			   bool replace)
 {
   XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
 
@@ -196,8 +213,16 @@ bool snp4_table_insert_kma(void * snp4_handle,
     break;
   }
 
-  if (XilVitisNetP4TableInsert(table, key, mask, priority, action_id, params) != XIL_VITIS_NET_P4_SUCCESS) {
-    return false;
+  if (replace) {
+    /* Replace an existing entry */
+    if (XilVitisNetP4TableUpdate(table, key, mask, action_id, params) != XIL_VITIS_NET_P4_SUCCESS) {
+      return false;
+    }
+  } else {
+    /* Insert an entirely new entry */
+    if (XilVitisNetP4TableInsert(table, key, mask, priority, action_id, params) != XIL_VITIS_NET_P4_SUCCESS) {
+      return false;
+    }
   }
 
   return true;

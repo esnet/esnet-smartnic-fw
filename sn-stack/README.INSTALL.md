@@ -207,25 +207,99 @@ sn-cli probe stats
 ```
 Refer to the `esnet-smartnic-hw` documentation for an explanation of exactly where in the FPGA design these statistics are measured.
 
-# Inspecting and configuring the vitisnetp4 application lookup tables with the "p4" subcommand
+Using the sn-p4-cli tool
+------------------------
 
-The user's p4 application embedded within the smartnic design may have configurable lookup tables which are used during the wire-speed execution of the packet processing pipeline.  The `p4` subcommand provides a way to modify these tables.
+The user's p4 application embedded within the smartnic design may have configurable lookup tables which are used during the wire-speed execution of the packet processing pipeline.  The sn-p4-cli tool provides subcommands to help you to manage the rules in all of the lookup tables defined in your p4 program.
 
-Inspect the p4 table parameters and capabilities implemented in the loaded FPGA image
+All commands described below are expected to be executed within the `smartnic-fw` container environment.  Use this command to enter the appropriate environment.
 ```
-sn-cli p4 info
-```
-This will dump out metadata about the tables themselves.  Note that *there is currently no way* to dump out the contents of the tables themselves.
-
-Parse and validate a p4 table config file
-```
-sn-cli p4 -c /scratch/runsim-ht.txt config-check
+docker compose exec smartnic-fw bash
 ```
 
-Wipe and program a new set of rules into one or more p4 tables in the user's p4 application
+The `sn-p4-cli` tool will automatically look for an environment variable called `SN_P4_CLI_SERVER` which can be set to the hostname of the `sn-p4-agent` that will perform all of the requested actions on the real hardware.  In the `smartnic-fw` container, this value will already be set for you.
+
+# Inspecting the pipeline structure with the "info" subcommand
+
+The `info` subcommand is used to display the pipeline structure, including table names, match fields (and their types), action names and the list of parameters for each action.  This information can be used to formulate new rule definitions for the other subcommands.
+
 ```
-sn-cli p4 -c /scratch/runsim-ht.txt config-apply
+sn-p4-cli info
 ```
+
+# Inserting a new rule into a table
+
+The `table-insert` subcommand allows you to insert a new rule into a specified table.
+
+```
+sn-p4-cli table-insert <table-name> <action-name> --match <match-expr> [--param <param-expr>] [--priority <prio-val>]
+```
+Where:
+* `<table-name>` is the name of the table to be operated on
+* `<action-name>` is the action that you would like to activate when this rule matches
+* `<match-expr>` is one or more match expressions which collectively define when this rule should match a given packet
+  * The number and type of the match fields depends on the p4 definition of the table
+  * The `--match` option may be specified multiple times and all `match-expr`s will be concatenated
+* `<param-expr>` is one or more parameter values which will be returned as a result when this rule matches a given packet
+  * The number and type of the action parameters depends on the p4 definition of the action within the table
+  * Some actions require zero parameters.  In this case, omit the optional `--param` option entirely.
+* `<prio-val>` is the priority to be used to resolve scenarios where multiple matches could occur
+  * The `--priority` option is *required* for tables with CAM/TCAM type matches (prefix/range/ternary)
+  * The `--priority` option is *prohibited* for tables without CAM/TCAM type mathes
+
+**NOTE**: You can find details about your pipeline structure and valid names by running the `info` subcommand.
+
+# Updating an existing rule within a table
+
+The `table-update` subcommand allows you to update the action and parameters for an existing rule within a table
+
+```
+sn-p4-cli table-update <table-name> <new-action-name> --match <match-expr> [--param <new-param-expr>]
+```
+Where:
+* `<table-name>` is the table containing the rule to be updated
+* `<new-action-name>` is the new action that should be applied when this rule matches
+* `<match-expr>` is the exact original `<match-expr>` used when the original rule was inserted
+* `<new-param-expr>` is the set of new parameters to be returned when this rule matches
+  * **NOTE**: the new parameters must be consistent with the new action
+
+# Removing previously inserted rules
+
+The `clear-all` and `table-clear` and `table-delete` subcommands allow you to remove rules from tables with varying precision.
+
+Clear all rules from *all tables* in the pipeline.
+```
+sn-p4-cli clear-all`
+```
+
+Clear all rules from a *single* specified table.
+```
+sn-p4-cli table-clear <table-name>
+```
+
+Remove a specific rule from a specific table.
+```
+table-delete <table-name> --match <match-expr>
+```
+
+# Bulk changes of rules using a p4bm simulator rules file
+
+Using the the `p4bm-apply` subcommand, a list of pipeline modifications can be applied from a file.  A subset of the full p4bm simulator file format is supported by the `sn-p4-cli` command.
+
+```
+sn-p4-cli p4bm-apply <filename>
+```
+
+Supported actions within the p4bm file are:
+* `table_insert <table-name> <action-name> <match-expr> => <param-expr> [priority]`
+  * Insert a rule
+* `clear_all`
+  * Clear all rules from all tables
+* `table_clear <table-name>`
+  * Clear all rules from a specified table
+
+All comment characters `#` and text following them up to the end of the line are ignored.
+
 Stopping the runtime environment
 --------------------------------
 
