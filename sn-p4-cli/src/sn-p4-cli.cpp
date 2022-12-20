@@ -475,14 +475,14 @@ int main(int argc, char* argv[]) {
   table_insert->add_option("table", table_name, "Name of the table to operate on")->required();
   table_insert->add_option("action", action_name, "Name of the action to invoke")->required();
   table_insert->add_option("--match", match_strings, "One or more value-mask pairs used in the key")->required()->delimiter(' ');
-  table_insert->add_option("--param", param_strings, "One or more values for action parameters")->required()->delimiter(' ');
+  table_insert->add_option("--param", param_strings, "One or more values for action parameters")->delimiter(' ');
   table_insert->add_option("--priority", priority, "Priority for the rule");
 
   CLI::App* table_update = app.add_subcommand("table-update", "Update a single rule in the specified table");
   table_update->add_option("table", table_name, "Name of the table to operate on")->required();
   table_update->add_option("action", action_name, "Name of the action to invoke")->required();
   table_update->add_option("--match", match_strings, "One or more value-mask pairs used in the key")->required()->delimiter(' ');
-  table_update->add_option("--param", param_strings, "One or more values for action parameters")->required()->delimiter(' ');
+  table_update->add_option("--param", param_strings, "One or more values for action parameters")->delimiter(' ');
 
   std::string file_name;
   CLI::App* p4bm_apply = app.add_subcommand("p4bm-apply", "Apply the rules described in a p4bm simulator rules file");
