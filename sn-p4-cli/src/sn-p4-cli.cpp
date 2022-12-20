@@ -200,10 +200,10 @@ public:
 
 	match->mutable_prefix()->set_key(key);
 	match->mutable_prefix()->set_prefix_len(prefix_len);
-      } else if ((p = match_str.find("-")) != std::string::npos) {
+      } else if ((p = match_str.find("->")) != std::string::npos) {
 	// lower-upper range format
 	auto lower = stoi(match_str.substr(0, p));
-	auto upper = stoi(match_str.substr(p + 1));
+	auto upper = stoi(match_str.substr(p + 2));
 
 	match->mutable_range()->set_lower(lower);
 	match->mutable_range()->set_upper(upper);
@@ -279,10 +279,10 @@ public:
 
 	match->mutable_prefix()->set_key(key);
 	match->mutable_prefix()->set_prefix_len(prefix_len);
-      } else if ((p = match_str.find("-")) != std::string::npos) {
+      } else if ((p = match_str.find("->")) != std::string::npos) {
 	// lower-upper range format
 	auto lower = stoi(match_str.substr(0, p));
-	auto upper = stoi(match_str.substr(p + 1));
+	auto upper = stoi(match_str.substr(p + 2));
 
 	match->mutable_range()->set_lower(lower);
 	match->mutable_range()->set_upper(upper);
