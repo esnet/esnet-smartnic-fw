@@ -71,10 +71,11 @@ public:
     if (table != pi.tables().end()) {
       // Found the table
       *found = true;
+      return *table;
     } else {
       *found = false;
+      return PipelineInfo::TableInfo{};
     }
-    return *table;
   }
 
   const PipelineInfo::TableInfo::ActionSpec GetTableActionInfoByName(const PipelineInfo::TableInfo& table, const std::string action_name, bool * found) {
@@ -85,10 +86,11 @@ public:
     if (action != table.action_specs().end()) {
       // Found the action
       *found = true;
+      return *action;
     } else {
       *found = false;
+      return PipelineInfo::TableInfo::ActionSpec{};
     }
-    return *action;
   }
 
   bool ClearAllTables() {
