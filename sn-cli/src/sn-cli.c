@@ -14,7 +14,7 @@ const char *argp_program_bug_address = "ESnet SmartNIC Developers <smartnic@es.n
 static char doc_global[] = "Tool for interacting with an esnet-smartnic based on a Xilinx U280 card.";
 
 /* A description of the arguments we accept. */
-static char args_doc_global[] = "(cmac | dev | probe | qdma)";
+static char args_doc_global[] = "(cmac | dev | probe | qdma | sw)";
 
 static struct argp_option argp_options_global[] = {
 					    { "slotaddr", 's',
@@ -64,6 +64,8 @@ static error_t parse_opt_global (int key, char *arg, struct argp_state *state)
       cmd_probe(state);
     } else if (strcmp(arg, "dev") == 0) {
       cmd_dev(state);
+    } else if (strcmp(arg, "sw") == 0) {
+      cmd_sw(state);
     } else {
       argp_error(state, "%s is not a valid command", arg);
     }

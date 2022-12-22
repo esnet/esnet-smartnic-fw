@@ -61,9 +61,17 @@ enum output_format {
 #define PROBE_SELECT_TO_HOST_1   (1 << 7)
 #define PROBE_SELECT_HOST_1      (PROBE_SELECT_FROM_HOST_1 | PROBE_SELECT_TO_HOST_1)
 #define PROBE_SELECT_HOST        (PROBE_SELECT_HOST_0 | PROBE_SELECT_HOST_1)
-#define PROBE_SELECT_APP_TO_CORE (1 << 8)
-#define PROBE_SELECT_CORE_TO_APP (1 << 9)
-#define PROBE_SELECT_APP         (PROBE_SELECT_APP_TO_CORE | PROBE_SELECT_CORE_TO_APP)
+#define PROBE_SELECT_CORE_TO_APP_0 (1 << 8)
+#define PROBE_SELECT_APP_0_TO_CORE (1 << 9)
+#define PROBE_SELECT_APP_0         (PROBE_SELECT_CORE_TO_APP_0 | PROBE_SELECT_APP_0_TO_CORE)
+#define PROBE_SELECT_CORE_TO_APP_1 (1 << 10)
+#define PROBE_SELECT_APP_1_TO_CORE (1 << 11)
+#define PROBE_SELECT_APP_1         (PROBE_SELECT_CORE_TO_APP_1 | PROBE_SELECT_APP_1_TO_CORE)
+#define PROBE_SELECT_BYPASS        (1 << 12)
+#define PROBE_SELECT_DROP          (1 << 13)
+#define PROBE_SELECT_CORE_TO_APP   (PROBE_SELECT_CORE_TO_APP_0 | PROBE_SELECT_CORE_TO_APP_1 | PROBE_SELECT_BYPASS | PROBE_SELECT_DROP)
+#define PROBE_SELECT_APP_TO_CORE   (PROBE_SELECT_APP_0_TO_CORE | PROBE_SELECT_APP_1_TO_CORE)
+#define PROBE_SELECT_APP           (PROBE_SELECT_CORE_TO_APP | PROBE_SELECT_APP_TO_CORE)
 #define PROBE_SELECT_ALL (\
 			  PROBE_SELECT_CMAC_0 | \
 			  PROBE_SELECT_CMAC_1 | \
@@ -108,6 +116,14 @@ static error_t parse_opt_probe (int key, char *arg, struct argp_state *state)
       arguments->probes |= PROBE_SELECT_HOST_1;
     } else if (!strcmp(arg, "app")) {
       arguments->probes |= PROBE_SELECT_APP;
+    } else if (!strcmp(arg, "app0")) {
+      arguments->probes |= PROBE_SELECT_APP_0;
+    } else if (!strcmp(arg, "app1")) {
+      arguments->probes |= PROBE_SELECT_APP_1;
+    } else if (!strcmp(arg, "bypass")) {
+      arguments->probes |= PROBE_SELECT_BYPASS;
+    } else if (!strcmp(arg, "drop")) {
+      arguments->probes |= PROBE_SELECT_DROP;
     } else if (!strcmp(arg, "app-to-core")) {
       arguments->probes |= PROBE_SELECT_APP_TO_CORE;
     } else if (!strcmp(arg, "core-to-app")) {
@@ -243,9 +259,27 @@ void cmd_probe(struct argp_state *state)
       printf("\n");
     }
 
-    if (arguments.probes & PROBE_SELECT_CORE_TO_APP) {
-      printf("Smartnic Platform to P4 App Input\n");
-      print_probe_stats(&bar2->probe_core_to_app, "ok", false);
+    if (arguments.probes & PROBE_SELECT_CORE_TO_APP_0) {
+      printf("Smartnic Platform to P4 App 0 Input\n");
+      print_probe_stats(&bar2->probe_core_to_app0, "ok", false);
+      printf("\n");
+    }
+
+    if (arguments.probes & PROBE_SELECT_CORE_TO_APP_1) {
+      printf("Smartnic Platform to P4 App 1 Input\n");
+      print_probe_stats(&bar2->probe_core_to_app1, "ok", false);
+      printf("\n");
+    }
+
+    if (arguments.probes & PROBE_SELECT_BYPASS) {
+      printf("Smartnic Platform to Bypass\n");
+      print_probe_stats(&bar2->probe_to_bypass, "ok", false);
+      printf("\n");
+    }
+
+    if (arguments.probes & PROBE_SELECT_DROP) {
+      printf("Smartnic Platform to Ingress Blackhole\n");
+      print_probe_stats(&bar2->drops_from_igr_sw, "ok/drop", false);
       printf("\n");
     }
 
@@ -254,18 +288,22 @@ void cmd_probe(struct argp_state *state)
     printf("Egress from p4 application\n");
     printf("--------------------------\n");
 
-    if (arguments.probes & PROBE_SELECT_APP_TO_CORE) {
-      printf("P4 App Output to Smartnic Platform\n");
-      print_probe_stats(&bar2->probe_app_to_core, "ok", false);
+    if (arguments.probes & PROBE_SELECT_APP_0_TO_CORE) {
+      printf("P4 App 0 Output to Smartnic Platform\n");
+      print_probe_stats(&bar2->probe_app0_to_core, "ok", false);
+      printf("\n");
+    }
+
+    if (arguments.probes & PROBE_SELECT_APP_1_TO_CORE) {
+      printf("P4 App 1 Output to Smartnic Platform\n");
+      print_probe_stats(&bar2->probe_app1_to_core, "ok", false);
       printf("\n");
     }
 
     if (arguments.probes & PROBE_SELECT_TO_HOST_0) {
       printf("To HOST PF 0 (c2h)\n");
       print_probe_stats(&bar2->probe_to_host_0, "ok", false);
-      // Host PF 0 doesn't (yet) implement this probe since PF0 is somewhat
-      // special purpose rather than general purpose.  This may change in the future.
-      //print_probe_stats(&bar2->drops_ovfl_to_host_0, "ovfl/drop");
+      print_probe_stats(&bar2->drops_ovfl_to_host_0, "ovfl/drop", false);
       printf("\n");
     }
 

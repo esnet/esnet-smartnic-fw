@@ -207,6 +207,82 @@ sn-cli probe stats
 ```
 Refer to the `esnet-smartnic-hw` documentation for an explanation of exactly where in the FPGA design these statistics are measured.
 
+# Configuring the smartnic platform ingress/egress/bypass switch port remapping functions with the "sw" subcommand
+
+The smartnic platform implements reconfigurable ingress and egress port remapping, connections and redirecting.  You can inspect and modify these configuration points using the "sw" subcommand.
+
+Most of the `sw` subcommands take one or more port bindings as parameters.  The port bindings are of the form:
+```
+<port>:<port-connector>
+```
+Where:
+* `<port>` is one of
+  * cmac0  -- 100G port 0
+  * cmac1  -- 100G port 1
+  * host0  -- DMA over PCIe Physical Function 0 (PF0)
+  * host1  -- DMA over PCIe Physical Function 1 (PF1)
+* `<port-connector>` is context dependent and is one of
+  * cmac0
+  * cmac1
+  * host0
+  * host1
+  * bypass -- a high bandwidth channel through the smartnic which does **NOT** pass through the user's application
+  * app0   -- user application port 0 (typically a p4 program ingress)
+  * app1   -- user application port 1 (only available when user implements it in verilog)
+  * drop   -- infinite blackhole that discards all packets sent to it
+
+## Display the current configuration status
+```
+sn-cli sw status
+```
+
+## Remap/rename physical input ports to logical input ports
+
+The `in-port-rename` subcommand allows you to remap the identity of a smartnic platform physical ingress port to any logical port as seen by the user logic.  Once remapped (eg. from `a`->`b`), all following logic in the smartnic will perceive that the packet arrived on ingress port `b` even though it physically arrived on port `a`.  This can be useful for test injection scenarios but would typically be set to a straight-through mapping in production.
+```
+sn-cli sw in-port-rename a:b
+```
+
+To reset this mapping so each port maps to its usual identity:
+```
+sn-cli sw in-port-rename cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
+```
+
+## Attach logical input ports to pipelines
+
+The `in-port-connect` subcommand allows you to connect a logical input port to different processing pipelines within the smartnic.  This can be used to connect to a p4 program or to custom logic within the user application.  It can also be used to shunt all packets to a blackhole or to bypass packets around the user application entirely.
+
+```
+sn-cli sw in-port-connect cmac0:app0 cmac1:app0 host0:bypass host1:bypass
+```
+
+## Connect input ports to output ports in the bypass path
+
+The `bypass-connect` subcommand allows you to connect input ports directly to output ports as they pass through the bypass path (ie. not through the user application).  This is useful for providing direct connectivity from host PCIe PFs to 100G CMAC interfaces for network testing.
+
+```
+sn-cli sw bypass-connect host0:cmac0 host1:cmac1 cmac0:host0 cmac1:host1
+```
+
+**NOTE** any packets that follow the bypass path will not be processed by the user's p4 program
+
+## Override user application output port decisions and redirect to an alternate port
+
+The `app0-out-port-redirect` and `app1-out-port-redirect` subcommands allow the user to override the forwarding decisions made by the user application and/or p4 program and redirect any given output port to a different output port.  This can be useful during development/debugging and in test fixtures.
+
+**NOTE** there are separate overrides for the app0 outputs and the app1 outputs.
+
+```
+sn-cli sw app0-out-port-redirect cmac0:host0 cmac1:host1
+sn-cli sw app1-out-port-redirect cmac0:host0 cmac1:host1
+```
+
+To reset this mapping so each output ports maps to its usual destination:
+```
+sn-cli sw app0-out-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
+sn-cli sw app1-out-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
+```
+
 Using the sn-p4-cli tool
 ------------------------
 

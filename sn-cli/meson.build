@@ -5,6 +5,7 @@ sources = files(
     'src/sub-dev.c',
     'src/sub-probe.c',
     'src/sub-qdma.c',
+    'src/sub-sw.c',
   ]
 )
 
