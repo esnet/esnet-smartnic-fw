@@ -268,19 +268,19 @@ sn-cli sw bypass-connect host0:cmac0 host1:cmac1 cmac0:host0 cmac1:host1
 
 ## Override user application output port decisions and redirect to an alternate port
 
-The `app0-out-port-redirect` and `app1-out-port-redirect` subcommands allow the user to override the forwarding decisions made by the user application and/or p4 program and redirect any given output port to a different output port.  This can be useful during development/debugging and in test fixtures.
+The `app0-port-redirect` and `app1-port-redirect` subcommands allow the user to override the forwarding decisions made by the user application and/or p4 program and redirect any given output port to a different output port.  This can be useful during development/debugging and in test fixtures.
 
 **NOTE** there are separate overrides for the app0 outputs and the app1 outputs.
 
 ```
-sn-cli sw app0-out-port-redirect cmac0:host0 cmac1:host1
-sn-cli sw app1-out-port-redirect cmac0:host0 cmac1:host1
+sn-cli sw app0-port-redirect cmac0:host0 cmac1:host1
+sn-cli sw app1-port-redirect cmac0:host0 cmac1:host1
 ```
 
 To reset this mapping so each output ports maps to its usual destination:
 ```
-sn-cli sw app0-out-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
-sn-cli sw app1-out-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
+sn-cli sw app0-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
+sn-cli sw app1-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
 ```
 
 Using the sn-p4-cli tool
