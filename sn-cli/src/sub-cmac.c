@@ -123,43 +123,73 @@ static void print_cmac_status(volatile struct cmac_block * cmac, bool verbose)
 {
   union cmac_conf_rx_1 conf_rx;
   union cmac_conf_tx_1 conf_tx;
-  union cmac_stat_rx_status rx_status;
-  union cmac_stat_tx_status tx_status;
+  union cmac_stat_rx_status rx_status[2];
+  union cmac_stat_tx_status tx_status[2];
 
   // Read current configuration
   conf_rx._v = cmac->conf_rx_1._v;
   conf_tx._v = cmac->conf_tx_1._v;
 
-  // Read multiple times to flush out any old latched status
+  // Read twice to collect historical (since last read) and current status
   for (int i = 0; i < 2; i++) {
-    tx_status._v = cmac->stat_tx_status._v;
-    rx_status._v = cmac->stat_rx_status._v;
+    tx_status[i]._v = cmac->stat_tx_status._v;
+    rx_status[i]._v = cmac->stat_rx_status._v;
   }
 
-  printf("  Tx (MAC %s/PHY %s)\n",
-	 conf_tx.ctl_tx_enable ? "ENABLED" : "DISABLED",
-	 tx_status._v == 0 ? "UP" : "DOWN");
+  printf("  Tx (MAC %s/PHY %s -> %s)\n",
+         conf_tx.ctl_tx_enable ? "ENABLED" : "DISABLED",
+         tx_status[0]._v == 0 ? "UP" : "DOWN",
+         tx_status[1]._v == 0 ? "UP" : "DOWN");
   if (verbose) {
-    printf("\t%25s %u\n", "tx_local_fault", tx_status.stat_tx_local_fault);
+    printf("\t%25s %u -> %u\n", "tx_local_fault",
+           tx_status[0].stat_tx_local_fault,
+           tx_status[1].stat_tx_local_fault);
   }
 
-  printf("  Rx (MAC %s/PHY %s)\n",
+  printf("  Rx (MAC %s/PHY %s -> %s)\n",
 	 conf_rx.ctl_rx_enable ? "ENABLED" : "DISABLED",
-	 rx_status._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN");
+         rx_status[0]._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN",
+         rx_status[1]._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN");
   if (verbose) {
-    printf("\t%25s %u\n", "rx_got_signal_os", rx_status.stat_rx_got_signal_os);
-    printf("\t%25s %u\n", "rx_bad_sfd", rx_status.stat_rx_bad_sfd);
-    printf("\t%25s %u\n", "rx_bad_preamble", rx_status.stat_rx_bad_preamble);
-    printf("\t%25s %u\n", "rx_test_pattern_mismatch", rx_status.stat_rx_test_pattern_mismatch);
-    printf("\t%25s %u\n", "rx_received_local_fault", rx_status.stat_rx_received_local_fault);
-    printf("\t%25s %u\n", "rx_internal_local_fault", rx_status.stat_rx_internal_local_fault);
-    printf("\t%25s %u\n", "rx_local_fault", rx_status.stat_rx_local_fault);
-    printf("\t%25s %u\n", "rx_remote_fault", rx_status.stat_rx_remote_fault);
-    printf("\t%25s %u\n", "rx_hi_ber", rx_status.stat_rx_hi_ber);
-    printf("\t%25s %u\n", "rx_aligned_err", rx_status.stat_rx_aligned_err);
-    printf("\t%25s %u\n", "rx_misaligned", rx_status.stat_rx_misaligned);
-    printf("\t%25s %u\n", "rx_aligned", rx_status.stat_rx_aligned);
-    printf("\t%25s %u\n", "rx_status", rx_status.stat_rx_status);
+    printf("\t%25s %u -> %u\n", "rx_got_signal_os",
+	    rx_status[0].stat_rx_got_signal_os,
+	    rx_status[1].stat_rx_got_signal_os);
+    printf("\t%25s %u -> %u\n", "rx_bad_sfd",
+	    rx_status[0].stat_rx_bad_sfd,
+	    rx_status[1].stat_rx_bad_sfd);
+    printf("\t%25s %u -> %u\n", "rx_bad_preamble",
+	    rx_status[0].stat_rx_bad_preamble,
+	    rx_status[1].stat_rx_bad_preamble);
+    printf("\t%25s %u -> %u\n", "rx_test_pattern_mismatch",
+	    rx_status[0].stat_rx_test_pattern_mismatch,
+	    rx_status[1].stat_rx_test_pattern_mismatch);
+    printf("\t%25s %u -> %u\n", "rx_received_local_fault",
+	    rx_status[0].stat_rx_received_local_fault,
+	    rx_status[1].stat_rx_received_local_fault);
+    printf("\t%25s %u -> %u\n", "rx_internal_local_fault",
+	    rx_status[0].stat_rx_internal_local_fault,
+	    rx_status[1].stat_rx_internal_local_fault);
+    printf("\t%25s %u -> %u\n", "rx_local_fault",
+	    rx_status[0].stat_rx_local_fault,
+	    rx_status[1].stat_rx_local_fault);
+    printf("\t%25s %u -> %u\n", "rx_remote_fault",
+	    rx_status[0].stat_rx_remote_fault,
+	    rx_status[1].stat_rx_remote_fault);
+    printf("\t%25s %u -> %u\n", "rx_hi_ber",
+	    rx_status[0].stat_rx_hi_ber,
+	    rx_status[1].stat_rx_hi_ber);
+    printf("\t%25s %u -> %u\n", "rx_aligned_err",
+	    rx_status[0].stat_rx_aligned_err,
+	    rx_status[1].stat_rx_aligned_err);
+    printf("\t%25s %u -> %u\n", "rx_misaligned",
+	    rx_status[0].stat_rx_misaligned,
+	    rx_status[1].stat_rx_misaligned);
+    printf("\t%25s %u -> %u\n", "rx_aligned",
+	    rx_status[0].stat_rx_aligned,
+	    rx_status[1].stat_rx_aligned);
+    printf("\t%25s %u -> %u\n", "rx_status",
+	    rx_status[0].stat_rx_status,
+	    rx_status[1].stat_rx_status);
   }
 
   return;
