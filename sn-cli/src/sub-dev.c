@@ -132,6 +132,10 @@ void cmd_dev(struct argp_state *state)
 
   if (!strcmp(arguments.command, "version")) {
     printf("Device Version Info\n");
+    printf("\tDNA:           0x%08x%08x%08x\n",
+	    bar2->syscfg.dna[2],
+	    bar2->syscfg.dna[1],
+	    bar2->syscfg.dna[0]);
     printf("\tUSR_ACCESS:    0x%08x (%u)\n", bar2->syscfg.usr_access, bar2->syscfg.usr_access);
     printf("\tBUILD_STATUS:  0x%08x\n", bar2->syscfg.build_status);
   } else if (!strcmp(arguments.command, "temp")) {
