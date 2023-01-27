@@ -123,65 +123,204 @@ static void print_cmac_status(volatile struct cmac_block * cmac, bool verbose)
 {
   union cmac_conf_rx_1 conf_rx;
   union cmac_conf_tx_1 conf_tx;
-  union cmac_stat_rx_status rx_status;
-  union cmac_stat_tx_status tx_status;
+  union cmac_stat_rx_status rx_status[2];
+  union cmac_stat_tx_status tx_status[2];
 
   // Read current configuration
   conf_rx._v = cmac->conf_rx_1._v;
   conf_tx._v = cmac->conf_tx_1._v;
 
-  // Read multiple times to flush out any old latched status
+  // Read twice to collect historical (since last read) and current status
   for (int i = 0; i < 2; i++) {
-    tx_status._v = cmac->stat_tx_status._v;
-    rx_status._v = cmac->stat_rx_status._v;
+    tx_status[i]._v = cmac->stat_tx_status._v;
+    rx_status[i]._v = cmac->stat_rx_status._v;
   }
 
-  printf("  Tx (MAC %s/PHY %s)\n",
-	 conf_tx.ctl_tx_enable ? "ENABLED" : "DISABLED",
-	 tx_status._v == 0 ? "UP" : "DOWN");
+  printf("  Tx (MAC %s/PHY %s -> %s)\n",
+         conf_tx.ctl_tx_enable ? "ENABLED" : "DISABLED",
+         tx_status[0]._v == 0 ? "UP" : "DOWN",
+         tx_status[1]._v == 0 ? "UP" : "DOWN");
   if (verbose) {
-    printf("\t%25s %u\n", "tx_local_fault", tx_status.stat_tx_local_fault);
+    printf("\t%25s %u -> %u\n", "tx_local_fault",
+           tx_status[0].stat_tx_local_fault,
+           tx_status[1].stat_tx_local_fault);
   }
 
-  printf("  Rx (MAC %s/PHY %s)\n",
+  printf("  Rx (MAC %s/PHY %s -> %s)\n",
 	 conf_rx.ctl_rx_enable ? "ENABLED" : "DISABLED",
-	 rx_status._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN");
+         rx_status[0]._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN",
+         rx_status[1]._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN");
   if (verbose) {
-    printf("\t%25s %u\n", "rx_got_signal_os", rx_status.stat_rx_got_signal_os);
-    printf("\t%25s %u\n", "rx_bad_sfd", rx_status.stat_rx_bad_sfd);
-    printf("\t%25s %u\n", "rx_bad_preamble", rx_status.stat_rx_bad_preamble);
-    printf("\t%25s %u\n", "rx_test_pattern_mismatch", rx_status.stat_rx_test_pattern_mismatch);
-    printf("\t%25s %u\n", "rx_received_local_fault", rx_status.stat_rx_received_local_fault);
-    printf("\t%25s %u\n", "rx_internal_local_fault", rx_status.stat_rx_internal_local_fault);
-    printf("\t%25s %u\n", "rx_local_fault", rx_status.stat_rx_local_fault);
-    printf("\t%25s %u\n", "rx_remote_fault", rx_status.stat_rx_remote_fault);
-    printf("\t%25s %u\n", "rx_hi_ber", rx_status.stat_rx_hi_ber);
-    printf("\t%25s %u\n", "rx_aligned_err", rx_status.stat_rx_aligned_err);
-    printf("\t%25s %u\n", "rx_misaligned", rx_status.stat_rx_misaligned);
-    printf("\t%25s %u\n", "rx_aligned", rx_status.stat_rx_aligned);
-    printf("\t%25s %u\n", "rx_status", rx_status.stat_rx_status);
+    printf("\t%25s %u -> %u\n", "rx_got_signal_os",
+	    rx_status[0].stat_rx_got_signal_os,
+	    rx_status[1].stat_rx_got_signal_os);
+    printf("\t%25s %u -> %u\n", "rx_bad_sfd",
+	    rx_status[0].stat_rx_bad_sfd,
+	    rx_status[1].stat_rx_bad_sfd);
+    printf("\t%25s %u -> %u\n", "rx_bad_preamble",
+	    rx_status[0].stat_rx_bad_preamble,
+	    rx_status[1].stat_rx_bad_preamble);
+    printf("\t%25s %u -> %u\n", "rx_test_pattern_mismatch",
+	    rx_status[0].stat_rx_test_pattern_mismatch,
+	    rx_status[1].stat_rx_test_pattern_mismatch);
+    printf("\t%25s %u -> %u\n", "rx_received_local_fault",
+	    rx_status[0].stat_rx_received_local_fault,
+	    rx_status[1].stat_rx_received_local_fault);
+    printf("\t%25s %u -> %u\n", "rx_internal_local_fault",
+	    rx_status[0].stat_rx_internal_local_fault,
+	    rx_status[1].stat_rx_internal_local_fault);
+    printf("\t%25s %u -> %u\n", "rx_local_fault",
+	    rx_status[0].stat_rx_local_fault,
+	    rx_status[1].stat_rx_local_fault);
+    printf("\t%25s %u -> %u\n", "rx_remote_fault",
+	    rx_status[0].stat_rx_remote_fault,
+	    rx_status[1].stat_rx_remote_fault);
+    printf("\t%25s %u -> %u\n", "rx_hi_ber",
+	    rx_status[0].stat_rx_hi_ber,
+	    rx_status[1].stat_rx_hi_ber);
+    printf("\t%25s %u -> %u\n", "rx_aligned_err",
+	    rx_status[0].stat_rx_aligned_err,
+	    rx_status[1].stat_rx_aligned_err);
+    printf("\t%25s %u -> %u\n", "rx_misaligned",
+	    rx_status[0].stat_rx_misaligned,
+	    rx_status[1].stat_rx_misaligned);
+    printf("\t%25s %u -> %u\n", "rx_aligned",
+	    rx_status[0].stat_rx_aligned,
+	    rx_status[1].stat_rx_aligned);
+    printf("\t%25s %u -> %u\n", "rx_status",
+	    rx_status[0].stat_rx_status,
+	    rx_status[1].stat_rx_status);
   }
 
   return;
 }
 
-static void print_cmac_stats(volatile struct cmac_block * cmac)
+static void print_cmac_stats(volatile struct cmac_block * cmac, bool verbose)
 {
   // Latch the current stats
   cmac->tick = 1;
 
-  printf("TX %6lu RX %6lu RX-DISC %6lu RX-ERR %6lu\n",
-	   cmac->stat_tx_total_good_pkts,
-	   cmac->stat_rx_total_good_pkts,
-	   cmac->stat_rx_total_pkts - cmac->stat_rx_total_good_pkts,
-	   cmac->stat_rx_undersize +
-	   cmac->stat_rx_fragment +
-	   cmac->stat_rx_oversize +
-	   cmac->stat_rx_toolong +
-	   cmac->stat_rx_jabber +
-	   cmac->stat_rx_bad_fcs +
-	   cmac->stat_rx_pkt_bad_fcs +
-	   cmac->stat_rx_stomped_fcs);
+  printf("  Tx:\n");
+  printf("      %8lu pkts  %8lu bytes   ok\n", cmac->stat_tx_total_good_pkts, cmac->stat_tx_total_good_bytes);
+  if (verbose) {
+	  printf("               %9s  %9s  %9s  %9s  %9s  %9s\n",
+		  "64",
+		  "65-127",
+		  "128-255",
+		  "256-511",
+		  "512-1023",
+		  "1024-1518");
+	  printf("               %9s  %9s  %9s  %9s  %9s  %9s\n",
+		  "--",
+		  "------",
+		  "-------",
+		  "-------",
+		  "--------",
+		  "---------");
+	  printf("               %9lu  %9lu  %9lu  %9lu  %9lu  %9lu\n",
+		  cmac->stat_tx_pkt_64_bytes,
+		  cmac->stat_tx_pkt_65_127_bytes,
+		  cmac->stat_tx_pkt_128_255_bytes,
+		  cmac->stat_tx_pkt_256_511_bytes,
+		  cmac->stat_tx_pkt_512_1023_bytes,
+		  cmac->stat_tx_pkt_1024_1518_bytes);
+	  printf("               %9s  %9s  %9s  %9s  %9s  %9s\n",
+		  "1519-1522",
+		  "1523-1548",
+		  "1549-2047",
+		  "2048-4095",
+		  "4096-8191",
+		  "8192-9215");
+	  printf("               %9s  %9s  %9s  %9s  %9s  %9s\n",
+		  "---------",
+		  "---------",
+		  "---------",
+		  "---------",
+		  "---------",
+		  "---------");
+	  printf("               %9lu  %9lu  %9lu  %9lu  %9lu  %9lu\n",
+		  cmac->stat_tx_pkt_1519_1522_bytes,
+		  cmac->stat_tx_pkt_1523_1548_bytes,
+		  cmac->stat_tx_pkt_1549_2047_bytes,
+		  cmac->stat_tx_pkt_2048_4095_bytes,
+		  cmac->stat_tx_pkt_4096_8191_bytes,
+		  cmac->stat_tx_pkt_8192_9215_bytes);
+  }
+  printf("      %8lu pkts  %8lu bytes   errors\n",
+	  cmac->stat_tx_total_pkts - cmac->stat_tx_total_good_pkts,
+	  cmac->stat_tx_total_bytes - cmac->stat_tx_total_good_bytes);
+  printf("      %8lu pkts  large\n", cmac->stat_tx_pkt_large);
+  printf("      %8lu pkts  small\n", cmac->stat_tx_pkt_small);
+  printf("      %8lu pkts  bad fcs\n", cmac->stat_tx_bad_fcs);
+  printf("      %8lu pkts  unicast\n", cmac->stat_tx_unicast);
+  printf("      %8lu pkts  multicast\n", cmac->stat_tx_multicast);
+  printf("      %8lu pkts  broadcast\n", cmac->stat_tx_broadcast);
+  printf("      %8lu pkts  vlan\n", cmac->stat_tx_vlan);
+
+  printf("  Rx:\n");
+  printf("      %8lu pkts  %8lu bytes   ok\n", cmac->stat_rx_total_good_pkts, cmac->stat_rx_total_good_bytes);
+  if (verbose) {
+	  printf("               %9s  %9s  %9s  %9s  %9s  %9s\n",
+		  "64",
+		  "65-127",
+		  "128-255",
+		  "256-511",
+		  "512-1023",
+		  "1024-1518");
+	  printf("               %9s  %9s  %9s  %9s  %9s  %9s\n",
+		  "--",
+		  "------",
+		  "-------",
+		  "-------",
+		  "--------",
+		  "---------");
+	  printf("               %9lu  %9lu  %9lu  %9lu  %9lu  %9lu\n",
+		  cmac->stat_rx_pkt_64_bytes,
+		  cmac->stat_rx_pkt_65_127_bytes,
+		  cmac->stat_rx_pkt_128_255_bytes,
+		  cmac->stat_rx_pkt_256_511_bytes,
+		  cmac->stat_rx_pkt_512_1023_bytes,
+		  cmac->stat_rx_pkt_1024_1518_bytes);
+	  printf("               %9s  %9s  %9s  %9s  %9s  %9s\n",
+		  "1519-1522",
+		  "1523-1548",
+		  "1549-2047",
+		  "2048-4095",
+		  "4096-8191",
+		  "8192-9215");
+	  printf("               %9s  %9s  %9s  %9s  %9s  %9s\n",
+		  "---------",
+		  "---------",
+		  "---------",
+		  "---------",
+		  "---------",
+		  "---------");
+	  printf("               %9lu  %9lu  %9lu  %9lu  %9lu  %9lu\n",
+		  cmac->stat_rx_pkt_1519_1522_bytes,
+		  cmac->stat_rx_pkt_1523_1548_bytes,
+		  cmac->stat_rx_pkt_1549_2047_bytes,
+		  cmac->stat_rx_pkt_2048_4095_bytes,
+		  cmac->stat_rx_pkt_4096_8191_bytes,
+		  cmac->stat_rx_pkt_8192_9215_bytes);
+  }
+  printf("      %8lu pkts  %8lu bytes   errors\n",
+	  cmac->stat_rx_total_pkts - cmac->stat_rx_total_good_pkts,
+	  cmac->stat_rx_total_bytes - cmac->stat_rx_total_good_bytes);
+  printf("      %8lu pkts  large\n", cmac->stat_rx_pkt_large);
+  printf("      %8lu pkts  small\n", cmac->stat_rx_pkt_small);
+  printf("      %8lu pkts  undersize\n", cmac->stat_rx_undersize);
+  printf("      %8lu pkts  fragment\n", cmac->stat_rx_fragment);
+  printf("      %8lu pkts  oversize\n", cmac->stat_rx_oversize);
+  printf("      %8lu pkts  too long\n", cmac->stat_rx_toolong);
+  printf("      %8lu pkts  jabber\n", cmac->stat_rx_jabber);
+  printf("      %8lu pkts  bad fcs\n", cmac->stat_rx_bad_fcs);
+  printf("      %8lu pkts  stomped fcs\n", cmac->stat_rx_stomped_fcs);
+  printf("      %8lu pkts  unicast\n", cmac->stat_rx_unicast);
+  printf("      %8lu pkts  multicast\n", cmac->stat_rx_multicast);
+  printf("      %8lu pkts  broadcast\n", cmac->stat_rx_broadcast);
+  printf("      %8lu pkts  vlan\n", cmac->stat_rx_vlan);
+  printf("      %8lu pkts  truncated\n", cmac->stat_rx_truncated);
+
   return;
 }
 
@@ -273,13 +412,13 @@ void cmd_cmac(struct argp_state *state)
 
   } else if (!strcmp(arguments.command, "stats")) {
     if (arguments.ports & PORT_SELECT_CMAC0) {
-      printf("CMAC0: ");
-      print_cmac_stats(&bar2->cmac0);
+      printf("CMAC0\n");
+      print_cmac_stats(&bar2->cmac0, arguments.global->verbose);
     }
 
     if (arguments.ports & PORT_SELECT_CMAC1) {
-      printf("CMAC1: ");
-      print_cmac_stats(&bar2->cmac1);
+      printf("CMAC1\n");
+      print_cmac_stats(&bar2->cmac1, arguments.global->verbose);
     }
 
   } else {
