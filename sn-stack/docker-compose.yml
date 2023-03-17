@@ -1,9 +1,9 @@
 x-labtools-service: &labtools-service
-  image: ${LABTOOLS_REGISTRY-}xilinx-labtools-docker:${LABTOOLS_TAG-v2022.1-latest}
+  image: ${LABTOOLS_IMAGE_URI-xilinx-labtools-docker:v2022.1-latest}
   restart: unless-stopped
 
-x-smartnic-dpdk-service: &smartnic-dpdk-service
-  image: ${SMARTNIC_DPDK_REGISTRY-}smartnic-dpdk-docker:${SMARTNIC_DPDK_TAG-$USER-dev}
+x-smartnic-fw-service: &smartnic-fw-service
+  image: ${SMARTNIC_FW_IMAGE_URI-esnet-smartnic-fw:$USER-dev}
   restart: unless-stopped
 
 services:
@@ -39,6 +39,27 @@ services:
           -e "set auto-open-ports 0" \
           -e "set jtag-port-filter ${HW_TARGET_SERIAL:-Xilinx/}"
 
+  smartnic-unpack:
+    <<: *smartnic-fw-service
+    hostname: smartnic-unpack
+    init: true
+    user: root
+    volumes:
+      - bitfiles:/bitfiles
+    network_mode: none
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        rm -f /bitfiles/ok
+        cp -a /usr/local/lib/firmware/esnet-smartnic/esnet-smartnic.{bit,mcs} /bitfiles
+        touch /bitfiles/ok
+        sleep infinity
+
   smartnic-hw:
     <<: *labtools-service
     hostname: smartnic-hw
@@ -48,12 +69,10 @@ services:
     init: true
     user: root
     privileged: true
-    env_file:
-      - ${SN_STACK_ROOT-.}/buildinfo.env
     tmpfs:
       - /status
     volumes:
-      - debs:/debs:ro
+      - bitfiles:/bitfiles:ro
       - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
     healthcheck:
       test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
@@ -69,12 +88,13 @@ services:
       - pipefail
       - -x
       - |
-        dpkg -i \
-          /debs/esnet-smartnic-hw_1.0.0-$${SN_FW_VER}_amd64.deb
+        if [ ! -e /bitfiles/ok ] ; then
+          exit 1
+        fi
         /scripts/program_card.sh \
           xilinx-hwserver:3121 \
           "${HW_TARGET_SERIAL:-*}" \
-          /usr/lib/firmware/esnet-smartnic/esnet-smartnic.bit \
+          /bitfiles/esnet-smartnic.bit \
           $FPGA_PCIE_DEV \
           # FORCE
         if [ $$? ] ; then
@@ -83,7 +103,7 @@ services:
         fi
 
   smartnic-devbind:
-    <<: *smartnic-dpdk-service
+    <<: *smartnic-fw-service
     hostname: smartnic-devbind
     depends_on:
       smartnic-hw:
@@ -91,8 +111,6 @@ services:
     init: true
     user: root
     privileged: true
-    env_file:
-      - ${SN_STACK_ROOT-.}/buildinfo.env
     environment:
       - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
     tmpfs:
@@ -131,17 +149,16 @@ services:
 
   smartnic-dpdk:
     hostname: smartnic-dpdk
-    <<: *smartnic-dpdk-service
+    <<: *smartnic-fw-service
     init: true
     user: root
     privileged: true
     depends_on:
       smartnic-devbind:
         condition: service_healthy
-    env_file:
-      - ${SN_STACK_ROOT-.}/buildinfo.env
     environment:
       - SN_PCIE_DEV=$FPGA_PCIE_DEV
+      - SN_DEV_PCIEADDR=$FPGA_PCIE_DEV.0
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /var/run/dpdk:/var/run/dpdk
@@ -165,11 +182,8 @@ services:
       - smartnic-dpdk
 
   smartnic-fw:
+    <<: *smartnic-fw-service
     hostname: smartnic-fw
-    build:
-      context: ${SN_STACK_ROOT-.}/smartnic-fw
-      args:
-        DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
     depends_on:
       smartnic-hw:
         condition: service_healthy
@@ -177,14 +191,12 @@ services:
     user: root
     privileged: true
     restart: unless-stopped
-    env_file:
-      - ${SN_STACK_ROOT-.}/buildinfo.env
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
+      - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_CLI_SERVER=smartnic-p4
     volumes:
-      - debs:/debs:ro
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
       - sn-scratch:/scratch
@@ -196,20 +208,13 @@ services:
       - pipefail
       - -x
       - |
-        dpkg -i \
-          /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb \
-          /debs/esnet-smartnic1-dbgsym_1.0.0-$${SN_FW_VER}_amd64.ddeb \
-          /debs/esnet-smartnic-dev_1.0.0-$${SN_FW_VER}_amd64.deb
         setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2
         setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2
         sleep infinity
 
   smartnic-p4:
+    <<: *smartnic-fw-service
     hostname: smartnic-p4
-    build:
-      context: ${SN_STACK_ROOT-.}/smartnic-fw
-      args:
-        DOCKERHUB_PROXY: ${DOCKERHUB_PROXY-}
     depends_on:
       smartnic-hw:
         condition: service_healthy
@@ -217,19 +222,14 @@ services:
     user: root
     privileged: true
     restart: unless-stopped
-    env_file:
-      - ${SN_STACK_ROOT-.}/buildinfo.env
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_AGENT_SLOTADDR=$FPGA_PCIE_DEV.0
     volumes:
-      - debs:/debs:ro
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
       - sn-scratch:/scratch
-      ## [debug] Uncomment the next line to include the source code in your container to debug with gdb
-      #- ${PWD}/..:/source
     entrypoint:
       - /bin/bash
       - -c
@@ -238,18 +238,10 @@ services:
       - pipefail
       - -x
       - |
-        dpkg -i \
-          /debs/esnet-smartnic1_1.0.0-$${SN_FW_VER}_amd64.deb \
-          /debs/esnet-smartnic1-dbgsym_1.0.0-$${SN_FW_VER}_amd64.ddeb \
-          /debs/esnet-smartnic-dev_1.0.0-$${SN_FW_VER}_amd64.deb
         sn-p4-agent $$SN_P4_AGENT_SLOTADDR
 
 volumes:
-  debs:
-    driver_opts:
-      type: none
-      device: ${SN_STACK_ROOT-${PWD}}/debs/focal
-      o: bind,ro
+  bitfiles:
 
   sn-scratch:
     driver_opts:
