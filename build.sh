@@ -1,4 +1,7 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
+# NOTE: This script is also used inside of an alpine linux container and
+#       as such, needs to find bash at a different path than where it is
+#       in ubuntu.  The indirection through /usr/bin/env is required.
 
 # By default, point to a user dev image in the local registry
 DEFAULT_IMAGE_URI="esnet-smartnic-fw:${USER}-dev"
@@ -87,6 +90,10 @@ docker build \
 	--build-arg SN_FW_APP_NAME=${SN_FW_APP_NAME} \
 	--build-arg SN_FW_VER=${SN_FW_VER} \
 	-t ${IMAGE_URI} .
+if [ $? -ne 0 ] ; then
+    echo "ERROR: Failed to build container"
+    exit 1
+fi
 
 # Rewrite a cleaned-up, simplified version of the input .env file used to build this image
 # The buildinfo.env file will be available to users that embed the sn-stack directory into a larger compose stack
