@@ -50,7 +50,7 @@ docker compose down -v
 Start up the separate flash-programming service like this
 
 ```
-docker compose -f docker-compose-flash.yml run --rm smartnic-flash
+docker compose run --rm smartnic-flash
 ```
 
 This will:
@@ -60,6 +60,12 @@ This will:
   * The "gold" partition is left untouched
 
 **Note:** the flash programming sequence takes about 19 minutes to complete.
+
+Clean up after the flash programming operation.
+
+```
+docker compose down -v --remove-orphans
+```
 
 Inspecting registers and interacting with the firmware
 ------------------------------------------------------
