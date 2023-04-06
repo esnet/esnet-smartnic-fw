@@ -94,7 +94,7 @@ Install Smartnic Hardware Build Artifact
 
 The firmware build depends on the result of a smartnic hardware (FPGA) build.  This file must be available prior to invoking the firmware build.
 
-This file will be called `artifacts.esnet-smartnic-hw.<version>.zip` and should be placed in the `sn-hw` directory in your source tree before starting the firmware build.
+This file will be called `artifacts.<board>.<build_name>.0.zip` and should be placed in the `sn-hw` directory in your source tree before starting the firmware build.
 
 Set up your .env file for building a new firmware image
 -------------------------------------------------------

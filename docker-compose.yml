@@ -20,6 +20,7 @@ services:
       SN_HW_REPO: ${SN_HW_REPO-unset}
       SN_HW_BRANCH: ${SN_HW_BRANCH-unset}
       SN_HW_APP_NAME: ${SN_HW_APP_NAME?}
+      SN_HW_BOARD: ${SN_HW_BOARD?}
       SN_HW_VER: ${SN_HW_VER?}
       SN_FW_REPO: ${SN_FW_REPO-unset}
       SN_FW_BRANCH: ${SN_FW_BRANCH-unset}
@@ -36,7 +37,7 @@ services:
         cp -a /source /build
         cd /build/source
         meson subprojects purge --include-cache --confirm
-        SN_HW_API="/sn-hw/artifacts.$${SN_HW_APP_NAME}.$${SN_HW_VER}.zip"
+        SN_HW_API="/sn-hw/artifacts.$${SN_HW_BOARD}.$${SN_HW_APP_NAME}.$${SN_HW_VER}.zip"
         [ -r $${SN_HW_API} ] || ( echo "Error - Can't open $${SN_HW_API}" ; exit 1)
         ln -fs \
           $${SN_HW_API} \
@@ -68,6 +69,7 @@ services:
         SN_HW_REPO=$${SN_HW_REPO}
         SN_HW_BRANCH=$${SN_HW_BRANCH}
         SN_HW_APP_NAME=$${SN_HW_APP_NAME}
+        SN_HW_BOARD=$${SN_HW_BOARD}
         SN_HW_VER=$${SN_HW_VER}
         _EOF
         file subprojects/esnet-smartnic-hwapi/firmware/esnet-smartnic.bit
