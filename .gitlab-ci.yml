@@ -112,9 +112,11 @@ package:
   stage: build
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
-    SN_FW_GROUP: ${CI_GROUP_NAME}
+    SN_FW_GROUP: ${CI_PROJECT_NAMESPACE}
     SN_FW_REPO: ${CI_PROJECT_NAME}
     SN_FW_BRANCH: ${CI_COMMIT_BRANCH}
+    # Copy HW_APP_NAME into FW_APP_NAME
+    SN_FW_APP_NAME: ${SN_HW_APP_NAME}
     SN_FW_VER: ${CI_PIPELINE_ID}
   before_script:
     # Install bash
@@ -154,6 +156,11 @@ package:
     # Capture this job's ID for downstream triggered pipelines
     - |
       cat <<_EOF >> fwapi.env
+      SN_FW_GROUP=${SN_FW_GROUP}
+      SN_FW_REPO=${SN_FW_REPO}
+      SN_FW_BRANCH=${SN_FW_BRANCH}
+      SN_FW_APP_NAME=${SN_FW_APP_NAME}
+      SN_FW_VER=${SN_FW_VER}
       SN_FW_API_JOB_NUMBER=$CI_JOB_ID
       SMARTNIC_FW_IMAGE_URI=$PUBLISH_URI$TAG_SUFFIX
       _EOF
@@ -244,26 +251,26 @@ fail_if_not_default_context:
   #       even the rules evaluation for *this* trigger job
   inherit:
     variables:
-      - SN_HW_BOARD
       - SN_HW_APP_NAME
+      - SN_FW_GROUP
+      - SN_FW_REPO
+      - SN_FW_BRANCH
+      - SN_FW_APP_NAME
+      - SMARTNIC_FW_IMAGE_URI
   variables:
-    SN_FW_GROUP: $CI_PROJECT_NAMESPACE
-    SN_FW_REPO: $CI_PROJECT_NAME
-    SN_FW_BRANCH: $CI_COMMIT_BRANCH
     # override the artifact URL in the triggered repo so it pulls directly from the package job from this pipeline
     ESNET_SMARTNIC_FWAPI_URL: "$CI_PROJECT_URL/-/jobs/$SN_FW_API_JOB_NUMBER/artifacts/download?file_type=archive"
-    # override the firmware container URI in the triggered repo so it pulls directly from the images built in this pipeline
-    SMARTNIC_FW_IMAGE_URI: $SMARTNIC_FW_IMAGE_URI
   rules:
-    - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_FW_APP_NAME)
-    - if: ($CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_FW_APP_NAME)
+    # Compare HW_APP_NAME to SW_APP_NAME here since the dynamically computed FW_APP_NAME is not visible to the rules section
+    - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_SW_APP_NAME)
+    - if: ($CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_SW_APP_NAME)
       when: manual
       allow_failure: true
 
 trigger_ht_sw:
   extends: .trigger_sw
   variables:
-    SN_FW_APP_NAME: esnet-smartnic-ht
+    SN_SW_APP_NAME: esnet-smartnic-ht
     SN_FW_API_JOB: package
   trigger:
     project: ht/hightouch-xilinx
