@@ -59,21 +59,21 @@ Install the `docker compose` plugin like this for a single user:
 
 ```
 mkdir -p ~/.docker/cli-plugins/
-curl -SL https://github.com/docker/compose/releases/download/v2.12.2/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+curl -SL https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
 chmod +x ~/.docker/cli-plugins/docker-compose
 ```
 
 Alternatively, you can install the `docker compose` plugin system-wide like this:
 ```
 sudo mkdir -p /usr/local/lib/docker/cli-plugins
-sudo curl  -o /usr/local/lib/docker/cli-plugins/docker-compose -SL https://github.com/docker/compose/releases/download/v2.12.2/docker-compose-linux-x86_64
+sudo curl  -o /usr/local/lib/docker/cli-plugins/docker-compose -SL https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-linux-x86_64
 sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 ```
 
 Verify your docker compose installation by running this as an ordinary (non-root) user without using `sudo`.  For this install, the version output should be
 ```
 $ docker compose version
-Docker Compose version v2.12.2
+Docker Compose version v2.17.2
 ```
 
 Git Submodules
@@ -94,7 +94,7 @@ Install Smartnic Hardware Build Artifact
 
 The firmware build depends on the result of a smartnic hardware (FPGA) build.  This file must be available prior to invoking the firmware build.
 
-This file will be called `artifacts.<board>.<build_name>.0.zip` and should be placed in the `sn-hw` directory in your source tree before starting the firmware build.
+This file will be called `artifacts.<board>.<app_name>.0.zip` and should be placed in the `sn-hw` directory in your source tree before starting the firmware build.
 
 Set up your .env file for building a new firmware image
 -------------------------------------------------------
@@ -108,37 +108,33 @@ cd $(git rev-parse --show-toplevel)
 cp example.env .env
 ```
 
+Since the values in the .env file are used to locate the correct hardware artifact, you will need to (at least) set these values in the `.env` file to match the exact naming of the .zip file you installed in the previous step:
+```
+SN_HW_BOARD=<board>
+SN_HW_APP_NAME=<app_name>
+SN_HW_VER=0
+```
+
 Build the firmware
 ------------------
 
-The firmware build happens inside of a docker container which manages all of the build-time dependencies and tools.
-
+The firmware build creates a docker container with everything needed to interact with your FPGA image.  Without any parameters, the newly built firmware container will be named/tagged `esnet-smartnic-fw:${USER}-dev` and will be available only on the local system.
 ```
 cd $(git rev-parse --show-toplevel)
-docker compose build
-docker compose run --rm sn-fw-pkg
+./build.sh
 ```
 
-Note: to pick up the very latest Ubuntu packages used in the build environment, you may wish to occasionally run `docker compose build --no-cache` to force the build env to be refreshed rather than (potentially) using the previously cached docker image.
-
-The firmware build produces its output files in the `sn-stack/debs` directory where you'll find files similar to these
+**Optionally** you can use any alternative name by specifying the full container URI as an optional parameter to the build script like this.  Using a fully specified URI here can be useful if you are planning to push the newly built container to a remote docker registry.
 ```
-cd $(git rev-parse --show-toplevel)
-$ tree sn-stack/debs/
-sn-stack/debs/
-└── focal
-    ├── esnet-smartnic_1.0.0-user.001_amd64.buildinfo
-    ├── esnet-smartnic_1.0.0-user.001_amd64.changes
-    ├── esnet-smartnic1_1.0.0-user.001_amd64.deb
-    ├── esnet-smartnic1-dbgsym_1.0.0-user.001_amd64.ddeb
-    └── esnet-smartnic-dev_1.0.0-user.001_amd64.deb
+./build.sh wharf.es.net/ht/esnet-smartnic-fw:${USER}-dev
 ```
 
-These files will be used to customize the smartnic runtime environment and the `esnet-smartnic-dev_*` packages can also be used in your application software development environment.  For further details about the contents of these `.deb` files, see `README.fw.artifacts`.
+The build script also automatically customizes the `sn-stack/.env` file to refer exactly to the firmware image that you just built.
+
 
 The entire `sn-stack` directory will need to be transferred to the runtime system.
 
 ```
 cd $(git rev-parse --show-toplevel)
-zip -r artifacts.esnet-smartnic-fw.package_focal.user.001.zip sn-stack
+zip -r artifacts.esnet-smartnic-fw.package.0.zip sn-stack
 ```

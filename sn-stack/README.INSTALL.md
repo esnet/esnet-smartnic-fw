@@ -14,14 +14,12 @@ Running the firmware
 The firmware artifact produced by the build (see README.md at the top of this repo) should be transferred to the runtime system that hosts an FPGA card.
 
 ```
-unzip artifacts.esnet-smartnic-fw.package_focal.user.001.zip
+unzip artifacts.esnet-smartnic-fw.package.0.zip
 cd sn-stack
-cp example.env .env
 # edit the .env file to provide sane values for
 #    FPGA_PCIE_DEV=0000:d8:00
 # and IFF you have more than one JTAG you also need a line like this
 #    HW_TARGET_SERIAL=21760204S029A
-docker compose build
 docker compose up -d
 ```
 
@@ -50,7 +48,7 @@ docker compose down -v
 Start up the separate flash-programming service like this
 
 ```
-docker compose -f docker-compose-flash.yml run --rm smartnic-flash
+docker compose run --rm smartnic-flash
 ```
 
 This will:
@@ -60,6 +58,12 @@ This will:
   * The "gold" partition is left untouched
 
 **Note:** the flash programming sequence takes about 19 minutes to complete.
+
+Clean up after the flash programming operation.
+
+```
+docker compose down -v --remove-orphans
+```
 
 Inspecting registers and interacting with the firmware
 ------------------------------------------------------
@@ -91,8 +95,9 @@ This will show information about the device such as the build version, build dat
 ```
 root@smartnic-fw:/# sn-cli dev version
 Device Version Info
-	USR_ACCESS:    0x00006a14 (27156)
-	BUILD_STATUS:  0x08300532
+	DNA:           0x40020000012306a21c10c285
+	USR_ACCESS:    0x000086d3 (34515)
+	BUILD_STATUS:  0x04130920
 
 root@smartnic-fw:/# sn-cli dev temp
 Temperature Monitors
@@ -100,6 +105,7 @@ Temperature Monitors
 ```
 The `USR_ACCESS` value is typically the unique build pipeline number that produced the embedded FPGA bitfile.
 The `BUILD_STATUS` value holds an encoded date/time (Aug 30 at 05:32am) which is when the embedded FPGA bitfile build was started.
+The `DNA` value holds the factory programmed unique ID of the FPGA
 
 # Inspecting and Configuring the CMAC (100G) Interfaces with the "cmac" subcommand
 
