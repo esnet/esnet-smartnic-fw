@@ -195,11 +195,6 @@ wharf_release:
   timeout: 1h
   needs:
     - package
-  rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
-      when: manual
-      allow_failure: true
 
 # This is an unfortunate hack to workaround downstream SW build failures.
 #
