@@ -6,6 +6,10 @@ x-smartnic-fw-service: &smartnic-fw-service
   image: ${SMARTNIC_FW_IMAGE_URI-esnet-smartnic-fw:$USER-dev}
   restart: unless-stopped
 
+x-smartnic-dpdk-service: &smartnic-dpdk-service
+  image: ${SMARTNIC_DPDK_IMAGE_URI-smartnic-dpdk-docker:$USER-dev}
+  restart: unless-stopped
+
 services:
   xilinx-hwserver:
     <<: *labtools-service
@@ -191,7 +195,7 @@ services:
 
   smartnic-dpdk:
     hostname: smartnic-dpdk
-    <<: *smartnic-fw-service
+    <<: *smartnic-dpdk-service
     init: true
     user: root
     privileged: true
