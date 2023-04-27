@@ -184,6 +184,7 @@ services:
         sleep 1
         # Bind the vfio-pci driver to each FPGA PF
         dpdk-devbind.py -b vfio-pci $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
+        dpdk-devbind.py --status
         # Confirm that the driver is properly bound to each FPGA PF
         # Note the <TAB> before vfio-pci in the grep command
         lspci -D -kvm -s $$FPGA_PCIE_DEV.0 | grep '^Driver:	vfio-pci'
@@ -191,11 +192,44 @@ services:
         touch /status/ok
         sleep infinity
     profiles:
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      # Note: the smartnic-dpdk profile is deprecated and will be removed
       - smartnic-dpdk
 
+  smartnic-vfio-unlock:
+    <<: *smartnic-fw-service
+    hostname: smartnic-vfio-unlock
+    init: true
+    user: root
+    privileged: true
+    depends_on:
+      smartnic-devbind:
+        condition: service_healthy
+    environment:
+      # Tell python to do unbuffered IO to stdout
+      - PYTHONUNBUFFERED=1
+      - VFIO_UNLOCK_SELECT=$FPGA_PCIE_DEV.0
+      - VFIO_UNLOCK_BAR=2
+    volumes:
+      - /sys/bus/pci:/sys/bus/pci
+      - /dev/vfio:/dev/vfio
+      - ${SN_STACK_ROOT-${PWD}}/smartnic-vfio-unlock/scripts:/scripts
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - /scripts/vfio-unlock.py
+    profiles:
+      - smartnic-mgr-vfio-unlock
+
+
   smartnic-dpdk:
-    hostname: smartnic-dpdk
     <<: *smartnic-dpdk-service
+    hostname: smartnic-dpdk
     init: true
     user: root
     privileged: true
@@ -222,9 +256,10 @@ services:
       - pipefail
       - -x
       - |
-        dpdk-devbind.py --status
         sleep infinity
     profiles:
+      - smartnic-mgr-user
+      # Note: the smartnic-dpdk profile is deprecated and will be removed
       - smartnic-dpdk
 
   smartnic-fw:
