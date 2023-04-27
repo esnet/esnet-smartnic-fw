@@ -137,14 +137,17 @@ if egrep -q "^${ENV_BLOCK_TOP}\$" sn-stack/.env ; then
 ${ENV_BLOCK_TOP}\n\
 SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}\n\
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}\n\
+SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}\n
 ${ENV_BLOCK_BOT}" \
 	sn-stack/.env
 else
     # No marker block found, append it to the end of the file
     cat >>sn-stack/.env <<EOF
+
 ${ENV_BLOCK_TOP}
 SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}
+SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}
 ${ENV_BLOCK_BOT}
 EOF
 fi
