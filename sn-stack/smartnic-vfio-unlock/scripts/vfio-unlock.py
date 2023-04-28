@@ -149,7 +149,8 @@ def main(select, bar):
             print("\tBUILD_STATUS = 0x{:08x}".format(syscfg[0]))
             print()
 
-            time.sleep(1000)
+            while True:
+                time.sleep(60)
 
 if __name__ == "__main__":
     main(auto_envvar_prefix='VFIO_UNLOCK')
