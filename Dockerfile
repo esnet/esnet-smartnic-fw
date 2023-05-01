@@ -11,6 +11,7 @@ ENV LANG C.UTF-8
 #COPY sources.list /etc/apt/sources.list
 
 RUN <<EOT
+    set -ex
     ln -fs /usr/share/zoneinfo/UTC /etc/localtime
     apt update -y
     apt upgrade -y
@@ -74,6 +75,7 @@ COPY ${PWD} /sn-fw/source
 WORKDIR /sn-fw/source
 
 RUN <<EOF
+    set -ex
     meson subprojects purge --include-cache --confirm
     ln -fs \
       ${PWD}/sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
