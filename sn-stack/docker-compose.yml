@@ -1,5 +1,5 @@
 x-labtools-service: &labtools-service
-  image: ${LABTOOLS_IMAGE_URI-xilinx-labtools-docker:v2022.1-latest}
+  image: ${LABTOOLS_IMAGE_URI-xilinx-labtools-docker:$USER-dev}
   restart: unless-stopped
 
 x-smartnic-fw-service: &smartnic-fw-service
