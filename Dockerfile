@@ -74,9 +74,9 @@ ENV SN_FW_VER ${SN_FW_VER}
 COPY ${PWD} /sn-fw/source
 WORKDIR /sn-fw/source
 
-RUN <<EOF
+RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
     set -ex
-    meson subprojects purge --include-cache --confirm
+    meson subprojects purge --confirm
     ln -fs \
       ${PWD}/sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
       subprojects/packagefiles/esnet-smartnic-hwapi.zip
