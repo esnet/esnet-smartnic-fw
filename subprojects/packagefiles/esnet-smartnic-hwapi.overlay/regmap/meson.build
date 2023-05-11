@@ -12,6 +12,7 @@ regio_info_prog = find_program('regio-info')
 regmap_info = run_command(
   regio_info_prog,
   'esnet-smartnic-top-ir.yaml',
+  check: true,
 )
 
 regmap_blocks = regmap_info.stdout().strip().split('\n')

@@ -8,7 +8,7 @@ libvitisnetp4drv_dep = declare_dependency(
   dependencies :
     [
       cc.find_library(
-	'libvitisnetp4drv',
+	'vitisnetp4drv',
 	dirs : join_paths(meson.current_source_dir(),
 			  'lib'),
 	static : true,
