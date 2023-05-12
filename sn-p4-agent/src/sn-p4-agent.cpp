@@ -27,19 +27,19 @@ public:
   explicit SmartnicP4Impl(const std::string& pci_address) {
     bar2 = smartnic_map_bar2_by_pciaddr(pci_address.c_str());
     if (bar2 == NULL) {
-      std::cout << "Failed to map PCIe register space for device: " << pci_address << std::endl;
+      std::cerr << "Failed to map PCIe register space for device: " << pci_address << std::endl;
       exit(EXIT_FAILURE);
     }
 
     snp4_handle = snp4_init((uintptr_t) &bar2->sdnet);
     if (snp4_handle == NULL) {
-      std::cout << "Failed to initialize snp4/vitisnetp4 library: " << pci_address << std::endl;
+      std::cerr << "Failed to initialize snp4/vitisnetp4 library: " << pci_address << std::endl;
       exit(EXIT_FAILURE);
     }
 
     auto rc = snp4_info_get_pipeline(&pipeline);
     if (rc != SNP4_STATUS_OK) {
-      std::cout << "Failed to load snp4 pipeline info: " << rc << std::endl;
+      std::cerr << "Failed to load snp4 pipeline info: " << rc << std::endl;
       exit(EXIT_FAILURE);
     }
   }
@@ -151,7 +151,7 @@ public:
     for (const Match& match : ma->matches()) {
       struct sn_match * m = &rule.matches[rule.num_matches];
 
-      std::cout << "match: " << match.match_case() << std::endl;
+      std::cerr << "match: " << match.match_case() << std::endl;
       if (!load_one_match(match, m)) {
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse match");
       }
@@ -167,7 +167,7 @@ public:
     for (const Param& param : ma->params()) {
       struct sn_param * p = &rule.params[rule.num_params];
 
-      std::cout << "param: " << param.value() << std::endl;
+      std::cerr << "param: " << param.value() << std::endl;
       if (!load_one_param(param, p)) {
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse param");
       }
@@ -218,7 +218,7 @@ public:
     for (const Match& match : mo->matches()) {
       struct sn_match * m = &matches[num_matches];
 
-      std::cout << "match: " << match.match_case() << std::endl;
+      std::cerr << "match: " << match.match_case() << std::endl;
       if (!load_one_match(match, m)) {
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse match fields");
       }
@@ -341,7 +341,7 @@ int main(int argc, char *argv[])
   std::vector<std::string> args(argv + 1, argv + argc);
 
   if (args.size() < 1) {
-    std::cout << "Missing PCIe address parameter" << std::endl;
+    std::cerr << "Missing PCIe address parameter" << std::endl;
     exit(EXIT_FAILURE);
   }
 
