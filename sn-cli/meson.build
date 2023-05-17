@@ -2,6 +2,7 @@ sources = files(
   [
     'src/sn-cli.c',
     'src/sub-cmac.c',
+    'src/sub-cms.c',
     'src/sub-dev.c',
     'src/sub-probe.c',
     'src/sub-qdma.c',
