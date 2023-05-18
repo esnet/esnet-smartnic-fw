@@ -27,40 +27,52 @@ public:
   explicit SmartnicP4Impl(const std::string& pci_address) {
     bar2 = smartnic_map_bar2_by_pciaddr(pci_address.c_str());
     if (bar2 == NULL) {
-      std::cout << "Failed to map PCIe register space for device: " << pci_address << std::endl;
+      std::cerr << "Failed to map PCIe register space for device: " << pci_address << std::endl;
       exit(EXIT_FAILURE);
     }
 
     snp4_handle = snp4_init((uintptr_t) &bar2->sdnet);
     if (snp4_handle == NULL) {
-      std::cout << "Failed to initialize snp4/vitisnetp4 library: " << pci_address << std::endl;
+      std::cerr << "Failed to initialize snp4/vitisnetp4 library: " << pci_address << std::endl;
       exit(EXIT_FAILURE);
     }
 
     auto rc = snp4_info_get_pipeline(&pipeline);
     if (rc != SNP4_STATUS_OK) {
-      std::cout << "Failed to load snp4 pipeline info: " << rc << std::endl;
+      std::cerr << "Failed to load snp4 pipeline info: " << rc << std::endl;
       exit(EXIT_FAILURE);
     }
   }
 
   Status ClearAllTables(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, ClearResponse* /* clear_response */) override {
+    std::cerr << "--- ClearAllTables" << std::endl;
+
     if (!snp4_reset_all_tables(snp4_handle)) {
+      std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset all tables");
     } else {
+      std::cerr << "OK" << std::endl << std::endl;
       return Status::OK;
     }
   }
 
   Status ClearOneTable(ServerContext* /* context */, const ClearOneTableRequest* clear_one_table, ClearResponse* /* clear_response */) override {
+    std::cerr << "--- ClearOneTable" << std::endl;
+    std::cerr << clear_one_table->DebugString() << std::endl;
+    std::cerr << "---" << std::endl;
+
     if (!snp4_reset_one_table(snp4_handle, const_cast<char *>(clear_one_table->table_name().c_str()))) {
+      std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset table");
     } else {
+      std::cerr << "OK" << std::endl << std::endl;
       return Status::OK;
     }
   }
 
   Status GetPipelineInfo(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, PipelineInfo* PipelineInfoResponse) override {
+    std::cerr << "--- GetPipelineInfo" << std::endl;
+
     // Iterate over all tables
     for (unsigned int tidx = 0; tidx < pipeline.num_tables; tidx++) {
       struct snp4_info_table * t = &pipeline.tables[tidx];
@@ -137,10 +149,15 @@ public:
       pi_table->set_priority_bits(t->priority_bits);
 
     }
+    std::cerr << "OK" << std::endl << std::endl;
     return Status::OK;
   }
 
   Status InsertRule(ServerContext* /* context */, const MatchActionRule* ma, RuleOperationResponse* /* response */) override {
+    std::cerr << "--- InsertRule" << std::endl;
+    std::cerr << ma->DebugString() << std::endl;
+    std::cerr << "---" << std::endl;
+
     struct sn_rule rule;
 
     // Table Name
@@ -151,8 +168,9 @@ public:
     for (const Match& match : ma->matches()) {
       struct sn_match * m = &rule.matches[rule.num_matches];
 
-      std::cout << "match: " << match.match_case() << std::endl;
+      std::cerr << "Load match [" << rule.num_matches << "] " << match.ShortDebugString() << std::endl;
       if (!load_one_match(match, m)) {
+	std::cerr << "FAIL (match)" << std::endl << std::endl;
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse match");
       }
 
@@ -167,8 +185,9 @@ public:
     for (const Param& param : ma->params()) {
       struct sn_param * p = &rule.params[rule.num_params];
 
-      std::cout << "param: " << param.value() << std::endl;
+      std::cerr << "Load param [" << rule.num_params << "] " << param.ShortDebugString() << std::endl;
       if (!load_one_param(param, p)) {
+	std::cerr << "FAIL (param)" << std::endl << std::endl;
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse param");
       }
 
@@ -181,6 +200,7 @@ public:
     // Pack the rule's matches and params
     struct sn_pack pack;
     if (snp4_rule_pack(&pipeline, &rule, &pack) != SNP4_STATUS_OK) {
+      std::cerr << "FAIL (pack)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to pack rule into key/mask and params");
     }
 
@@ -195,19 +215,26 @@ public:
 			       pack.params_len,
 			       rule.priority,
 			       ma->replace())) {
+      std::cerr << "FAIL (insert)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to insert rule into hardware table");
     }
 
+    std::cerr << "OK" << std::endl << std::endl;
     return Status::OK;
   }
 
   Status DeleteRule(ServerContext* /* context */, const MatchOnlyRule* mo, RuleOperationResponse* /* response */) override {
+    std::cerr << "--- DeleteRule" << std::endl;
+    std::cerr << mo->DebugString() << std::endl;
+    std::cerr << "---" << std::endl;
+
     // Table Name
     auto table_name = const_cast<char *>(mo->table_name().c_str());
 
     // Find the requested table
     auto table_info = snp4_info_get_table_by_name(&pipeline, table_name);
     if (table_info == NULL) {
+      std::cerr << "FAIL (get_table_by_name)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Table not found");
     }
 
@@ -218,8 +245,9 @@ public:
     for (const Match& match : mo->matches()) {
       struct sn_match * m = &matches[num_matches];
 
-      std::cout << "match: " << match.match_case() << std::endl;
+      std::cerr << "Load match [" << num_matches << "] " << match.ShortDebugString() << std::endl;
       if (!load_one_match(match, m)) {
+	std::cerr << "FAIL (match)" << std::endl << std::endl;
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse match fields");
       }
       num_matches++;
@@ -234,6 +262,7 @@ public:
 				num_matches,
 				&pack);
     if (rc != SNP4_STATUS_OK) {
+      std::cerr << "FAIL (pack)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to pack match fields into key/mask");
     }
 
@@ -243,9 +272,11 @@ public:
 			     pack.key_len,
 			     pack.mask,
 			     pack.mask_len)) {
+      std::cerr << "FAIL (delete)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to delete rule from hardware table");
     }
 
+    std::cerr << "OK" << std::endl << std::endl;
     return Status::OK;
   }
 
@@ -341,7 +372,7 @@ int main(int argc, char *argv[])
   std::vector<std::string> args(argv + 1, argv + argc);
 
   if (args.size() < 1) {
-    std::cout << "Missing PCIe address parameter" << std::endl;
+    std::cerr << "Missing PCIe address parameter" << std::endl;
     exit(EXIT_FAILURE);
   }
 
