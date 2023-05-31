@@ -62,8 +62,7 @@ for i in $(lspci -Dmm -s $FPGA_PCIE_DEV | cut -d' ' -f 1) ; do
 done
 
 # Program the mcsfile into the FPGA flash
-source /opt/Xilinx/Vivado_Lab/${VIVADO_VERSION}/settings64.sh
-/opt/Xilinx/Vivado_Lab/${VIVADO_VERSION}/bin/vivado_lab \
+vivado_lab \
     -nolog \
     -nojournal \
     -tempDir /tmp/ \
