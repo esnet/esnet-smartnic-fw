@@ -29,10 +29,10 @@ variables:
   #       and *also* variable comparisons in rules:if statements.
   #
   SMARTNIC_DPDK_IMAGE_URI:
-    value: wharf.es.net/ht/smartnic-dpdk-docker:34635-g2745d783
+    value: wharf.es.net/ht/smartnic-dpdk-docker:36670-gbed07f40
     description: smartnic-dpdk-docker image to use as basis for DPDK builds
   LABTOOLS_IMAGE_URI:
-    value: wharf.es.net/ht/xilinx-labtools-docker:35221-gf57cff12
+    value: wharf.es.net/ht/xilinx-labtools-docker:36669-ga795854a
     description: xilinx-labtools-docker image to use when deploying the sn-stack HW services
   SN_HW_GROUP:
     value: ht
