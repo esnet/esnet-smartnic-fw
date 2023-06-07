@@ -93,8 +93,7 @@ else
     done
 
     # Program the bitfile into the FPGA
-    source /opt/Xilinx/Vivado_Lab/${VIVADO_VERSION}/settings64.sh
-    /opt/Xilinx/Vivado_Lab/${VIVADO_VERSION}/bin/vivado_lab \
+    vivado_lab \
 	-nolog \
 	-nojournal \
 	-tempDir /tmp/ \

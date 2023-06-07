@@ -28,7 +28,7 @@ services:
       timeout: 10s
       retries: 6
       start_period: 3s
-    entrypoint:
+    command:
       - /bin/bash
       - -c
       - -e
@@ -36,7 +36,7 @@ services:
       - pipefail
       - -x
       - |
-        /opt/Xilinx/Vivado_Lab/$${VIVADO_VERSION}/bin/hw_server \
+        hw_server \
           -S \
           -s \
           tcp::3121 \
@@ -77,7 +77,7 @@ services:
       - bitfiles:/bitfiles:ro
       - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
     network_mode: none
-    entrypoint:
+    command:
       - /bin/bash
       - -c
       - -e
@@ -126,7 +126,7 @@ services:
       timeout: 10s
       retries: 6
       start_period: 10s
-    entrypoint:
+    command:
       - /bin/bash
       - -c
       - -e
