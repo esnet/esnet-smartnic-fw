@@ -248,7 +248,7 @@ services:
       - /dev:/dev
       - /sys/kernel/mm/hugepages:/sys/kernel/mm/hugepages
       - /lib/modules:/lib/modules
-      - sn-scratch:/scratch
+      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
     entrypoint:
       - /bin/bash
       - -c
@@ -281,7 +281,7 @@ services:
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
-      - sn-scratch:/scratch
+      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
     entrypoint:
       - /bin/bash
       - -c
@@ -311,7 +311,7 @@ services:
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
-      - sn-scratch:/scratch
+      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
     entrypoint:
       - /bin/bash
       - -c
@@ -323,10 +323,14 @@ services:
         sn-p4-agent $$SN_P4_AGENT_SLOTADDR
 
 volumes:
+  # NOTE: If you're about to add a bind mount here and give it a name so that you don't repeat it
+  #       in multiple service volume lists, STOP.  There is a subtle bug in the docker daemon where
+  #       name volumes which are built on bind-mounts are not properly reference counted  when the
+  #       docker daemon restarts *and* live-restore is enabled.  This is most noticable as a failure
+  #       to delete the named volume when bringing down the stack (or after it's already down) IFF
+  #       the docker daemon was restarted while the stack was previously running.
+  #
+  #       See: https://github.com/moby/moby/issues/44422
+
   bitfiles:
 
-  sn-scratch:
-    driver_opts:
-      type: none
-      device: ${SN_STACK_ROOT-${PWD}}/scratch
-      o: bind
