@@ -147,6 +147,35 @@ services:
     profiles:
       - smartnic-flash
 
+  smartnic-flash-reset-to-gold:
+    <<: *labtools-service
+    hostname: smartnic-flash-reset-to-gold
+    init: true
+    user: root
+    privileged: true
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+    network_mode: none
+    command:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        printf "\n" | xbflash2 program --spi --revert-to-golden -d $${FPGA_PCIE_DEV}.0 -b 2 -s 0x340000
+        if [ $$? ] ; then
+          # Flash update has succeeded, all OK
+          echo "Card Successfully Reverted to Golden Image"
+          exit 0
+        else
+          echo "Revert to Golden Image Attempted and Failed, Not Healthy!"
+          exit 1
+        fi
+    profiles:
+      - smartnic-flash
+
   smartnic-hw:
     <<: *labtools-service
     hostname: smartnic-hw
