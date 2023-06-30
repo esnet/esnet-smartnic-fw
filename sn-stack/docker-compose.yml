@@ -112,9 +112,13 @@ services:
     depends_on:
       xilinx-hwserver:
         condition: service_healthy
+      smartnic-unpack:
+        condition: service_started
     init: true
     user: root
     privileged: true
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
     tmpfs:
       - /status
     volumes:
