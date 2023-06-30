@@ -64,12 +64,14 @@ services:
         touch /bitfiles/ok
         sleep infinity
 
-  smartnic-flash:
+  smartnic-flash-jtag:
     <<: *labtools-service
-    hostname: smartnic-flash
+    hostname: smartnic-flash-jtag
     init: true
     user: root
     privileged: true
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
     depends_on:
       smartnic-unpack:
         condition: service_started
