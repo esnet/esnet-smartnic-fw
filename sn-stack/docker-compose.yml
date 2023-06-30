@@ -108,6 +108,45 @@ services:
     profiles:
       - smartnic-flash
 
+  smartnic-flash:
+    <<: *labtools-service
+    hostname: smartnic-flash
+    init: true
+    user: root
+    privileged: true
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+    depends_on:
+      smartnic-unpack:
+        condition: service_started
+    volumes:
+      - bitfiles:/bitfiles:ro
+    network_mode: none
+    command:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        while [ ! -e /bitfiles/ok ] ; do
+          echo "Waiting for bitfiles to be unpacked..."
+          sleep 1
+        done
+        file /bitfiles/esnet-smartnic.bit
+        printf "\n" | xbflash2 program --spi --image /bitfiles/esnet-smartnic.mcs -d $${FPGA_PCIE_DEV}.0 -b 2 -s 0x340000
+        if [ $$? ] ; then
+          # Flash update has succeeded, all OK
+          echo "Flash Update Successful"
+          exit 0
+        else
+          echo "Flash Update Attempted and Failed, Not Healthy!"
+          exit 1
+        fi
+    profiles:
+      - smartnic-flash
+
   smartnic-hw:
     <<: *labtools-service
     hostname: smartnic-hw
