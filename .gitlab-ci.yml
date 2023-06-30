@@ -261,19 +261,33 @@ fail_if_not_default_context:
     # override the artifact URL in the triggered repo so it pulls directly from the package job from this pipeline
     ESNET_SMARTNIC_FWAPI_URL: "$CI_PROJECT_URL/-/jobs/$SN_FW_API_JOB_NUMBER/artifacts/download?file_type=archive"
   rules:
-    # Compare HW_APP_NAME to SW_APP_NAME here since the dynamically computed FW_APP_NAME is not visible to the rules section
-    - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_SW_APP_NAME)
-    - if: ($CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_SW_APP_NAME)
+    # Compare HW_APP_NAME to HW_EXPECTED_APP_NAME here since the dynamically computed FW_APP_NAME is not visible to the rules section
+    - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_HW_EXPECTED_APP_NAME)
+    - if: ($CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_HW_EXPECTED_APP_NAME)
       when: manual
       allow_failure: true
 
-trigger_ht_sw:
+trigger_sw_ht:
   extends: .trigger_sw
   variables:
-    SN_SW_APP_NAME: esnet-smartnic-ht
+    SN_HW_EXPECTED_APP_NAME: esnet-smartnic-ht
+    SN_SW_APP_NAME: hightouch
     SN_FW_API_JOB: package
   trigger:
     project: ht/hightouch-xilinx
+    branch: main
+  needs:
+    - package
+    - wharf_release
+
+trigger_sw_demo:
+  extends: .trigger_sw
+  variables:
+    SN_HW_EXPECTED_APP_NAME: p4_only
+    SN_SW_APP_NAME: demo
+    SN_FW_API_JOB: package
+  trigger:
+    project: ht/esnet-smartnic-sw-demo
     branch: main
   needs:
     - package
