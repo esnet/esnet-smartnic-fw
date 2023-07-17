@@ -18,6 +18,7 @@ unzip artifacts.esnet-smartnic-fw.package.0.zip
 cd sn-stack
 # edit the .env file to provide sane values for
 #    FPGA_PCIE_DEV=0000:d8:00
+#    COMPOSE_PROFILES=smartnic-mgr-vfio-unlock
 # and IFF you have more than one JTAG you also need a line like this
 #    HW_TARGET_SERIAL=21760204S029A
 docker compose up -d

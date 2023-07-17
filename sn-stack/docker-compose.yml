@@ -223,6 +223,11 @@ services:
           touch /status/ok
           sleep infinity
         fi
+    profiles:
+      - smartnic-mgr-dpdk-manual
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      - smartnic-no-vfio
 
   smartnic-devunbind:
     <<: *smartnic-fw-service
@@ -407,6 +412,11 @@ services:
       - -x
       - |
         sleep infinity
+    profiles:
+      - smartnic-mgr-dpdk-manual
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      - smartnic-no-vfio
 
   smartnic-p4:
     <<: *smartnic-fw-service
@@ -435,6 +445,11 @@ services:
       - -x
       - |
         sn-p4-agent $$SN_P4_AGENT_SLOTADDR
+    profiles:
+      - smartnic-mgr-dpdk-manual
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      - smartnic-no-vfio
 
 volumes:
   # NOTE: If you're about to add a bind mount here and give it a name so that you don't repeat it
