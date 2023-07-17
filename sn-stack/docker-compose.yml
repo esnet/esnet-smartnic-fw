@@ -64,9 +64,9 @@ services:
         touch /bitfiles/ok
         sleep infinity
 
-  smartnic-flash-jtag:
+  smartnic-flash-rescue:
     <<: *labtools-service
-    hostname: smartnic-flash-jtag
+    hostname: smartnic-flash-rescue
     init: true
     user: root
     privileged: true
