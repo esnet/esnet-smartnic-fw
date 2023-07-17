@@ -147,9 +147,9 @@ services:
     profiles:
       - smartnic-flash
 
-  smartnic-flash-reset-to-gold:
+  smartnic-flash-remove:
     <<: *labtools-service
-    hostname: smartnic-flash-reset-to-gold
+    hostname: smartnic-flash-remove
     init: true
     user: root
     privileged: true
