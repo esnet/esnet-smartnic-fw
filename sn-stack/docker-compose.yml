@@ -108,9 +108,9 @@ services:
     profiles:
       - smartnic-flash
 
-  smartnic-flash:
+  smartnic-flash-update:
     <<: *labtools-service
-    hostname: smartnic-flash
+    hostname: smartnic-flash-update
     init: true
     user: root
     privileged: true
