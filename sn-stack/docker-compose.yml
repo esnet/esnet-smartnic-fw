@@ -67,6 +67,7 @@ services:
   smartnic-flash-rescue:
     <<: *labtools-service
     hostname: smartnic-flash-rescue
+    restart: no
     init: true
     user: root
     privileged: true
@@ -110,6 +111,7 @@ services:
 
   smartnic-flash-update:
     <<: *labtools-service
+    restart: no
     hostname: smartnic-flash-update
     init: true
     user: root
@@ -149,6 +151,7 @@ services:
 
   smartnic-flash-remove:
     <<: *labtools-service
+    restart: no
     hostname: smartnic-flash-remove
     init: true
     user: root
