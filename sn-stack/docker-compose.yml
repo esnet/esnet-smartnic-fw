@@ -314,8 +314,6 @@ services:
       - smartnic-mgr-user
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-vfio-unlock
-      # Note: the smartnic-dpdk profile is deprecated and will be removed
-      - smartnic-dpdk
 
   smartnic-vfio-unlock:
     <<: *smartnic-fw-service
@@ -379,8 +377,6 @@ services:
         sleep infinity
     profiles:
       - smartnic-mgr-dpdk-manual
-      # Note: the smartnic-dpdk profile is deprecated and will be removed
-      - smartnic-dpdk
 
   smartnic-fw:
     <<: *smartnic-fw-service
