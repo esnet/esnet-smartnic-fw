@@ -120,9 +120,6 @@ services:
     privileged: true
     environment:
       - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
-    depends_on:
-      smartnic-unpack:
-        condition: service_started
     volumes:
       - bitfiles:/bitfiles:ro
     network_mode: none
@@ -348,7 +345,6 @@ services:
       - /scripts/vfio-unlock.py
     profiles:
       - smartnic-mgr-vfio-unlock
-
 
   smartnic-dpdk:
     <<: *smartnic-dpdk-service
