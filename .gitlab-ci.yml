@@ -29,7 +29,7 @@ variables:
   #       and *also* variable comparisons in rules:if statements.
   #
   SMARTNIC_DPDK_IMAGE_URI:
-    value: wharf.es.net/ht/smartnic-dpdk-docker:36670-gbed07f40
+    value: wharf.es.net/ht/smartnic-dpdk-docker:38850-ga52dba35
     description: smartnic-dpdk-docker image to use as basis for DPDK builds
   LABTOOLS_IMAGE_URI:
     value: wharf.es.net/ht/xilinx-labtools-docker:36669-ga795854a
