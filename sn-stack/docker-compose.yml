@@ -64,13 +64,18 @@ services:
         touch /bitfiles/ok
         sleep infinity
 
-  smartnic-flash:
+  smartnic-flash-rescue:
     <<: *labtools-service
-    hostname: smartnic-flash
+    hostname: smartnic-flash-rescue
+    restart: no
     init: true
     user: root
     privileged: true
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
     depends_on:
+      xilinx-hwserver:
+        condition: service_healthy
       smartnic-unpack:
         condition: service_started
     volumes:
@@ -106,15 +111,86 @@ services:
     profiles:
       - smartnic-flash
 
+  smartnic-flash-update:
+    <<: *labtools-service
+    restart: no
+    hostname: smartnic-flash-update
+    init: true
+    user: root
+    privileged: true
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+    volumes:
+      - bitfiles:/bitfiles:ro
+    network_mode: none
+    command:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        while [ ! -e /bitfiles/ok ] ; do
+          echo "Waiting for bitfiles to be unpacked..."
+          sleep 1
+        done
+        file /bitfiles/esnet-smartnic.bit
+        printf "\n" | xbflash2 program --spi --image /bitfiles/esnet-smartnic.mcs -d $${FPGA_PCIE_DEV}.0 -b 2 -s 0x340000
+        if [ $$? ] ; then
+          # Flash update has succeeded, all OK
+          echo "Flash Update Successful"
+          exit 0
+        else
+          echo "Flash Update Attempted and Failed, Not Healthy!"
+          exit 1
+        fi
+    profiles:
+      - smartnic-flash
+
+  smartnic-flash-remove:
+    <<: *labtools-service
+    restart: no
+    hostname: smartnic-flash-remove
+    init: true
+    user: root
+    privileged: true
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+    network_mode: none
+    command:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        printf "\n" | xbflash2 program --spi --revert-to-golden -d $${FPGA_PCIE_DEV}.0 -b 2 -s 0x340000
+        if [ $$? ] ; then
+          # Flash update has succeeded, all OK
+          echo "Card Successfully Reverted to Golden Image"
+          exit 0
+        else
+          echo "Revert to Golden Image Attempted and Failed, Not Healthy!"
+          exit 1
+        fi
+    profiles:
+      - smartnic-flash
+
   smartnic-hw:
     <<: *labtools-service
     hostname: smartnic-hw
     depends_on:
       xilinx-hwserver:
         condition: service_healthy
+      smartnic-unpack:
+        condition: service_started
     init: true
     user: root
     privileged: true
+    environment:
+      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
     tmpfs:
       - /status
     volumes:
@@ -147,6 +223,11 @@ services:
           touch /status/ok
           sleep infinity
         fi
+    profiles:
+      - smartnic-mgr-dpdk-manual
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      - smartnic-no-vfio
 
   smartnic-devunbind:
     <<: *smartnic-fw-service
@@ -240,8 +321,6 @@ services:
       - smartnic-mgr-user
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-vfio-unlock
-      # Note: the smartnic-dpdk profile is deprecated and will be removed
-      - smartnic-dpdk
 
   smartnic-vfio-unlock:
     <<: *smartnic-fw-service
@@ -271,7 +350,6 @@ services:
       - /scripts/vfio-unlock.py
     profiles:
       - smartnic-mgr-vfio-unlock
-
 
   smartnic-dpdk:
     <<: *smartnic-dpdk-service
@@ -305,8 +383,6 @@ services:
         sleep infinity
     profiles:
       - smartnic-mgr-dpdk-manual
-      # Note: the smartnic-dpdk profile is deprecated and will be removed
-      - smartnic-dpdk
 
   smartnic-fw:
     <<: *smartnic-fw-service
@@ -336,6 +412,11 @@ services:
       - -x
       - |
         sleep infinity
+    profiles:
+      - smartnic-mgr-dpdk-manual
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      - smartnic-no-vfio
 
   smartnic-p4:
     <<: *smartnic-fw-service
@@ -364,6 +445,11 @@ services:
       - -x
       - |
         sn-p4-agent $$SN_P4_AGENT_SLOTADDR
+    profiles:
+      - smartnic-mgr-dpdk-manual
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      - smartnic-no-vfio
 
 volumes:
   # NOTE: If you're about to add a bind mount here and give it a name so that you don't repeat it

@@ -1,15 +1,15 @@
-Setting up the Runtime Environment
-==================================
+One-time Setup of the Runtime Environment
+=========================================
 
 The smartnic runtime environment also requires `docker` and `docker compose` as described in README.md at the top of this repo.
 
 Set up Xilinx Labtools
 ----------------------
 
-In order to load a smartnic FPGA bitfile into the Xilinx U280 card, we need to make use of the Xilinx Labtools.  The instructions for setting up labtools can be found in a separate repository.  That repository will provide us with a docker container populated with the xilinx labtools.  That docker container will be used to program the FPGA bitfile.
+In order to load a smartnic FPGA bitfile into the Xilinx U280 card, we need to make use of the Xilinx Labtools.  The instructions for setting up labtools can be found in a separate repository (https://github.com/esnet/xilinx-labtools-docker).  That repository will provide us with a docker container populated with the xilinx labtools.  That docker container will be used to program the FPGA bitfile.
 
-Running the firmware
---------------------
+Configuring the firmware runtime environment
+--------------------------------------------
 
 The firmware artifact produced by the build (see README.md at the top of this repo) should be transferred to the runtime system that hosts an FPGA card.
 
@@ -18,15 +18,60 @@ unzip artifacts.esnet-smartnic-fw.package.0.zip
 cd sn-stack
 # edit the .env file to provide sane values for
 #    FPGA_PCIE_DEV=0000:d8:00
+#    COMPOSE_PROFILES=smartnic-mgr-vfio-unlock
 # and IFF you have more than one JTAG you also need a line like this
 #    HW_TARGET_SERIAL=21760204S029A
+```
+
+Verify that the stack configuration is valid
+
+```
+docker compose config --quiet && echo "All good!"
+```
+
+If this prints anything other than "All good!" then your `.env` configuration file has errors.  Do not proceed until this step passes.
+
+Converting from factory flash image to ESnet Smartnic flash image
+-----------------------------------------------------------------
+
+From the factory, the FPGA cards have only a "gold" bitfile in flash with the "user" partition of flash being blank.  The "gold" bitfile has a narrow PCIe memory window for BAR1 and BAR2 which is insufficient for the ESnet Smartnic platform.  Fixing this requires a one-time flash programming step to install an ESnet Smartnic bitfile into the FPGA "user" partition in flash.  This initial setup is done using the JTAG.
+
+Ensure that any running `sn-stack` instances have been stopped so that they don't interfere with the flash programming operation.
+```
+docker compose down -v --remove-orphans
+```
+
+Start the flash rescue service to program an ESnet Smartnic bitfile into the FPGA card "user" partition using the JTAG interface.  This takes approximately 20 minutes.  This process should not be interrupted.
+```
+docker compose --profile smartnic-flash run --rm smartnic-flash-rescue
+```
+This will:
+* Use JTAG to write a small flash-programing helper bitfile into the FPGA
+* Use JTAG to write the current version of the bitfile into the FPGA card's "user" partition in flash
+  * Only the "user" partition of the flash is overwritten by this step
+  * The "gold" partition is left untouched
+
+Clean up by bringing down the running stack after flash writing has completed.
+```
+docker compose down -v --remove-orphans
+```
+
+**Perform a cold-boot (power cycle) of the server hosting the FPGA card**
+
+It is essential that this is a proper power cycle and not simply a warm reboot.  Specifically **do not** use `shutdown -r now` but rather use something like `ipmitool chassis power cycle`.  Failure to perform a cold-boot here will result in an unusable card.
+
+
+Normal Operation of the Runtime Environment
+===========================================
+
+**NOTE** the steps in this major section are only expected to work once you've completed the initial setup in "One-time Setup of the Runtime Environment".
+
+Running the firmware
+--------------------
+
+Start up the full firmware docker stack like this
+```
 docker compose up -d
-```
-
-Verify that the stack is running like this
-
-```
-docker compose ps
 ```
 
 Verifying the bitfile download
@@ -34,35 +79,6 @@ Verifying the bitfile download
 
 ```
 docker compose logs smartnic-hw
-```
-
-Writing the bitfile to the FPGA card persistent flash (Optional)
-----------------------------------------------------------------
-
-Ensure that any running `sn-stack` instances have been stopped so that they don't interfere with the flash programming operation.
-
-```
-docker compose down -v
-```
-
-Start up the separate flash-programming service like this
-
-```
-docker compose run --rm smartnic-flash
-```
-
-This will:
-* Use JTAG to write a small flash-programing helper bitfile into the FPGA
-* Use JTAG to write the current version of the bitfile into the U280 card's flash
-  * Only the "user" partition of the flash is overwritten by this step
-  * The "gold" partition is left untouched
-
-**Note:** the flash programming sequence takes about 19 minutes to complete.
-
-Clean up after the flash programming operation.
-
-```
-docker compose down -v --remove-orphans
 ```
 
 Inspecting registers and interacting with the firmware
@@ -74,6 +90,64 @@ The firmware runtime environment exists inside of the `smartnic-fw` container.  
 docker compose exec smartnic-fw bash
 sn-cli dev version
 regio syscfg
+```
+
+(OPTIONAL) Updating the flash image to a new ESnet Smartnic flash image
+-----------------------------------------------------------------------
+
+The instructions in this section are used to **update** the Smartnic flash image **from an already working** Smartnic environment.  This update step is *optional* and only required if you want to change the contents of the FPGA card flash.  Normally, the "RAM" of the FPGA is loaded using JTAG during stack startup.
+
+**NOTE** This will not work for the very first time ever programming the flash.  See "Converting from factory flash image to ESnet Smartnic flash image" section above for first-time setup.
+
+Start up a any properly configured stack which will allow us to write the flash using a fast algorithm over PCIe.
+
+```
+docker compose up -d
+```
+
+Confirm that PCIe register IO is working in your stack by querying the version registers.
+
+```
+docker compose exec smartnic-fw sn-cli dev version
+```
+Confirm that the "DNA" register is **not** showing 0xfffff... as its contents.
+
+Start the flash update service to write the currently active FPGA bitfile into the persistent flash on the FPGA card.  This takes approximately 7-8 minutes. This process should not be interrupted.
+```
+docker compose --profile smartnic-flash run --rm smartnic-flash-update
+```
+
+Bring down the running stack after flash writing has completed.
+```
+docker compose down -v --remove-orphans
+```
+
+(OPTIONAL) Remove the ESnet Smartnic flash image from the FPGA card to revert to factory image
+----------------------------------------------------------------------------------------------
+
+The instructions in this section are used to **remove** the Smartnic flash image **from an already working** Smartnic environment.  This removal step is *optional* and only required if you want to reset the contents of the FPGA card flash back to the factory bitfile.  If you want to keep using the card as an ESnet Smartnic, **do not** perform these operations or you'll have to re-do the  "Converting from factory flash image to ESnet Smartnic flash image" section above.
+
+Start up a any properly configured stack which will allow us to write the flash using a fast algorithm over PCIe.
+
+```
+docker compose up -d
+```
+
+Confirm that PCIe register IO is working in your stack by querying the version registers.
+
+```
+docker compose exec smartnic-fw sn-cli dev version
+```
+Confirm that the "DNA" register is **not** showing 0xfffff... as its contents.
+
+Start the flash remove service to erase the ESnet Smartnic image from the "user" partition of the FPGA card flash.  This takes less than 1 minute. This process should not be interrupted.
+```
+docker compose --profile smartnic-flash run --rm smartnic-flash-remove
+```
+
+Bring down the running stack after flash reset is completed.
+```
+docker compose down -v --remove-orphans
 ```
 
 Using the sn-cli tool
@@ -398,7 +472,7 @@ The `sn-stack` environment can be started in a mode where the FPGA can be contro
 
 Broadly speaking, the steps required to bring up a DPDK application are as follows:
 * Bind the `vfio-pci` kernel driver to each FPGA PCIe physical function (PF)
-  * This is handled automatically by the sn-stack when `COMPOSE_PROFILES=smartnic-dpdk` is set in the `.env` file.
+  * This is handled automatically by the sn-stack.
 * Run a DPDK application with appropriate DPDK Environment Abstraction Layer (EAL) settings
   * Use `-a $SN_PCIE_DEV.0` to allow control of one or more specific FPGA PCIe PFs
   * Use `-d librte_net_qdma.so` to dynamically link the correct Userspace Polled-Mode Driver (PMD) for the smartnic QDMA engine
