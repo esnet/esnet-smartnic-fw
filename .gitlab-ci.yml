@@ -96,8 +96,6 @@ pull_sn_hw:
 
 .docker:
   image: docker:20.10.21
-  tags:
-    - ht-docker
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERT_DIR: ""
