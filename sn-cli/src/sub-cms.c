@@ -268,6 +268,9 @@ static float sensor2v(uint32_t sensor)
 
 static void print_voltage(volatile struct cms_block * cms)
 {
+  // Ensure that the CMS block is fully enabled/ready
+  cms_block_enable(cms);
+
   printf("\t12v PEX         : %8.2f V (avg: %8.2f, max: %8.2f)\n",
 	 sensor2v(cms->_12v_pex_ins_reg),
 	 sensor2v(cms->_12v_pex_avg_reg),
@@ -405,6 +408,9 @@ static float sensor2i(uint32_t sensor)
 
 static void print_power(volatile struct cms_block * cms)
 {
+  // Ensure that the CMS block is fully enabled/ready
+  cms_block_enable(cms);
+
   printf("\t12V PEX I IN    : %8.2f A (avg: %8.2f, max: %8.2f)\n",
 	 sensor2i(cms->_12vpex_i_in_ins_reg),
 	 sensor2i(cms->_12vpex_i_in_avg_reg),
@@ -473,6 +479,9 @@ static void print_power(volatile struct cms_block * cms)
 
 static void print_temp(volatile struct cms_block * cms)
 {
+  // Ensure that the CMS block is fully enabled/ready
+  cms_block_enable(cms);
+
   printf("\tFPGA Temp       : %2u C (avg: %2u, max: %2u)\n",
 	 cms->fpga_temp_ins_reg,
 	 cms->fpga_temp_avg_reg,
@@ -545,6 +554,9 @@ static void print_temp(volatile struct cms_block * cms)
 
 static void print_fan(volatile struct cms_block * cms)
 {
+  // Ensure that the CMS block is fully enabled/ready
+  cms_block_enable(cms);
+
   printf("\tFan Speed       : %u RPM (avg: %u, max: %u)\n",
 	 cms->fan_speed_ins_reg,
 	 cms->fan_speed_avg_reg,
@@ -595,17 +607,8 @@ static const char * cage_type_to_string(uint8_t cage_type)
 
 static void print_cardinfo(volatile struct cms_block * cms)
 {
-  // Ensure that the microblaze is out of reset
-  cms_mb_release_reset(cms);
-
-  // Wait for reg map to be ready
-  cms_wait_reg_map_ready(cms);
-
-  // Wait for SC to be ready
-  cms_wait_for_sc_ready(cms);
-
-  // Wait for mailbox to be ready/available
-  cms_wait_mailbox_ready(cms);
+  // Ensure that the CMS block is fully enabled/ready
+  cms_block_enable(cms);
 
   volatile uint32_t * mailbox = (uint32_t *)(((uint8_t *)&cms->reg_map_id_reg) + cms->host_msg_offset_reg);
 
@@ -748,9 +751,9 @@ void cmd_cms(struct argp_state *state)
   if (!strcmp(arguments.command, "cardinfo")) {
     print_cardinfo(&bar2->cms);
   } else if (!strcmp(arguments.command, "disable")) {
-    bar2->cms.mb_resetn_reg = 0;
+    cms_block_disable(&bar2->cms);
   } else if (!strcmp(arguments.command, "enable")) {
-    cms_mb_release_reset(&bar2->cms);
+    cms_block_enable(&bar2->cms);
   } else if (!strcmp(arguments.command, "fan")) {
     print_fan(&bar2->cms);
   } else if (!strcmp(arguments.command, "power")) {
