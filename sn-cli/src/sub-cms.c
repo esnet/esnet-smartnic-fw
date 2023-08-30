@@ -84,6 +84,72 @@ static error_t parse_opt_cms (int key, char *arg, struct argp_state *state)
   return 0;
 }
 
+enum cms_ops {
+	      CMS_OP_CARD_INFO_REQ = 4,
+};
+
+static void cms_mb_release_reset(volatile struct cms_block * cms)
+{
+  if (cms->mb_resetn_reg == 1) {
+    // CMC is already out of reset, nothing to do
+    return;
+  }
+
+  printf("Enabling CMC Microblaze (this takes 5s)\n");
+  cms->mb_resetn_reg = 1;
+  barrier();
+  // Sleep for 5s to allow the embedded microblaze to boot fully
+  // Without this, register reads can return old/stale values while
+  // the microblaze is booting.
+  usleep(5 * 1000 * 1000);
+}
+
+static void cms_wait_reg_map_ready(volatile struct cms_block * cms)
+{
+  union cms_host_status2_reg host_status2;
+  do {
+    host_status2._v = cms->host_status2_reg._v;
+  } while (!host_status2.reg_map_ready);
+}
+
+static void cms_wait_mailbox_ready(volatile struct cms_block * cms)
+{
+  union cms_control_reg control;
+  do {
+    control._v = cms->control_reg._v;
+  } while (control.mailbox_msg_status);
+}
+
+static void cms_set_mailbox_busy(volatile struct cms_block * cms)
+{
+  // Read current value
+  union cms_control_reg control;
+  control._v = cms->control_reg._v;
+  // Set the busy bit
+  control.mailbox_msg_status = 1;
+  // Write back
+  cms->control_reg._v = control._v;
+  barrier();
+}
+
+enum cms_status_sc_mode {
+			 CMS_STATUS_SC_MODE_UNKNOWN = 0,
+			 CMS_STATUS_SC_MODE_NORMAL = 1,
+			 CMS_STATUS_SC_MODE_BSL_MODE_UNSYNCED = 2,
+			 CMS_STATUS_SC_MODE_BSL_MODE_SYNCED = 3,
+			 CMS_STATUS_SC_MODE_BSL_MODE_SYNCED_SC_NOT_UPGRADABLE = 4,
+			 CMS_STATUS_SC_MODE_NORMAL_SC_NOT_UPGRADABLE = 5,
+};
+
+static void cms_wait_for_sc_ready(volatile struct cms_block * cms)
+{
+  union cms_status_reg status;
+  do {
+    status._v = cms->status_reg._v;
+  } while ((status.sat_ctrl_mode != CMS_STATUS_SC_MODE_NORMAL) &&
+	   (status.sat_ctrl_mode != CMS_STATUS_SC_MODE_NORMAL_SC_NOT_UPGRADABLE));
+}
+
 static const char * sc_error_to_string(uint32_t sat_ctrl_err)
 {
   switch (sat_ctrl_err) {
@@ -498,72 +564,6 @@ static const char * cage_type_to_string(uint8_t cage_type)
   case 2: return "SFP/SFP+";
   default: return "??";
   }
-}
-
-enum cms_ops {
-	      CMS_OP_CARD_INFO_REQ = 4,
-};
-
-static void cms_mb_release_reset(volatile struct cms_block * cms)
-{
-  if (cms->mb_resetn_reg == 1) {
-    // CMC is already out of reset, nothing to do
-    return;
-  }
-
-  printf("Enabling CMC Microblaze (this takes 5s)\n");
-  cms->mb_resetn_reg = 1;
-  barrier();
-  // Sleep for 5s to allow the embedded microblaze to boot fully
-  // Without this, register reads can return old/stale values while
-  // the microblaze is booting.
-  usleep(5 * 1000 * 1000);
-}
-
-static void cms_wait_reg_map_ready(volatile struct cms_block * cms)
-{
-  union cms_host_status2_reg host_status2;
-  do {
-    host_status2._v = cms->host_status2_reg._v;
-  } while (!host_status2.reg_map_ready);
-}
-
-static void cms_wait_mailbox_ready(volatile struct cms_block * cms)
-{
-  union cms_control_reg control;
-  do {
-    control._v = cms->control_reg._v;
-  } while (control.mailbox_msg_status);
-}
-
-static void cms_set_mailbox_busy(volatile struct cms_block * cms)
-{
-  // Read current value
-  union cms_control_reg control;
-  control._v = cms->control_reg._v;
-  // Set the busy bit
-  control.mailbox_msg_status = 1;
-  // Write back
-  cms->control_reg._v = control._v;
-  barrier();
-}
-
-enum cms_status_sc_mode {
-			 CMS_STATUS_SC_MODE_UNKNOWN = 0,
-			 CMS_STATUS_SC_MODE_NORMAL = 1,
-			 CMS_STATUS_SC_MODE_BSL_MODE_UNSYNCED = 2,
-			 CMS_STATUS_SC_MODE_BSL_MODE_SYNCED = 3,
-			 CMS_STATUS_SC_MODE_BSL_MODE_SYNCED_SC_NOT_UPGRADABLE = 4,
-			 CMS_STATUS_SC_MODE_NORMAL_SC_NOT_UPGRADABLE = 5,
-};
-
-static void cms_wait_for_sc_ready(volatile struct cms_block * cms)
-{
-  union cms_status_reg status;
-  do {
-    status._v = cms->status_reg._v;
-  } while ((status.sat_ctrl_mode != CMS_STATUS_SC_MODE_NORMAL) &&
-	   (status.sat_ctrl_mode != CMS_STATUS_SC_MODE_NORMAL_SC_NOT_UPGRADABLE));
 }
 
 static void print_cardinfo(volatile struct cms_block * cms)
