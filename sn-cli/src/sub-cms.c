@@ -104,6 +104,13 @@ static void cms_mb_release_reset(volatile struct cms_block * cms)
   usleep(5 * 1000 * 1000);
 }
 
+static void cms_mb_assert_reset(volatile struct cms_block *cms)
+{
+  printf("Disabling CMC Microblaze\n");
+  cms->mb_resetn_reg = 0;
+  barrier();
+}
+
 static void cms_wait_reg_map_ready(volatile struct cms_block * cms)
 {
   union cms_host_status2_reg host_status2;
@@ -148,6 +155,26 @@ static void cms_wait_for_sc_ready(volatile struct cms_block * cms)
     status._v = cms->status_reg._v;
   } while ((status.sat_ctrl_mode != CMS_STATUS_SC_MODE_NORMAL) &&
 	   (status.sat_ctrl_mode != CMS_STATUS_SC_MODE_NORMAL_SC_NOT_UPGRADABLE));
+}
+
+static void cms_block_enable(volatile struct cms_block * cms)
+{
+  // Ensure that the microblaze is out of reset
+  cms_mb_release_reset(cms);
+
+  // Wait for reg map to be ready
+  cms_wait_reg_map_ready(cms);
+
+  // Wait for SC to be ready
+  cms_wait_for_sc_ready(cms);
+
+  // Wait for mailbox to be ready/available
+  cms_wait_mailbox_ready(cms);
+}
+
+static void cms_block_disable(volatile struct cms_block *cms)
+{
+  cms_mb_assert_reset(cms);
 }
 
 static const char * sc_error_to_string(uint32_t sat_ctrl_err)
