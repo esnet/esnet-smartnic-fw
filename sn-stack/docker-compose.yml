@@ -334,7 +334,7 @@ services:
     environment:
       # Tell python to do unbuffered IO to stdout
       - PYTHONUNBUFFERED=1
-      - VFIO_UNLOCK_SELECT=$FPGA_PCIE_DEV.0
+      - VFIO_UNLOCK_SELECT=$FPGA_PCIE_DEV.0 $FPGA_PCIE_DEV.1
       - VFIO_UNLOCK_BAR=2
     volumes:
       - /sys/bus/pci:/sys/bus/pci
