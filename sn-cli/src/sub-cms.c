@@ -19,7 +19,7 @@ static char doc_cms[] =
   "--"
   ;
 
-static char args_doc_cms[] = "(cardinfo | enable | disable | fan | power | sensors | status | temp | voltage)";
+static char args_doc_cms[] = "(cardinfo | enable | disable | fan | power | qsfpdump | sensors | status | temp | voltage)";
 
 static struct argp_option argp_options_cms[] = {
   { "format", 'f',
@@ -85,7 +85,12 @@ static error_t parse_opt_cms (int key, char *arg, struct argp_state *state)
 }
 
 enum cms_ops {
-	      CMS_OP_CARD_INFO_REQ = 4,
+	      CMS_OP_CARD_INFO_REQ             = 0x04,
+	      CMS_OP_BLOCK_READ_MODULE_I2C     = 0x0B,
+	      CMS_OP_READ_MODULE_LOW_SPEED_IO  = 0x0D,
+	      CMS_OP_WRITE_MODULE_LOW_SPEED_IO = 0x0E,
+	      CMS_OP_BYTE_READ_MODULE_I2C      = 0x0F,
+	      CMS_OP_BYTE_WRITE_MODULE_I2C     = 0x10,
 };
 
 static void cms_mb_release_reset(volatile struct cms_block * cms)
@@ -170,6 +175,21 @@ static void cms_block_enable(volatile struct cms_block * cms)
 
   // Wait for mailbox to be ready/available
   cms_wait_mailbox_ready(cms);
+}
+
+static union cms_error_reg cms_get_error_reg(volatile struct cms_block *cms)
+{
+  return cms->error_reg;
+}
+
+static void cms_clear_error_reg(volatile struct cms_block *cms)
+{
+  union cms_control_reg control;
+  control._v = cms->control_reg._v;
+  control.reset_error_reg = 1;
+  cms->control_reg._v = control._v;
+
+  barrier();
 }
 
 static void cms_block_disable(volatile struct cms_block *cms)
@@ -700,6 +720,321 @@ static void print_cardinfo(volatile struct cms_block * cms)
   } while ((uint8_t *)tlv < rsp_buf + rsp_len_bytes);
 }
 
+static bool read_qsfp_page(volatile struct cms_block * cms, uint8_t cage_sel, uint8_t page_sel, bool upper_sel, uint8_t bank_sel, uint8_t rsp_buf[128])
+{
+  if (!rsp_buf) return false;
+  if (cage_sel > 1) return false;
+
+  // Ensure that the CMS block is fully enabled/ready
+  cms_block_enable(cms);
+
+  volatile uint32_t * mailbox = (uint32_t *)(((uint8_t *)&cms->reg_map_id_reg) + cms->host_msg_offset_reg);
+
+  // Write the card info request opcode and trigger the operation
+  mailbox[0] = CMS_OP_BLOCK_READ_MODULE_I2C << 24;
+  mailbox[1] = cage_sel;
+  mailbox[2] = page_sel;
+  bool bank_valid;
+  if (page_sel >= 0x10 && page_sel <= 0x1F) {
+    // CMIS pages are banked
+    // NOTE: only 32 (out of 256) banks are supported via the CMS block but CMIS only defines 4 used so probably OK
+    bank_valid = true;
+  } else {
+    bank_valid = false;
+    bank_sel = 0;
+  }
+  mailbox[3] = (0 |
+		((bank_sel & 0x1F) << 18) |
+		((bank_valid ? 0x1 : 0x0) << 17) |
+		((upper_sel ? 0x1 : 0x0) << 0));
+  barrier();
+  cms_set_mailbox_busy(cms);
+
+  // Wait for mailbox to be ready/available again (ie. opcode is processed by SC)
+  cms_wait_mailbox_ready(cms);
+
+  // Check if the read succeeded or failed
+  union cms_error_reg cms_error = cms_get_error_reg(cms);
+  if (cms_error.sat_ctrl_err != 0) {
+    printf("SC Error: %u (%s)\n", cms_error.sat_ctrl_err, sc_error_to_string(cms_error.sat_ctrl_err));
+    cms_clear_error_reg(cms);
+    return false;
+  }
+  if (cms_error.pkt_error != 0) {
+    printf("SC Packet Error: %u\n", cms_error.pkt_error);
+    cms_clear_error_reg(cms);
+    return false;
+  }
+
+  // Read out the response into a buffer
+  uint32_t rsp_len_bytes = mailbox[4];
+  uint32_t rsp_len_words = (rsp_len_bytes + 3) / sizeof(uint32_t); /* round up to catch partial last word */
+  if (rsp_len_words > 128/4) {
+    return false;
+  }
+
+  uint8_t * rsp_cursor = rsp_buf;
+  for (uint32_t i = 0; i < rsp_len_words; i++) {
+    uint32_t mb_word = mailbox[5 + i];
+    *rsp_cursor++ = (mb_word & 0x000000FF) >>  0;
+    *rsp_cursor++ = (mb_word & 0x0000FF00) >>  8;
+    *rsp_cursor++ = (mb_word & 0x00FF0000) >> 16;
+    *rsp_cursor++ = (mb_word & 0xFF000000) >> 24;
+  }
+
+  return true;
+}
+
+// See SFF-8024 Rev 4.10 Table 4-1
+static const char * sff_identifier_to_string(uint8_t identifier)
+{
+  switch (identifier) {
+  case 0x00: return "Unknown or unspecified";
+  case 0x01: return "GBIC";
+  case 0x02: return "Module/connector soldered to motherboard (using SFF-8472)";
+  case 0x03: return "SFP/SFP+/SFP28 and later with SFF-8472 management interface";
+  case 0x04: return "300 pin XBI";
+  case 0x05: return "XENPAK";
+  case 0x06: return "XFP";
+  case 0x07: return "XFF";
+  case 0x08: return "XFP-E";
+  case 0x09: return "XPAK";
+  case 0x0a: return "X2";
+  case 0x0b: return "DWDM-SFP/SFP+ (not using SFF-8472)";
+  case 0x0c: return "QSFP (INF-8438)";
+  case 0x0d: return "QSFP+ or later with SFF-8636 or SFF-8436 management interface (SFF-8436, SFF-8635, SFF-8665, SFF-8685 et al.)";
+  case 0x0e: return "CXP or later";
+  case 0x0f: return "Shielded Mini Multilane HD 4X";
+  case 0x10: return "Shielded Mini Multilane HD 8X";
+  case 0x11: return "QSFP28 or later with SFF-8636 management interface (SFF-8665 et al.)";
+  case 0x12: return "CXP2 (aka CXP28) or later";
+  case 0x13: return "CDFP (Style 1/Style2)";
+  case 0x14: return "Shielded Mini Multilane HD 4X Fanout Cable";
+  case 0x15: return "Shielded Mini Multilane HD 8X Fanout Cable";
+  case 0x16: return "CDFP (Style 3)";
+  case 0x17: return "microQSFP";
+  case 0x18: return "QSFP-DD Double Density 8X Pluggable Transceiver (INF-8628)";
+  case 0x19: return "OSFP 8X Pluggable Transceiver";
+  case 0x1a: return "SFP-DD Double Density 2X Pluggable Transceiver with SFP-DD Management Interface Specification";
+  case 0x1b: return "DSFP Dual Small Form Factor Pluggable Transceiver";
+  case 0x1c: return "x4 MiniLink/OcuLink";
+  case 0x1d: return "x8 MiniLink";
+  case 0x1e: return "QSFP+ or later with Common Management Interface Specification (CMIS)";
+  case 0x1f: return "SFP-DD Double Density 2X Pluggable Transceiver with Common Management Interface Specification (CMIS)";
+  case 0x20: return "SFP+ and later with Common Management Interface Specification (CMIS)";
+  default:
+    if (identifier < 0x80) {
+      return "Reserved";
+    } else {
+      return "Vendor Specific";
+    }
+    break;
+  }
+
+  return "????";
+}
+
+static const char * sff_revision_compliance_to_string(uint8_t revision)
+{
+  switch (revision) {
+  case 0x00: return "Revision not specified";
+  case 0x01: return "SFF-8436 Rev 4.8 or earlier";
+  case 0x02: return "Includes functionality described in revision 4.8 or earlier of SFF-8436";
+  case 0x03: return "SFF-8636 Rev 1.3 or earlier";
+  case 0x04: return "SFF-8636 Rev 1.4";
+  case 0x05: return "SFF-8636 Rev 1.5";
+  case 0x06: return "SFF-8636 Rev 2.0";
+  case 0x07: return "SFF-8636 Rev 2.5, 2.6 and 2.7";
+  case 0x08: return "SFF-8636 Rev 2.8, 2.9 and 2.10";
+  default:   return "Reserved";
+  }
+}
+
+static const char * sff_power_class_1to4_to_string(uint8_t power_class)
+{
+  switch (power_class) {
+  case 0x00: return "Power Class 1 (1.5 W max.)";
+  case 0x01: return "Power Class 2 (2.0 W max.)";
+  case 0x02: return "Power Class 3 (2.5 W max.)";
+  case 0x03: return "Power Class 4 (3.5 W max.) and Power Classes 5, 6 or 7";
+  default:   return "????";
+  }
+}
+
+static const char * sff_power_class_4to7_to_string(uint8_t power_class)
+{
+  switch (power_class) {
+  case 0x00: return "Power Classes 1 to 4";
+  case 0x01: return "Power Class 5 (4.0 W max.)";
+  case 0x02: return "Power Class 6 (4.5 W max.)";
+  case 0x03: return "Power Class 7 (5.0 W max.)";
+  default:   return "????";
+  }
+}
+
+static const char * sff_extended_spec_compliance_to_string(uint8_t ext_spec_compliance)
+{
+  switch (ext_spec_compliance) {
+  case 0x00: return "Unspecified";
+  case 0x01: return "100G AOC (Active Optical Cable), retimed or 25GAUI C2M AOC. Providing a worst BER of 5 × 10^-5";
+  case 0x02: return "100GBASE-SR4 or 25GBASE-SR";
+  case 0x03: return "100GBASE-LR4 or 25GBASE-LR";
+  case 0x04: return "100GBASE-ER4 or 25GBASE-ER";
+  case 0x05: return "100GBASE-SR10";
+  case 0x06: return "100G CWDM4";
+  case 0x07: return "100G PSM4 Parallel SMF";
+  case 0x08: return "100G ACC (Active Copper Cable), retimed or 25GAUI C2M ACC. Providing a worst BER of 5 × 10^-5";
+  case 0x09: return "Obsolete (assigned before 100G CWDM4 MSA required FEC)";
+  case 0x0a: return "Reserved";
+  case 0x0b: return "100GBASE-CR4, 25GBASE-CR CA-25G-L or 50GBASE-CR2 with RS (Clause91) FEC";
+  case 0x0c: return "25GBASE-CR CA-25G-S or 50GBASE-CR2 with BASE-R (Clause 74 Fire code) FEC";
+  case 0x0d: return "25GBASE-CR CA-25G-N or 50GBASE-CR2 with no FEC";
+  case 0x0e: return "10 Mb/s Single Pair Ethernet (802.3cg, Clause 146/147, 1000 m copper)";
+  case 0x0f: return "Reserved";
+  case 0x10: return "40GBASE-ER4";
+  case 0x11: return "4 x 10GBASE-SR";
+  case 0x12: return "40G PSM4 Parallel SMF";
+  case 0x13: return "G959.1 profile P1I1-2D1 (10709 MBd, 2km, 1310 nm SM)";
+  case 0x14: return "G959.1 profile P1S1-2D2 (10709 MBd, 40km, 1550 nm SM)";
+  case 0x15: return "G959.1 profile P1L1-2D2 (10709 MBd, 80km, 1550 nm SM)";
+  case 0x16: return "10GBASE-T with SFI electrical interface";
+  case 0x17: return "100G CLR4";
+  case 0x18: return "100G AOC, retimed or 25GAUI C2M AOC. Providing a worst BER of 10^-12 or below";
+  case 0x19: return "100G ACC, retimed or 25GAUI C2M ACC. Providing a worst BER of 10^-12 or below";
+  case 0x1a: return "100GE-DWDM2 (DWDM transceiver using 2 wavelengths on a 1550 nm DWDM grid with a reach up to 80 km)";
+  case 0x1b: return "100G 1550nm WDM (4 wavelengths)";
+  case 0x1c: return "10GBASE-T Short Reach (30 meters)";
+  case 0x1d: return "5GBASE-T";
+  case 0x1e: return "2.5GBASE-T";
+  case 0x1f: return "40G SWDM4";
+  case 0x20: return "100G SWDM4";
+  case 0x21: return "100G PAM4 BiDi";
+  case 0x22: return "4WDM-10 MSA (10km version of 100G CWDM4 with same RS(528,514) FEC in host system)";
+  case 0x23: return "4WDM-20 MSA (20km version of 100GBASE-LR4 with RS(528,514) FEC in host system)";
+  case 0x24: return "4WDM-40 MSA (40km reach with APD receiver and RS(528,514) FEC in host system)";
+  case 0x25: return "100GBASE-DR (Clause 140), CAUI-4 (no FEC)";
+  case 0x26: return "100G-FR or 100GBASE-FR1 (Clause 140), CAUI-4 (no FEC on host interface)";
+  case 0x27: return "100G-LR or 100GBASE-LR1 (Clause 140), CAUI-4 (no FEC on host interface)";
+  case 0x28: return "100GBASE-SR1 (P802.3db, Clause 167), CAUI-4 (no FEC on host interface)";
+  case 0x29: return "100GBASE-SR1, 200GBASE-SR2 or 400GBASE-SR4 (P802.3db, Clause 167)";
+  case 0x2a: return "100GBASE-FR1 (P802.3cu, Clause 140)";
+  case 0x2b: return "100GBASE-LR1 (P802.3cu, Clause 140)";
+  case 0x2c: return "100G-LR1-20 MSA, CAUI-4 (no FEC on host interface)";
+  case 0x2d: return "100G-ER1-30 MSA, CAUI-4 (no FEC on host interface)";
+  case 0x2e: return "100G-ER1-40 MSA, CAUI-4 (no FEC on host interface)";
+  case 0x2f: return "100G-LR1-20 MSA";
+  case 0x30: return "Active Copper Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. Providing a worst BER of 10^-6 or below";
+  case 0x31: return "Active Optical Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. Providing a worst BER of 10^-6 or below";
+  case 0x32: return "Active Copper Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. Providing a worst BER of 2.6x10^-4 for ACC, 10^-5 for AUI, or below";
+  case 0x33: return "Active Optical Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. Providing a worst BER of 2.6x10^-4 for AOC, 10^-5 for AUI, or below";
+  case 0x34: return "100G-ER1-30 MSA";
+  case 0x35: return "100G-ER1-40 MSA";
+  case 0x36: return "100GBASE-VR1, 200GBASE-VR2 or 400GBASE-VR4 (P802.3db, Clause 167)";
+  case 0x37: return "10GBASE-BR (Clause 158)";
+  case 0x38: return "25GBASE-BR (Clause 159)";
+  case 0x39: return "50GBASE-BR (Clause 160)";
+  case 0x3a: return "100GBASE-VR1 (P802.3db, Clause 167), CAUI-4 (no FEC on host interface)";
+    // 0x3b - 0x3e are reserved
+  case 0x3f: return "100GBASE-CR1, 200GBASE-CR2 or 400GBASE-CR4 (P802.3ck, Clause 162)";
+  case 0x40: return "50GBASE-CR, 100GBASE-CR2, or 200GBASE-CR4";
+  case 0x41: return "50GBASE-SR, 100GBASE-SR2, or 200GBASE-SR4";
+  case 0x42: return "50GBASE-FR or 200GBASE-DR4";
+  case 0x43: return "200GBASE-FR4";
+  case 0x44: return "200G 1550 nm PSM4";
+  case 0x45: return "50GBASE-LR";
+  case 0x46: return "200GBASE-LR4";
+  case 0x47: return "400GBASE-DR4 (802.3, Clause 124), 100GAUI-1 C2M (Annex 120G)";
+  case 0x48: return "400GBASE-FR4 (802.3, Clause 151)";
+  case 0x49: return "400GBASE-LR4-6 (802.3, Clause 151)";
+  case 0x4a: return "50GBASE-ER (IEEE 802.3, Clause 139)";
+  case 0x4b: return "400G-LR4-10";
+  case 0x4c: return "400GBASE-ZR (P802.3cw, Clause 156)";
+    // 0x4d - 0x7e are reserved
+  case 0x7f: return "256GFC-SW4 (FC-PI-7P)";
+  case 0x80: return "64GFC (FC-PI-7)";
+  case 0x81: return "128GFC (FC-PI-8)";
+    // 0x82 - 0xff are reserved
+  default:   return "Reserved";
+  }
+}
+
+static void print_qsfpdump(volatile struct cms_block * cms, uint8_t cage_sel)
+{
+  uint8_t rsp_buf[128];
+  bool read_ok;
+
+  // Read lower page 0
+  printf("Cage %u Page 0 Lower\n", cage_sel);
+  read_ok = read_qsfp_page(cms, cage_sel, 0, false, 0, rsp_buf);
+  if (!read_ok) {
+    printf("\tRead Failed\n");
+  } else {
+    printf("\tIdentifier:     %s\n", sff_identifier_to_string(rsp_buf[0]));
+    printf("\tSpec Revision:  %s\n", sff_revision_compliance_to_string(rsp_buf[1]));
+    printf("\tStatus\n");
+    printf("\t\tMemory Mapping:    %s\n", (rsp_buf[2] & 0x4) ? "Flat" : "Paging");
+    printf("\t\tInterrupt Active?: %s\n", (rsp_buf[2] & 0x2) ? "Not Asserted" : "Asserted");
+    printf("\t\tData Ready?:       %s\n", (rsp_buf[2] & 0x1) ? "Not Ready" : "Ready");
+  }
+
+  // Read upper page 0
+  printf("Cage %u Page 0 Upper\n", cage_sel);
+  read_ok = read_qsfp_page(cms, cage_sel, 0, true, 0, rsp_buf);
+  if (!read_ok) {
+    printf("\tRead Failed\n");
+  } else {
+    printf("\tIdentifer:           %s\n", sff_identifier_to_string(rsp_buf[0]));
+
+    printf("\tExtended Identifier:\n");
+    printf("\t\tCLEI Code Present: %s\n", (rsp_buf[1] & 0x10) ? "Yes" : "No");
+    printf("\t\tCDR in Tx        : %s\n", (rsp_buf[1] & 0x08) ? "Present" : "Not Present");
+    printf("\t\tCDR in Rx        : %s\n", (rsp_buf[1] & 0x04) ? "Present" : "Not Present");
+    printf("\t\tPower Class 1-4  : %s\n", sff_power_class_1to4_to_string((rsp_buf[1] & 0xC0) >> 6));
+    printf("\t\tPower Class 4-7  : %s\n", sff_power_class_4to7_to_string((rsp_buf[1] & 0x03) >> 0));
+    printf("\t\tPower Class 8    : %s\n", (rsp_buf[1] & 0x20) ? "Power Class 8 implemented" : "No");
+
+    printf("\tSpec Compliance:\n");
+    if (rsp_buf[3] & 0x80) printf("\t\tExtended\n");
+    if (rsp_buf[3] & 0x40) printf("\t\t10GBASE-LRM\n");
+    if (rsp_buf[3] & 0x20) printf("\t\t10GBASE-LR\n");
+    if (rsp_buf[3] & 0x10) printf("\t\t10GBASE-SR\n");
+    if (rsp_buf[3] & 0x08) printf("\t\t40GBASE-CR4\n");
+    if (rsp_buf[3] & 0x04) printf("\t\t40GBASE-SR4\n");
+    if (rsp_buf[3] & 0x02) printf("\t\t40GBASE-LR4\n");
+    if (rsp_buf[3] & 0x01) printf("\t\t40G Active Cable (XLPPI)\n");
+
+    // Skipped Spec Compliance for SONET, SAS/SATA, GigE, FC
+
+    printf("\tExtended Spec Compliance: %s\n", sff_extended_spec_compliance_to_string(rsp_buf[64]));
+
+    printf("\tVendor Name: ");
+    for (int i = 0; i < 16; i++) {
+      printf("%c", rsp_buf[20+i]);
+    }
+    printf("\n");
+
+    printf("\tVendor OUI:  %02x:%02x:%02x\n", rsp_buf[37], rsp_buf[38], rsp_buf[39]);
+
+    printf("\tVendor PN  : ");
+    for (int i = 0; i < 16; i++) {
+      printf("%c", rsp_buf[40+i]);
+    }
+    printf("\n");
+
+    printf("\tVendor Rev : ");
+    for (int i = 0; i < 2; i++) {
+      printf("%c", rsp_buf[56+i]);
+    }
+    printf("\n");
+
+    printf("\tVendor SN  : ");
+    for (int i = 0; i < 16; i++) {
+      printf("%c", rsp_buf[68+i]);
+    }
+    printf("\n");
+  }
+}
+
 void cmd_cms(struct argp_state *state)
 {
   struct arguments_cms arguments = {0,};
@@ -758,6 +1093,10 @@ void cmd_cms(struct argp_state *state)
     print_fan(&bar2->cms);
   } else if (!strcmp(arguments.command, "power")) {
     print_power(&bar2->cms);
+  } else if (!strcmp(arguments.command, "qsfpdump")) {
+    print_qsfpdump(&bar2->cms, 0);
+    printf("\n");
+    print_qsfpdump(&bar2->cms, 1);
   } else if (!strcmp(arguments.command, "sensors")) {
     printf("Voltage\n");
     print_voltage(&bar2->cms);
