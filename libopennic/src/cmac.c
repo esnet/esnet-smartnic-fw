@@ -1,6 +1,18 @@
 #include "cmac.h"		/* API */
 #include "memory-barriers.h"	/* barrier() */
 
+bool cmac_loopback_enable(volatile struct cmac_block * cmac)
+{
+  cmac->gt_loopback = 1;
+  return true;
+}
+
+bool cmac_loopback_disable(volatile struct cmac_block * cmac)
+{
+  cmac->gt_loopback = 0;
+  return true;
+}
+
 bool cmac_enable(volatile struct cmac_block * cmac) {
   union cmac_conf_rx_1 conf_rx = {
     .ctl_rx_enable = 1,
