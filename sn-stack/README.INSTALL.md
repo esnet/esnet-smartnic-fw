@@ -194,17 +194,30 @@ sn-cli cmac -p 1 disable
 ```
 Enabling a CMAC interface allows frames to pass (Rx/Tx) at the MAC layer.  These commands **do not affect** whether the underlying physical layer (PHY) is operational.
 
+Enable/Disable Reed-Solomon Forward Error Correction (RS-FEC) on one or more (or all by default) 100G MAC interfaces using these commands:
+
+```
+sn-cli cmac rsfec-enable
+sn-cli cmac rsfec-disable
+
+sn-cli cmac -p 0 rsfec-enable
+sn-cli cmac -p 1 rsfec-disable
+```
+
+**NOTE** The RS-FEC setting must be configured identically on **both ends of the physical link** or the link will not be established.
+
 Display the current MAC and PHY status of one or more (or all by default) 100G MAC interfaces using these commands:
 ```
 root@smartnic-fw:/# sn-cli cmac status
 CMAC0
-  Tx (MAC ENABLED/PHY UP)
-  Rx (MAC ENABLED/PHY UP)
+  Tx (MAC Enabled/RS-FEC Off/PHY UP -> UP)  
+  Rx (MAC Enabled/RS-FEC Off/PHY UP -> UP)  
 
 CMAC1
-  Tx (MAC ENABLED/PHY UP)
-  Rx (MAC ENABLED/PHY DOWN)
+  Tx (MAC Enabled/RS-FEC Off/PHY DOWN -> DOWN)  
+  Rx (MAC Enabled/RS-FEC Off/PHY DOWN -> DOWN)  
 ```
+
 In the example output above, CMAC0 PHY layer is **UP** in both the Tx and Rx directions.  The MAC is fully enabled.  This link is operational and should be passing packets normally.
 
 In the example output above, CMAC1 PHY layer is **DOWN** in the Rx (receive) direction.  Possible causes for this are:
@@ -214,7 +227,7 @@ In the example output above, CMAC1 PHY layer is **DOWN** in the Rx (receive) dir
   * Some 100G AOC or DACs are known to work
   * QSFP+ 40G modules **are not supported**
   * QSFP 5G modules **are not supported**
-* QSFP28 card improperly seated in the U280 card
+* QSFP28 module improperly seated in the U280 card
   * Check if the QSFP28 module is inserted upside down and physically blocked from being fully inserted
   * Unplug/replug the module, ensuring that it is properly oriented and firmly seated
 * Fiber not properly inserted
@@ -224,31 +237,30 @@ In the example output above, CMAC1 PHY layer is **DOWN** in the Rx (receive) dir
   * Only 100G mode is supported on each of the U280 100G interfaces
   * Configure far end in 100G mode
 * Far end has RS-FEC (Reed-Solomon Forward Error Correction) enabled
-  * The smartnic platform **does not support** RS-FEC
-  * Disable RS-FEC on the far end equipment
+  * The smartnic platform supports RS-FEC but it is disabled by default
+  * Use the `sn-cli cmac rsfec-enable` command to manualy enable RS-FEC on the CMAC ports
+  * Alternatively, disable RS-FEC on the far end equipment
 
 A more detailed status can also be displayed using the `--verbose` option.  Note that the `--verbose` option is a global option and thus must be positioned **before** the `cmac` subcommand.
 ```
 root@smartnic-fw:/# sn-cli --verbose cmac -p 1 status
 CMAC1
-  Tx (MAC ENABLED/PHY UP)
-	           tx_local_fault 0
-  Rx (MAC ENABLED/PHY DOWN)
-	         rx_got_signal_os 0
-	               rx_bad_sfd 0
-	          rx_bad_preamble 0
-	 rx_test_pattern_mismatch 0
-	  rx_received_local_fault 0
-	  rx_internal_local_fault 1
-	           rx_local_fault 1
-	          rx_remote_fault 0
-	                rx_hi_ber 0
-	           rx_aligned_err 0
-	            rx_misaligned 0
-	               rx_aligned 0
-	                rx_status 0
+  Tx (MAC Enabled/RS-FEC Off/PHY UP -> UP)  
+	           tx_local_fault 0 -> 0
+  Rx (MAC Enabled/FEC Off/PHY DOWN -> DOWN)  
+	         rx_got_signal_os 0 -> 0
+	               rx_bad_sfd 0 -> 0
+	          rx_bad_preamble 0 -> 0
+	 rx_test_pattern_mismatch 0 -> 0
+	  rx_received_local_fault 0 -> 0
+	  rx_internal_local_fault 1 -> 1
+	           rx_local_fault 1 -> 1
+	          rx_remote_fault 0 -> 0
+	                rx_hi_ber 0 -> 0
+	           rx_aligned_err 0 -> 0
+	            rx_misaligned 0 -> 0
+	               rx_aligned 0 -> 0
 ```
-
 Display summary statistics for packets Rx'd and Tx'd from CMAC ports
 ```
 root@smartnic-fw:/# sn-cli cmac stats

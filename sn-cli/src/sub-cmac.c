@@ -16,7 +16,7 @@ static char doc_cmac[] =
   "--"
   ;
 
-static char args_doc_cmac[] = "(enable | disable | status | stats)";
+static char args_doc_cmac[] = "(enable | disable | rsfec-enable | rsfec-disable | loopback-enable | loopback-disable | status | stats)";
 
 static struct argp_option argp_options_cmac[] = {
   { "format", 'f',
@@ -123,33 +123,43 @@ static void print_cmac_status(volatile struct cmac_block * cmac, bool verbose)
 {
   union cmac_conf_rx_1 conf_rx;
   union cmac_conf_tx_1 conf_tx;
+  union cmac_rsfec_conf_enable rsfec_conf;
+  uint32_t gt_loopback;
   union cmac_stat_rx_status rx_status[2];
   union cmac_stat_tx_status tx_status[2];
+  union cmac_stat_rsfec_status rsfec_status[2];
 
   // Read current configuration
   conf_rx._v = cmac->conf_rx_1._v;
   conf_tx._v = cmac->conf_tx_1._v;
+  rsfec_conf._v = cmac->rsfec_conf_enable._v;
+  gt_loopback = cmac->gt_loopback;
 
   // Read twice to collect historical (since last read) and current status
   for (int i = 0; i < 2; i++) {
     tx_status[i]._v = cmac->stat_tx_status._v;
     rx_status[i]._v = cmac->stat_rx_status._v;
+    rsfec_status[i]._v = cmac->stat_rsfec_status._v;
   }
 
-  printf("  Tx (MAC %s/PHY %s -> %s)\n",
-         conf_tx.ctl_tx_enable ? "ENABLED" : "DISABLED",
+  printf("  Tx (MAC %s/RS-FEC %s/PHY %s -> %s)  %s\n",
+         conf_tx.ctl_tx_enable ? "Enabled" : "Disabled",
+	 rsfec_conf.ctl_rsfec_enable ? "On" : "Off",
          tx_status[0]._v == 0 ? "UP" : "DOWN",
-         tx_status[1]._v == 0 ? "UP" : "DOWN");
+         tx_status[1]._v == 0 ? "UP" : "DOWN",
+	 gt_loopback ? "PMA LOOPBACK ON" : "");
   if (verbose) {
     printf("\t%25s %u -> %u\n", "tx_local_fault",
            tx_status[0].stat_tx_local_fault,
            tx_status[1].stat_tx_local_fault);
   }
 
-  printf("  Rx (MAC %s/PHY %s -> %s)\n",
-	 conf_rx.ctl_rx_enable ? "ENABLED" : "DISABLED",
+  printf("  Rx (MAC %s/RS-FEC %s/PHY %s -> %s)  %s\n",
+	 conf_rx.ctl_rx_enable ? "Enabled" : "Disabled",
+	 rsfec_conf.ctl_rx_rsfec_enable ? "On" : "Off",
          rx_status[0]._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN",
-         rx_status[1]._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN");
+         rx_status[1]._v == (CMAC_STAT_RX_STATUS_STAT_RX_STATUS_MASK | CMAC_STAT_RX_STATUS_STAT_RX_ALIGNED_MASK) ? "UP" : "DOWN",
+	 gt_loopback ? "PMA LOOPBACK ON" : "");
   if (verbose) {
     printf("\t%25s %u -> %u\n", "rx_got_signal_os",
 	    rx_status[0].stat_rx_got_signal_os,
@@ -187,9 +197,32 @@ static void print_cmac_status(volatile struct cmac_block * cmac, bool verbose)
     printf("\t%25s %u -> %u\n", "rx_aligned",
 	    rx_status[0].stat_rx_aligned,
 	    rx_status[1].stat_rx_aligned);
-    printf("\t%25s %u -> %u\n", "rx_status",
-	    rx_status[0].stat_rx_status,
-	    rx_status[1].stat_rx_status);
+    if (rsfec_conf.ctl_rx_rsfec_enable) {
+      printf("\t%25s %u -> %u\n", "rx_status",
+	     rx_status[0].stat_rx_status,
+	     rx_status[1].stat_rx_status);
+      printf("\t%25s %u -> %u\n", "rx_rsfec_lane_alignment",
+	     rsfec_status[0].stat_rx_rsfec_lane_alignment_status,
+	     rsfec_status[1].stat_rx_rsfec_lane_alignment_status);
+      printf("\t%25s %u -> %u\n", "rx_rsfec_am_lock3",
+	     rsfec_status[0].stat_rx_rsfec_am_lock3,
+	     rsfec_status[1].stat_rx_rsfec_am_lock3);
+      printf("\t%25s %u -> %u\n", "rx_rsfec_am_lock2",
+	     rsfec_status[0].stat_rx_rsfec_am_lock2,
+	     rsfec_status[1].stat_rx_rsfec_am_lock2);
+      printf("\t%25s %u -> %u\n", "rx_rsfec_am_lock1",
+	     rsfec_status[0].stat_rx_rsfec_am_lock1,
+	     rsfec_status[1].stat_rx_rsfec_am_lock1);
+      printf("\t%25s %u -> %u\n", "rx_rsfec_am_lock0",
+	     rsfec_status[0].stat_rx_rsfec_am_lock0,
+	     rsfec_status[1].stat_rx_rsfec_am_lock0);
+      printf("\t%25s %u -> %u\n", "rx_rsfec_hi_ser_lh",
+	     rsfec_status[0].stat_rx_rsfec_hi_ser_lh,
+	     rsfec_status[1].stat_rx_rsfec_hi_ser_lh);
+      printf("\t%25s %u -> %u\n", "rx_rsfec_hi_ser",
+	     rsfec_status[0].stat_rx_rsfec_hi_ser,
+	     rsfec_status[1].stat_rx_rsfec_hi_ser);
+    }
   }
 
   return;
@@ -395,6 +428,46 @@ void cmd_cmac(struct argp_state *state)
     if (arguments.ports & PORT_SELECT_CMAC1) {
       cmac_disable(&bar2->cmac1);
       printf("Disabled CMAC1\n");
+    }
+
+  } else if (!strcmp(arguments.command, "rsfec-enable")) {
+    if (arguments.ports & PORT_SELECT_CMAC0) {
+      cmac_rsfec_enable(&bar2->cmac0);
+      printf("Enabled RS-FEC on CMAC0\n");
+    }
+    if (arguments.ports & PORT_SELECT_CMAC1) {
+      cmac_rsfec_enable(&bar2->cmac1);
+      printf("Enabled RS-FEC on CMAC1\n");
+    }
+
+  } else if (!strcmp(arguments.command, "rsfec-disable")) {
+    if (arguments.ports & PORT_SELECT_CMAC0) {
+      cmac_rsfec_disable(&bar2->cmac0);
+      printf("Disabled RS-FEC on CMAC0\n");
+    }
+    if (arguments.ports & PORT_SELECT_CMAC1) {
+      cmac_rsfec_disable(&bar2->cmac1);
+      printf("Disabled RS-FEC on CMAC1\n");
+    }
+
+  } else if (!strcmp(arguments.command, "loopback-enable")) {
+    if (arguments.ports & PORT_SELECT_CMAC0) {
+      cmac_loopback_enable(&bar2->cmac0);
+      printf("Enabled Near End PMA (Inward) Loopback on CMAC0\n");
+    }
+    if (arguments.ports & PORT_SELECT_CMAC1) {
+      cmac_loopback_enable(&bar2->cmac1);
+      printf("Enabled Near End PMA (Inward) Loopback on CMAC1\n");
+    }
+
+  } else if (!strcmp(arguments.command, "loopback-disable")) {
+    if (arguments.ports & PORT_SELECT_CMAC0) {
+      cmac_loopback_disable(&bar2->cmac0);
+      printf("Disabled Near End PMA (Inward) Loopback on CMAC0\n");
+    }
+    if (arguments.ports & PORT_SELECT_CMAC1) {
+      cmac_loopback_disable(&bar2->cmac1);
+      printf("Disabled Near End PMA (Inward) Loopback on CMAC1\n");
     }
 
   } else if (!strcmp(arguments.command, "status")) {
