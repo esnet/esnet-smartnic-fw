@@ -5,6 +5,7 @@
 #include <stdlib.h>  /* malloc */
 #include <inttypes.h>		/* strtoumax */
 #include <unistd.h>		/* usleep */
+#include <math.h>		/* log10 */
 
 #include "smartnic.h"		/* smartnic_* */
 #include "unused.h"		/* UNUSED */
@@ -872,6 +873,83 @@ static const char * sff_power_class_4to7_to_string(uint8_t power_class)
   }
 }
 
+static const char * sff_connector_type_to_string(uint8_t connector_type)
+{
+  switch (connector_type) {
+  case 0x00: return "Unknown or unspecified";
+  case 0x01: return "SC (Subscriber Connector)";
+  case 0x02: return "Fibre Channel Style 1 copper connector";
+  case 0x03: return "Fibre Channel Style 2 copper connector";
+  case 0x04: return "BNC/TNC (Bayonet/Threaded Neill-Concelman)";
+  case 0x05: return "Fibre Channel coax headers";
+  case 0x06: return "Fiber Jack";
+  case 0x07: return "LC (Lucent Connector)";
+  case 0x08: return "MT-RJ (Mechanical Transfer – Registered Jack)";
+  case 0x09: return "MU (Multiple Optical)";
+  case 0x0a: return "SG";
+  case 0x0b: return "Optical Pigtail";
+  case 0x0c: return "MPO 1x12 (Multifiber Parallel Optic)";
+  case 0x0d: return "MPO 2x16";
+    // 0x0E - 0x1F Reserved
+  case 0x20: return "HSSDC II (High Speed Serial Data Connector)";
+  case 0x21: return "Copper pigtail";
+  case 0x22: return "RJ45 (Registered Jack)";
+  case 0x23: return "No separable connector";
+  case 0x24: return "MXC 2x16";
+  case 0x25: return "CS optical connector";
+  case 0x26: return "SN (previously Mini CS) optical connector";
+  case 0x27: return "MPO 2x12";
+  case 0x28: return "MPO 1x16";
+    // 0x29 - 0x7F Reserved
+    // 0x80 - 0xFF Vendor Specific
+  default:
+    if (connector_type <= 0x80) {
+      return "Reserved";
+    } else {
+      return "Vendor Specific";
+    }
+  }
+}
+
+static const char * sff_transmitter_technology_to_string(uint8_t transmitter_technology)
+{
+  switch (transmitter_technology) {
+  case 0x0: return "850 nm VCSEL";
+  case 0x1: return "1310 nm VCSEL";
+  case 0x2: return "1550 nm VCSEL";
+  case 0x3: return "1310 nm FP";
+  case 0x4: return "1310 nm DFB";
+  case 0x5: return "1550 nm DFB";
+  case 0x6: return "1310 nm EML";
+  case 0x7: return "1550 nm EML";
+  case 0x8: return "Other / Undefined";
+  case 0x9: return "1490 nm DFB";
+  case 0xa: return "Copper cable unequalized";
+  case 0xb: return "Copper cable passive equalized";
+  case 0xc: return "Copper cable, near and far end limiting active equalizers";
+  case 0xd: return "Copper cable, far end limiting active equalizers";
+  case 0xe: return "Copper cable, near end limiting active equalizers";
+  case 0xf: return "Copper cable, linear active equalizers";
+  default:  return "????";
+  }
+}
+
+static const char * sff_encoding_to_string(uint8_t encoding)
+{
+  switch (encoding) {
+  case 0x00: return ("Unspecified");
+  case 0x01: return ("8B/10B");
+  case 0x02: return ("4B/5B");
+  case 0x03: return ("NRZ");
+  case 0x04: return ("SONET Scrambled");
+  case 0x05: return ("64B/66B");
+  case 0x06: return ("Manchester");
+  case 0x07: return ("256B/257B (transcoded FEC-enabled data)");
+  case 0x08: return ("PAM4");
+  default:   return ("Reserved");
+  }
+}
+
 static const char * sff_extended_spec_compliance_to_string(uint8_t ext_spec_compliance)
 {
   switch (ext_spec_compliance) {
@@ -960,78 +1038,373 @@ static const char * sff_extended_spec_compliance_to_string(uint8_t ext_spec_comp
 
 static void print_qsfpdump(volatile struct cms_block * cms, uint8_t cage_sel)
 {
-  uint8_t rsp_buf[128];
+  uint8_t pages[4][256];
   bool read_ok;
 
   // Read lower page 0
   printf("Cage %u Page 0 Lower\n", cage_sel);
-  read_ok = read_qsfp_page(cms, cage_sel, 0, false, 0, rsp_buf);
+  read_ok = read_qsfp_page(cms, cage_sel, 0, false, 0, &pages[0][0]);
   if (!read_ok) {
     printf("\tRead Failed\n");
   } else {
-    printf("\tIdentifier:     %s\n", sff_identifier_to_string(rsp_buf[0]));
-    printf("\tSpec Revision:  %s\n", sff_revision_compliance_to_string(rsp_buf[1]));
+    printf("\tIdentifier:     %s\n", sff_identifier_to_string(pages[0][0]));
+    printf("\tSpec Revision:  %s\n", sff_revision_compliance_to_string(pages[0][1]));
     printf("\tStatus\n");
-    printf("\t\tMemory Mapping:    %s\n", (rsp_buf[2] & 0x4) ? "Flat" : "Paging");
-    printf("\t\tInterrupt Active?: %s\n", (rsp_buf[2] & 0x2) ? "Not Asserted" : "Asserted");
-    printf("\t\tData Ready?:       %s\n", (rsp_buf[2] & 0x1) ? "Not Ready" : "Ready");
+    printf("\t\tMemory Mapping:    %s\n", (pages[0][2] & 0x4) ? "Flat" : "Paging");
+    printf("\t\tInterrupt Active?: %s\n", (pages[0][2] & 0x2) ? "Not Asserted" : "Asserted");
+    printf("\t\tData Ready?:       %s\n", (pages[0][2] & 0x1) ? "Not Ready" : "Ready");
+
+    printf("\tActive Interrupts\n");
+    if (pages[0][3] == 0 &&
+	pages[0][4] == 0 &&
+	pages[0][5] == 0 &&
+	pages[0][6] == 0 &&
+	pages[0][7] == 0 &&
+	pages[0][8] == 0 &&
+	pages[0][9] == 0 &&
+	pages[0][10] == 0 &&
+	pages[0][11] == 0 &&
+	pages[0][12] == 0 &&
+	pages[0][13] == 0 &&
+	pages[0][14] == 0) {
+      printf("\t\tNone\n");
+    } else {
+      if (pages[0][3] & 0x80) printf("\t\tL-Tx4 LOS\n");
+      if (pages[0][3] & 0x40) printf("\t\tL-Tx3 LOS\n");
+      if (pages[0][3] & 0x20) printf("\t\tL-Tx2 LOS\n");
+      if (pages[0][3] & 0x10) printf("\t\tL-Tx1 LOS\n");
+      if (pages[0][3] & 0x08) printf("\t\tL-Rx4 LOS\n");
+      if (pages[0][3] & 0x04) printf("\t\tL-Rx3 LOS\n");
+      if (pages[0][3] & 0x02) printf("\t\tL-Rx2 LOS\n");
+      if (pages[0][3] & 0x01) printf("\t\tL-Rx1 LOS\n");
+
+      if (pages[0][4] & 0x80) printf("\t\tL-Tx4 Adapt EQ Fault\n");
+      if (pages[0][4] & 0x40) printf("\t\tL-Tx3 Adapt EQ Fault\n");
+      if (pages[0][4] & 0x20) printf("\t\tL-Tx2 Adapt EQ Fault\n");
+      if (pages[0][4] & 0x10) printf("\t\tL-Tx1 Adapt EQ Fault\n");
+      if (pages[0][4] & 0x08) printf("\t\tL-Tx4 Fault\n");
+      if (pages[0][4] & 0x04) printf("\t\tL-Tx3 Fault\n");
+      if (pages[0][4] & 0x02) printf("\t\tL-Tx2 Fault\n");
+      if (pages[0][4] & 0x01) printf("\t\tL-Tx1 Fault\n");
+
+      if (pages[0][5] & 0x80) printf("\t\tL-Tx4 LOL\n");
+      if (pages[0][5] & 0x40) printf("\t\tL-Tx3 LOL\n");
+      if (pages[0][5] & 0x20) printf("\t\tL-Tx2 LOL\n");
+      if (pages[0][5] & 0x10) printf("\t\tL-Tx1 LOL\n");
+      if (pages[0][5] & 0x08) printf("\t\tL-Rx4 LOL\n");
+      if (pages[0][5] & 0x04) printf("\t\tL-Rx3 LOL\n");
+      if (pages[0][5] & 0x02) printf("\t\tL-Rx2 LOL\n");
+      if (pages[0][5] & 0x01) printf("\t\tL-Rx1 LOL\n");
+
+      if (pages[0][6] & 0x80) printf("\t\tL-Temp High Alarm\n");
+      if (pages[0][6] & 0x40) printf("\t\tL-Temp Low Alarm\n");
+      if (pages[0][6] & 0x20) printf("\t\tL-Temp High Warning\n");
+      if (pages[0][6] & 0x10) printf("\t\tL-Temp Low Warning\n");
+      if (pages[0][6] & 0x08) printf("\t\tReserved\n");
+      if (pages[0][6] & 0x04) printf("\t\tReserved\n");
+      if (pages[0][6] & 0x02) printf("\t\tTC readiness flag\n");
+      if (pages[0][6] & 0x01) printf("\t\tInitialization complete flag\n");
+
+      if (pages[0][7] & 0x80) printf("\t\tL-Vcc High Alarm\n");
+      if (pages[0][7] & 0x40) printf("\t\tL-Vcc Low Alarm\n");
+      if (pages[0][7] & 0x20) printf("\t\tL-Vcc High Warning\n");
+      if (pages[0][7] & 0x10) printf("\t\tL-Vcc Low Warning\n");
+      if (pages[0][7] & 0x08) printf("\t\tReserved\n");
+      if (pages[0][7] & 0x04) printf("\t\tReserved\n");
+      if (pages[0][7] & 0x02) printf("\t\tReserved\n");
+      if (pages[0][7] & 0x01) printf("\t\tReserved\n");
+
+      if (pages[0][8] & 0x80) printf("\t\tVendor Specific 0x80\n");
+      if (pages[0][8] & 0x40) printf("\t\tVendor Specific 0x40\n");
+      if (pages[0][8] & 0x20) printf("\t\tVendor Specific 0x20\n");
+      if (pages[0][8] & 0x10) printf("\t\tVendor Specific 0x10\n");
+      if (pages[0][8] & 0x08) printf("\t\tVendor Specific 0x08\n");
+      if (pages[0][8] & 0x04) printf("\t\tVendor Specific 0x04\n");
+      if (pages[0][8] & 0x02) printf("\t\tVendor Specific 0x02\n");
+      if (pages[0][8] & 0x01) printf("\t\tVendor Specific 0x01\n");
+
+      if (pages[0][9] & 0x80) printf("\t\tL-Rx1 Power High Alarm\n");
+      if (pages[0][9] & 0x40) printf("\t\tL-Rx1 Power Low Alarm\n");
+      if (pages[0][9] & 0x20) printf("\t\tL-Rx1 Power High Warning\n");
+      if (pages[0][9] & 0x10) printf("\t\tL-Rx1 Power Low Warning\n");
+      if (pages[0][9] & 0x08) printf("\t\tL-Rx2 Power High Alarm\n");
+      if (pages[0][9] & 0x04) printf("\t\tL-Rx2 Power Low Alarm\n");
+      if (pages[0][9] & 0x02) printf("\t\tL-Rx2 Power High Warning\n");
+      if (pages[0][9] & 0x01) printf("\t\tL-Rx2 Power Low Warning\n");
+
+      if (pages[0][10] & 0x80) printf("\t\tL-Rx3 Power High Alarm\n");
+      if (pages[0][10] & 0x40) printf("\t\tL-Rx3 Power Low Alarm\n");
+      if (pages[0][10] & 0x20) printf("\t\tL-Rx3 Power High Warning\n");
+      if (pages[0][10] & 0x10) printf("\t\tL-Rx3 Power Low Warning\n");
+      if (pages[0][10] & 0x08) printf("\t\tL-Rx4 Power High Alarm\n");
+      if (pages[0][10] & 0x04) printf("\t\tL-Rx4 Power Low Alarm\n");
+      if (pages[0][10] & 0x02) printf("\t\tL-Rx4 Power High Warning\n");
+      if (pages[0][10] & 0x01) printf("\t\tL-Rx4 Power Low Warning\n");
+
+      if (pages[0][11] & 0x80) printf("\t\tL-Tx1 Bias High Alarm\n");
+      if (pages[0][11] & 0x40) printf("\t\tL-Tx1 Bias Low Alarm\n");
+      if (pages[0][11] & 0x20) printf("\t\tL-Tx1 Bias High Warning\n");
+      if (pages[0][11] & 0x10) printf("\t\tL-Tx1 Bias Low Warning\n");
+      if (pages[0][11] & 0x08) printf("\t\tL-Tx2 Bias High Alarm\n");
+      if (pages[0][11] & 0x04) printf("\t\tL-Tx2 Bias Low Alarm\n");
+      if (pages[0][11] & 0x02) printf("\t\tL-Tx2 Bias High Warning\n");
+      if (pages[0][11] & 0x01) printf("\t\tL-Tx2 Bias Low Warning\n");
+
+      if (pages[0][12] & 0x80) printf("\t\tL-Tx3 Bias High Alarm\n");
+      if (pages[0][12] & 0x40) printf("\t\tL-Tx3 Bias Low Alarm\n");
+      if (pages[0][12] & 0x20) printf("\t\tL-Tx3 Bias High Warning\n");
+      if (pages[0][12] & 0x10) printf("\t\tL-Tx3 Bias Low Warning\n");
+      if (pages[0][12] & 0x08) printf("\t\tL-Tx4 Bias High Alarm\n");
+      if (pages[0][12] & 0x04) printf("\t\tL-Tx4 Bias Low Alarm\n");
+      if (pages[0][12] & 0x02) printf("\t\tL-Tx4 Bias High Warning\n");
+      if (pages[0][12] & 0x01) printf("\t\tL-Tx4 Bias Low Warning\n");
+
+      if (pages[0][13] & 0x80) printf("\t\tL-Tx1 Power High Alarm\n");
+      if (pages[0][13] & 0x40) printf("\t\tL-Tx1 Power Low Alarm\n");
+      if (pages[0][13] & 0x20) printf("\t\tL-Tx1 Power High Warning\n");
+      if (pages[0][13] & 0x10) printf("\t\tL-Tx1 Power Low Warning\n");
+      if (pages[0][13] & 0x08) printf("\t\tL-Tx2 Power High Alarm\n");
+      if (pages[0][13] & 0x04) printf("\t\tL-Tx2 Power Low Alarm\n");
+      if (pages[0][13] & 0x02) printf("\t\tL-Tx2 Power High Warning\n");
+      if (pages[0][13] & 0x01) printf("\t\tL-Tx2 Power Low Warning\n");
+
+      if (pages[0][14] & 0x80) printf("\t\tL-Tx3 Power High Alarm\n");
+      if (pages[0][14] & 0x40) printf("\t\tL-Tx3 Power Low Alarm\n");
+      if (pages[0][14] & 0x20) printf("\t\tL-Tx3 Power High Warning\n");
+      if (pages[0][14] & 0x10) printf("\t\tL-Tx3 Power Low Warning\n");
+      if (pages[0][14] & 0x08) printf("\t\tL-Tx4 Power High Alarm\n");
+      if (pages[0][14] & 0x04) printf("\t\tL-Tx4 Power Low Alarm\n");
+      if (pages[0][14] & 0x02) printf("\t\tL-Tx4 Power High Warning\n");
+      if (pages[0][14] & 0x01) printf("\t\tL-Tx4 Power Low Warning\n");
+    }
+
+    printf("\tTemperature: %5.2f C\n", (float)((int16_t)((pages[0][22] << 8) | pages[0][23])) / 256.0f);
+    printf("\tSupply Voltage: %4.2f V\n", (float)((uint16_t)((pages[0][26] << 8) | pages[0][27])) * 100.0f / 1000000.0f);
+
+    printf("\tChannel Monitors:\n");
+    float rx1_p = (float)((uint16_t)((pages[0][34] << 8) | pages[0][35])) / 10.0f / 1000.0f;
+    float rx2_p = (float)((uint16_t)((pages[0][36] << 8) | pages[0][37])) / 10.0f / 1000.0f;
+    float rx3_p = (float)((uint16_t)((pages[0][38] << 8) | pages[0][39])) / 10.0f / 1000.0f;
+    float rx4_p = (float)((uint16_t)((pages[0][40] << 8) | pages[0][41])) / 10.0f / 1000.0f;
+    float rx1_dbm = 10.0f * log10f(rx1_p);
+    float rx2_dbm = 10.0f * log10f(rx2_p);
+    float rx3_dbm = 10.0f * log10f(rx3_p);
+    float rx4_dbm = 10.0f * log10f(rx4_p);
+    printf("\t\tRx1 input power : %5.2f mW (%5.2f dBm)\n", rx1_p, rx1_dbm);
+    printf("\t\tRx2 input power : %5.2f mW (%5.2f dBm)\n", rx2_p, rx2_dbm);
+    printf("\t\tRx3 input power : %5.2f mW (%5.2f dBm)\n", rx3_p, rx3_dbm);
+    printf("\t\tRx4 input power : %5.2f mW (%5.2f dBm)\n", rx4_p, rx4_dbm);
+
+    float tx1_bias = (float)((uint16_t)((pages[0][42] << 8) | pages[0][43])) * 2.0f / 1000.0f;
+    float tx2_bias = (float)((uint16_t)((pages[0][44] << 8) | pages[0][45])) * 2.0f / 1000.0f;
+    float tx3_bias = (float)((uint16_t)((pages[0][46] << 8) | pages[0][47])) * 2.0f / 1000.0f;
+    float tx4_bias = (float)((uint16_t)((pages[0][48] << 8) | pages[0][49])) * 2.0f / 1000.0f;
+    printf("\t\tTx1 bias        : %5.2f mA\n", tx1_bias);
+    printf("\t\tTx2 bias        : %5.2f mA\n", tx2_bias);
+    printf("\t\tTx3 bias        : %5.2f mA\n", tx3_bias);
+    printf("\t\tTx4 bias        : %5.2f mA\n", tx4_bias);
+
+    float tx1_p = (float)((uint16_t)((pages[0][50] << 8) | pages[0][51])) / 10.0f / 1000.0f;
+    float tx2_p = (float)((uint16_t)((pages[0][52] << 8) | pages[0][53])) / 10.0f / 1000.0f;
+    float tx3_p = (float)((uint16_t)((pages[0][54] << 8) | pages[0][55])) / 10.0f / 1000.0f;
+    float tx4_p = (float)((uint16_t)((pages[0][56] << 8) | pages[0][57])) / 10.0f / 1000.0f;
+    float tx1_dbm = 10.0f * log10f(tx1_p);
+    float tx2_dbm = 10.0f * log10f(tx2_p);
+    float tx3_dbm = 10.0f * log10f(tx3_p);
+    float tx4_dbm = 10.0f * log10f(tx4_p);
+    printf("\t\tTx1 output power: %5.2f mW (%5.2f dBm)\n", tx1_p, tx1_dbm);
+    printf("\t\tTx2 output power: %5.2f mW (%5.2f dBm)\n", tx2_p, tx2_dbm);
+    printf("\t\tTx3 output power: %5.2f mW (%5.2f dBm)\n", tx3_p, tx3_dbm);
+    printf("\t\tTx4 output power: %5.2f mW (%5.2f dBm)\n", tx4_p, tx4_dbm);
   }
 
   // Read upper page 0
   printf("Cage %u Page 0 Upper\n", cage_sel);
-  read_ok = read_qsfp_page(cms, cage_sel, 0, true, 0, rsp_buf);
+  read_ok = read_qsfp_page(cms, cage_sel, 0, true, 0, &pages[0][128]);
   if (!read_ok) {
     printf("\tRead Failed\n");
   } else {
-    printf("\tIdentifer:           %s\n", sff_identifier_to_string(rsp_buf[0]));
+    printf("\tIdentifer:           %s\n", sff_identifier_to_string(pages[0][128]));
 
     printf("\tExtended Identifier:\n");
-    printf("\t\tCLEI Code Present: %s\n", (rsp_buf[1] & 0x10) ? "Yes" : "No");
-    printf("\t\tCDR in Tx        : %s\n", (rsp_buf[1] & 0x08) ? "Present" : "Not Present");
-    printf("\t\tCDR in Rx        : %s\n", (rsp_buf[1] & 0x04) ? "Present" : "Not Present");
-    printf("\t\tPower Class 1-4  : %s\n", sff_power_class_1to4_to_string((rsp_buf[1] & 0xC0) >> 6));
-    printf("\t\tPower Class 4-7  : %s\n", sff_power_class_4to7_to_string((rsp_buf[1] & 0x03) >> 0));
-    printf("\t\tPower Class 8    : %s\n", (rsp_buf[1] & 0x20) ? "Power Class 8 implemented" : "No");
+    printf("\t\tCLEI Code Present: %s\n", (pages[0][129] & 0x10) ? "Yes" : "No");
+    printf("\t\tCDR in Tx        : %s\n", (pages[0][129] & 0x08) ? "Present" : "Not Present");
+    printf("\t\tCDR in Rx        : %s\n", (pages[0][129] & 0x04) ? "Present" : "Not Present");
+    printf("\t\tPower Class 1-4  : %s\n", sff_power_class_1to4_to_string((pages[0][129] & 0xC0) >> 6));
+    printf("\t\tPower Class 4-7  : %s\n", sff_power_class_4to7_to_string((pages[0][129] & 0x03) >> 0));
+    printf("\t\tPower Class 8    : %s\n", (pages[0][129] & 0x20) ? "Power Class 8 implemented" : "No");
 
+    printf("\tConnector Type: %s\n", sff_connector_type_to_string(pages[0][130]));
     printf("\tSpec Compliance:\n");
-    if (rsp_buf[3] & 0x80) printf("\t\tExtended\n");
-    if (rsp_buf[3] & 0x40) printf("\t\t10GBASE-LRM\n");
-    if (rsp_buf[3] & 0x20) printf("\t\t10GBASE-LR\n");
-    if (rsp_buf[3] & 0x10) printf("\t\t10GBASE-SR\n");
-    if (rsp_buf[3] & 0x08) printf("\t\t40GBASE-CR4\n");
-    if (rsp_buf[3] & 0x04) printf("\t\t40GBASE-SR4\n");
-    if (rsp_buf[3] & 0x02) printf("\t\t40GBASE-LR4\n");
-    if (rsp_buf[3] & 0x01) printf("\t\t40G Active Cable (XLPPI)\n");
+    if (pages[0][131] & 0x80) printf("\t\tExtended\n");
+    if (pages[0][131] & 0x40) printf("\t\t10GBASE-LRM\n");
+    if (pages[0][131] & 0x20) printf("\t\t10GBASE-LR\n");
+    if (pages[0][131] & 0x10) printf("\t\t10GBASE-SR\n");
+    if (pages[0][131] & 0x08) printf("\t\t40GBASE-CR4\n");
+    if (pages[0][131] & 0x04) printf("\t\t40GBASE-SR4\n");
+    if (pages[0][131] & 0x02) printf("\t\t40GBASE-LR4\n");
+    if (pages[0][131] & 0x01) printf("\t\t40G Active Cable (XLPPI)\n");
 
     // Skipped Spec Compliance for SONET, SAS/SATA, GigE, FC
 
-    printf("\tExtended Spec Compliance: %s\n", sff_extended_spec_compliance_to_string(rsp_buf[64]));
+    printf("\tEncoding: %s\n", sff_encoding_to_string(pages[0][138]));
+    printf("\tNominal Signalling Rate: ");
+    if (pages[0][139] == 0) {
+      printf("Not Specified (see Module Technology)\n");
+    } else if (pages[0][139] == 0xFF) {
+      printf("Exceeds 25.4 GBd (see 222)\n");
+    } else {
+      printf("%u MBd\n", pages[0][139] * 100);
+    }
+
+    printf("\tExtended Spec Compliance: %s\n", sff_extended_spec_compliance_to_string(pages[0][192]));
+
+    printf("\tLength: %3u km  (SMF)\n", pages[0][142]);
+    printf("\tLength: %3u m   (OM3 50um)\n", pages[0][143] * 2);
+    printf("\tLength: %3u m   (OM2 50um)\n", pages[0][144]);
+    printf("\tLength: %3u m   (OM1 62.5um)\n", pages[0][145]);
+    printf("\tLoss:   %3u dB  (Copper Cable Attenuation at 25.78 GHz)\n", pages[0][145]);
+    printf("\tLength: %3u m   (passive copper or active cable)\n", pages[0][146]);
+    printf("\tLength: %3u m   (OM4 50um)\n", pages[0][146] * 2);
+
+    printf("\tDevice Technology: %s\n", sff_transmitter_technology_to_string((pages[0][147] & 0xF0) >> 4));
+    printf("\t\t%s Wavelength Control\n", (pages[0][147] & 0x8) ? "Active" : "No");
+    printf("\t\t%s Transmitter Device\n", (pages[0][147] & 0x4) ? "Cooled" : "Uncooled");
+    printf("\t\t%s Detector\n", (pages[0][147] & 0x2) ? "APD" : "Pin");
+    printf("\t\tTransmitter %s Tunable\n", (pages[0][147] & 0x1) ? "" : "Not");
 
     printf("\tVendor Name: ");
     for (int i = 0; i < 16; i++) {
-      printf("%c", rsp_buf[20+i]);
+      printf("%c", pages[0][148+i]);
     }
     printf("\n");
 
-    printf("\tVendor OUI:  %02x:%02x:%02x\n", rsp_buf[37], rsp_buf[38], rsp_buf[39]);
+    printf("\tVendor OUI:  %02x:%02x:%02x\n", pages[0][165], pages[0][166], pages[0][167]);
 
     printf("\tVendor PN  : ");
     for (int i = 0; i < 16; i++) {
-      printf("%c", rsp_buf[40+i]);
+      printf("%c", pages[0][168+i]);
     }
     printf("\n");
 
     printf("\tVendor Rev : ");
     for (int i = 0; i < 2; i++) {
-      printf("%c", rsp_buf[56+i]);
+      printf("%c", pages[0][184+i]);
     }
     printf("\n");
 
     printf("\tVendor SN  : ");
     for (int i = 0; i < 16; i++) {
-      printf("%c", rsp_buf[68+i]);
+      printf("%c", pages[0][196+i]);
     }
     printf("\n");
+
+    printf("\tDate Code  : 20%c%c-%c%c-%c%c Lot %c%c\n",
+	   pages[0][212], pages[0][213],
+	   pages[0][214], pages[0][215],
+	   pages[0][216], pages[0][217],
+	   pages[0][218], pages[0][219]);
+
+    printf("\tMaximum Case Temperature: ");
+    if (pages[0][190] == 0) {
+      printf("70 C\n");
+    } else {
+      printf("%u C\n", pages[0][190]);
+    }
+
+    printf("\tCC_BASE: 0x%02x", pages[0][191]);
+    uint16_t cksum = 0;
+    for (int i = 128; i < 191; i++) {
+      cksum += pages[0][i];
+    }
+    if ((cksum & 0xFF) == pages[0][191]) {
+      printf (" (OK)\n");
+    } else {
+      printf (" (Corrupt)\n");
+    }
+
+    printf("\tOptions:\n");
+    if (pages[0][193] & 0x80) printf ("\t\t??? Reserved bit set\n");
+    if (pages[0][193] & 0x40) printf ("\t\tLPMode/TxDis input signal is configurable using byte 99, bit 1\n");
+    if (pages[0][193] & 0x20) printf ("\t\tIntL/RxLOSL output signal is configurable using byte 99, bit 0\n");
+    if (pages[0][193] & 0x10) printf ("\t\tTx input adaptive equalizers freeze capable\n");
+    if (pages[0][193] & 0x08) printf ("\t\tTx input equalizers auto-adaptive capable\n");
+    if (pages[0][193] & 0x04) printf ("\t\tTx input equalizers fixed-programmable settings\n");
+    if (pages[0][193] & 0x02) printf ("\t\tRx output emphasis fixed-programmable settings\n");
+    if (pages[0][193] & 0x01) printf ("\t\tRx output amplitude fixed-programmable settings\n");
+
+    if (pages[0][194] & 0x80) printf ("\t\tTx CDR On/Off Control implemented\n");
+    if (pages[0][194] & 0x40) printf ("\t\tRx CDR On/Off Control implemented\n");
+    if (pages[0][194] & 0x20) printf ("\t\tTx CDR Loss of Lock (LOL) flag implemented\n");
+    if (pages[0][194] & 0x10) printf ("\t\tRx CDR Loss of Lock (LOL) flag implemented\n");
+    if (pages[0][194] & 0x08) printf ("\t\tRx Squelch Disable implemented\n");
+    if (pages[0][194] & 0x04) printf ("\t\tRx Output Disable implemented\n");
+    if (pages[0][194] & 0x02) printf ("\t\tTx Squelch Disable implemented\n");
+    if (pages[0][194] & 0x01) {
+      printf ("\t\tTx Squelch implemented\n");
+      printf ("\t\tTx Squelch implemented to reduce %s\n", (pages[0][195] & 0x04) ? "Pave" : "OMA");
+    }
+
+    if (pages[0][195] & 0x80) printf ("\t\tMemory Page 02h provided\n");
+    if (pages[0][195] & 0x40) printf ("\t\tMemory Page 01h provided\n");
+    if (pages[0][195] & 0x20) printf ("\t\tRate select is implemented as defined in 6.2.7\n");
+    if (pages[0][195] & 0x10) printf ("\t\tTx_Disable is implemented and disables the serial output\n");
+    if (pages[0][195] & 0x08) printf ("\t\tTx_Fault signal implemented\n");
+    // 0x04 handled as sub-element of Tx Squelch above
+    if (pages[0][195] & 0x02) printf ("\t\tTx Loss of Signal implemented\n");
+    if (pages[0][195] & 0x01) printf ("\t\tPages 20-21h implemented\n");
+
+    printf("\tDiagnostic Monitoring Type:\n");
+    if (pages[0][220] & 0x20) printf ("\t\tTemperature monitoring implemented\n");
+    if (pages[0][220] & 0x10) printf ("\t\tSupply voltage monitoring implemented\n");
+    printf("\t\tReceived power measurements %s\n", (pages[0][220] & 0x08) ? "Average Power" : "OMA");
+    if (pages[0][220] & 0x04) printf ("\t\tTransmitter power measurement\n");
+
+    printf("\tEnhanced Options:\n");
+    if (pages[0][221] & 0x10) printf ("\t\tInitialization Complete Flag implemented\n");
+    if (pages[0][221] & 0x08) printf ("\t\tExtended Rate Selection\n");
+    // 0x04 is reserved
+    if (pages[0][221] & 0x02) printf ("\t\tTC readiness flag implemented\n");
+    if (pages[0][221] & 0x01) printf ("\t\tSoftware reset is implemented\n");
+
+    printf("\tExtended Baud Rate: %u MBd\n", pages[0][222] * 250);
+
+    printf("\tCC_EXT: 0x%02x", pages[0][223]);
+    uint16_t cksum_ext = 0;
+    for (int i = 192; i < 223; i++) {
+      cksum_ext += pages[0][i];
+    }
+    if ((cksum_ext & 0xFF) == pages[0][223]) {
+      printf (" (OK)\n");
+    } else {
+      printf (" (Corrupt)\n");
+    }
+  }
+
+  // Check if Page 01h is provided by checking the relevant Option bit
+  if (pages[0][195] & 0x40) {
+    printf ("Cage %u Page 01h is provided by this device but not read or decoded by this tool\n", cage_sel);
+  } else {
+    printf ("Cage %u Page 01h is not provided by this device\n", cage_sel);
+  }
+
+  if (pages[0][195] & 0x80) {
+    printf ("Cage %u Page 02h is provided by this device but not read or decoded by this tool\n", cage_sel);
+  } else {
+    printf ("Cage %u Page 02h is not provided by this device\n", cage_sel);
+  }
+
+  // Check if Page 3 is supported by checking the "Paging" bit
+  if (!(pages[0][2] & 0x4)) {
+    printf("Cage %u Page 3 Upper\n", cage_sel);
+    read_ok = read_qsfp_page(cms, cage_sel, 3, true, 0, &pages[3][128]);
+    if (!read_ok) {
+      printf("\tRead Failed\n");
+    } else {
+      // TODO Decode page 3
+    }
+  } else {
+    printf ("Cage %u Page 03h is not provided by this device\n", cage_sel);
   }
 }
 
