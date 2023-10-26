@@ -339,7 +339,7 @@ services:
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev/vfio:/dev/vfio
-      - ${SN_STACK_ROOT-${PWD}}/smartnic-vfio-unlock/scripts:/scripts
+      - ${SN_STACK_ROOT-${PWD}}/smartnic-vfio-unlock/scripts:/scripts:ro
     entrypoint:
       - /bin/bash
       - -c
