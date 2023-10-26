@@ -85,7 +85,7 @@ bool cmac_rsfec_enable(volatile struct cmac_block * cmac) {
   cmac->rsfec_conf_ind_correction._v = rsfec_conf_ind_correction._v;
 
   union cmac_rsfec_conf_enable rsfec_conf_enable = {
-    .ctl_rsfec_enable = 1,
+    .ctl_tx_rsfec_enable = 1,
     .ctl_rx_rsfec_enable = 1,
   };
   cmac->rsfec_conf_enable._v = rsfec_conf_enable._v;
@@ -106,7 +106,7 @@ bool cmac_rsfec_disable(volatile struct cmac_block * cmac) {
   cmac->rsfec_conf_ind_correction._v = rsfec_conf_ind_correction._v;
 
   union cmac_rsfec_conf_enable rsfec_conf_enable = {
-    .ctl_rsfec_enable = 0,
+    .ctl_tx_rsfec_enable = 0,
     .ctl_rx_rsfec_enable = 0,
   };
   cmac->rsfec_conf_enable._v = rsfec_conf_enable._v;

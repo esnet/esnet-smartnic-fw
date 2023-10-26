@@ -144,7 +144,7 @@ static void print_cmac_status(volatile struct cmac_block * cmac, bool verbose)
 
   printf("  Tx (MAC %s/RS-FEC %s/PHY %s -> %s)  %s\n",
          conf_tx.ctl_tx_enable ? "Enabled" : "Disabled",
-	 rsfec_conf.ctl_rsfec_enable ? "On" : "Off",
+	 rsfec_conf.ctl_tx_rsfec_enable ? "On" : "Off",
          tx_status[0]._v == 0 ? "UP" : "DOWN",
          tx_status[1]._v == 0 ? "UP" : "DOWN",
 	 gt_loopback ? "PMA LOOPBACK ON" : "");
