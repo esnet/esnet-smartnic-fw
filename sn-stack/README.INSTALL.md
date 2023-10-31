@@ -459,7 +459,7 @@ sn-p4-cli p4bm-apply <filename>
 ```
 
 Supported actions within the p4bm file are:
-* `table_insert <table-name> <action-name> <match-expr> => <param-expr> [priority]`
+* `table_add <table-name> <action-name> <match-expr> => <param-expr> [priority]`
   * Insert a rule
 * `clear_all`
   * Clear all rules from all tables
