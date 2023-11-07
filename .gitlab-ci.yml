@@ -3,12 +3,16 @@ include:
   - template: 'Workflows/Branch-Pipelines.gitlab-ci.yml'
   - project: 'security/container-scanning'
     file: '.ESnet-container-scan.yml'
+  - project: 'ht/cicd-common'
+    ref: 'main'
+    file: 'smartnic-ansible.yml'
 
 stages:
   - pull_sn_hw
   - build
   - test
   - push
+  - review
   - trigger_downstream
 
 variables:
@@ -204,6 +208,34 @@ wharf_release:
   timeout: 1h
   needs:
     - package
+
+review:
+  extends: .ansible_stack_start
+  stage: review
+  environment:
+    name: review/${AAP_LIMIT}
+    url: ssh://${AAP_LIMIT}
+    action: start
+  parallel:
+    matrix:
+      - AAP_LIMIT:
+          - ht-dev1-mgt.es.net
+          - ht-dev2-mgt.es.net
+          - ht-dev3-mgt.es.net
+  variables:
+    ARTIFACT_JOB_ID: ${SN_FW_API_JOB_NUMBER}
+    # host, hostgroup or list of hosts
+    # AAP_LIMIT: # from parallel matrix
+    # AAP job template
+    AAP_JOB_TEMPLATE: 458
+    # AAP_TOKEN: from gitlab variables
+    # AAP_HOST:  from gitlab variables
+  rules:
+    - when: manual
+      allow_failure: true
+  needs:
+    - package
+    - wharf_release
 
 # This is an unfortunate hack to workaround downstream SW build failures.
 #
