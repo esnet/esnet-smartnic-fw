@@ -6,6 +6,9 @@ include:
   - project: 'ht/cicd-common'
     ref: 'main'
     file: 'smartnic-ansible.yml'
+  - project: 'ht/cicd-common'
+    ref: 'main'
+    file: 'harbor-cve.yml'
 
 stages:
   - pull_sn_hw
@@ -108,9 +111,17 @@ pull_sn_hw:
   services:
     - docker:20.10.21-dind
 
+pull_cve_allowlist:
+  extends: .harbor_cve_allowlist
+
 container_scanning:
   variables:
     CS_IMAGE: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
+  # use 'dependencies' here rather than 'needs' since the gitlab container scanning
+  # include sets 'dependencies: []' which takes precedence over 'needs'
+  dependencies:
+    - pull_cve_allowlist
+    - package
 
 package:
   extends:
