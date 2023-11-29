@@ -101,5 +101,8 @@ SN_HW_APP_NAME=${SN_HW_APP_NAME}
 SN_HW_VER=${SN_HW_VER}
 EOF
 
+# Install test automation packages.
+RUN pip3 install --no-deps --requirement=sn-stack/test/pip-requirements.txt
+
 WORKDIR /
 CMD ["/bin/bash", "-l"]
