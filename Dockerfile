@@ -71,7 +71,7 @@ ENV SN_FW_BRANCH ${SN_FW_BRANCH}
 ENV SN_FW_APP_NAME ${SN_FW_APP_NAME}
 ENV SN_FW_VER ${SN_FW_VER}
 
-COPY ${PWD} /sn-fw/source
+COPY . /sn-fw/source
 WORKDIR /sn-fw/source
 
 RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
