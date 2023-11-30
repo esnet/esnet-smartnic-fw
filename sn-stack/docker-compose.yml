@@ -228,7 +228,6 @@ services:
       - smartnic-mgr-user
       - smartnic-mgr-vfio-unlock
       - smartnic-no-vfio
-      - smartnic-test
 
   smartnic-devunbind:
     <<: *smartnic-fw-service
@@ -456,9 +455,6 @@ services:
     <<: *smartnic-fw-service
     restart: no
     hostname: smartnic-fw
-    depends_on:
-      smartnic-hw:
-        condition: service_healthy
     init: true
     user: root
     privileged: true
