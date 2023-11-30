@@ -71,7 +71,7 @@ ENV SN_FW_BRANCH ${SN_FW_BRANCH}
 ENV SN_FW_APP_NAME ${SN_FW_APP_NAME}
 ENV SN_FW_VER ${SN_FW_VER}
 
-COPY ${PWD} /sn-fw/source
+COPY . /sn-fw/source
 WORKDIR /sn-fw/source
 
 RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
@@ -100,6 +100,9 @@ SN_HW_BOARD=${SN_HW_BOARD}
 SN_HW_APP_NAME=${SN_HW_APP_NAME}
 SN_HW_VER=${SN_HW_VER}
 EOF
+
+# Install test automation packages.
+RUN pip3 install --no-deps --requirement=sn-stack/test/pip-requirements.txt
 
 WORKDIR /
 CMD ["/bin/bash", "-l"]

@@ -451,6 +451,32 @@ services:
       - smartnic-mgr-vfio-unlock
       - smartnic-no-vfio
 
+  smartnic-fw-test:
+    <<: *smartnic-fw-service
+    restart: no
+    hostname: smartnic-fw
+    init: true
+    user: root
+    privileged: true
+    environment:
+      - REGIO_SELECT=$FPGA_PCIE_DEV.0
+      - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
+      - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
+      - SN_P4_CLI_SERVER=smartnic-p4
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      - /sys/bus/pci:/sys/bus/pci
+      - /dev:/dev
+      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+      - ${SN_STACK_ROOT-${PWD}}/test:/test:ro
+    entrypoint:
+      - robot
+      - --pythonpath=/test/library
+      - --outputdir=/scratch
+      - /test/suites
+    profiles:
+      - smartnic-test
+
 volumes:
   # NOTE: If you're about to add a bind mount here and give it a name so that you don't repeat it
   #       in multiple service volume lists, STOP.  There is a subtle bug in the docker daemon where
