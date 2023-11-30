@@ -471,9 +471,7 @@ services:
       - ${SN_STACK_ROOT-${PWD}}/test:/test:ro
     entrypoint:
       - robot
-      - --pythonpath=/test/library
-      - --outputdir=/scratch
-      - /test/suites
+      - --argumentfile=/test/robot-arguments.txt
     profiles:
       - smartnic-test
 

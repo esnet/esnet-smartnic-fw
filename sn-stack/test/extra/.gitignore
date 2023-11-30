@@ -1,0 +1,5 @@
+# This directory should only be used for staging extra Robot Framework test
+# suites and library files added either manually by symlink to an external
+# source tree or during a build when extracting an FPGA artifact package.
+*
+!.gitignore

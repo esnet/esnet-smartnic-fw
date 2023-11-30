@@ -136,8 +136,8 @@ package:
     SN_FW_APP_NAME: ${SN_HW_APP_NAME}
     SN_FW_VER: ${CI_PIPELINE_ID}
   before_script:
-    # Install bash
-    - apk add bash
+    # Install bash and GNU find (with full regex support).
+    - apk add bash findutils
   script:
     # Auth with gitlab container registry
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY

@@ -101,8 +101,12 @@ SN_HW_APP_NAME=${SN_HW_APP_NAME}
 SN_HW_VER=${SN_HW_VER}
 EOF
 
-# Install test automation packages.
-RUN pip3 install --no-deps --requirement=sn-stack/test/pip-requirements.txt
+# Install Python dependencies for the test automation libraries.
+RUN <<EOF
+    for req in $(find sn-stack/test -type f -name pip-requirements.txt); do
+        pip3 install --no-deps --requirement="${req}"
+    done
+EOF
 
 # Install the MinIO client command line tool.
 ADD \

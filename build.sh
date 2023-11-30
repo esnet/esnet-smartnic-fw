@@ -3,6 +3,8 @@
 #       as such, needs to find bash at a different path than where it is
 #       in ubuntu.  The indirection through /usr/bin/env is required.
 
+this_dir=$(dirname $(readlink -f "$0"))
+
 # By default, point to a user dev image in the local registry
 DEFAULT_IMAGE_URI="esnet-smartnic-fw:${USER}-dev"
 
@@ -72,6 +74,48 @@ SN_FW_REPO="${SN_FW_REPO:-unset}"
 SN_FW_BRANCH="${SN_FW_BRANCH:-unset}"
 SN_FW_APP_NAME="${SN_FW_APP_NAME:-unset}"
 SN_FW_VER="${SN_FW_VER:-unset}"
+
+# Install the Robot Framework directory tree from the upstream pipeline.
+artifacts="${this_dir}/sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip"
+
+test_dir="${this_dir}/sn-stack/test"
+extra_dir="${test_dir}/extra"
+app_dir="${extra_dir}/${SN_HW_APP_NAME}"
+
+# If the application's test directory is a symlink, assume a developer is
+# actively working on tests and ignore any extras from the artifacts. If
+# the path exists and isn't a symlink, assume it's left over from a previous
+# build and replace it.
+if [ ! -h "${app_dir}" ]; then
+    rm -rf "${app_dir}"
+
+    # NOTE:
+    #     The busybox version of "unzip -t <zip-file> <target-file>" from the
+    #     alpine linux container exits with 0 even when <target-file> isn't
+    #     present in the <zip-file>. To work around this, the extraction is
+    #     performed unconditionally and the existence of the target is tested
+    #     afterwards instead.
+    robot_ar_base='robot-framework-test.tar.bz2'
+    robot_ar="${extra_dir}/${robot_ar_base}"
+
+    unzip "${artifacts}" "${robot_ar_base}" -d "${extra_dir}"
+    if [ -e "${robot_ar}" ]; then
+        # Extract the application's test suites and library.
+        mkdir "${app_dir}"
+        tar -xf "${robot_ar}" -C "${app_dir}"
+        _rc=$?
+        if [ ${_rc} -ne 0 ]; then
+            echo "ERROR[${_rc}]: Failed to extract Robot Framework tests."
+            exit 1
+        fi
+
+        # Cleanup.
+        rm "${robot_ar}"
+    fi
+fi
+
+# Generate helper files for executing tests.
+${test_dir}/generate-helpers.sh
 
 # Build the image
 export DOCKER_BUILDKIT=1
