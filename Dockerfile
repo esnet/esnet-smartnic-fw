@@ -104,5 +104,11 @@ EOF
 # Install test automation packages.
 RUN pip3 install --no-deps --requirement=sn-stack/test/pip-requirements.txt
 
+# Install the MinIO client command line tool.
+ADD \
+    --chmod=755 \
+    https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2023-11-20T16-30-59Z \
+    /usr/local/bin/mc
+
 WORKDIR /
 CMD ["/bin/bash", "-l"]
