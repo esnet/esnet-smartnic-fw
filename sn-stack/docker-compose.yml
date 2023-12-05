@@ -454,7 +454,7 @@ services:
   smartnic-fw-test:
     <<: *smartnic-fw-service
     restart: no
-    hostname: smartnic-fw
+    hostname: smartnic-fw-test
     init: true
     user: root
     privileged: true
