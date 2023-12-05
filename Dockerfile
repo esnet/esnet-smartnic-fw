@@ -101,9 +101,14 @@ SN_HW_APP_NAME=${SN_HW_APP_NAME}
 SN_HW_VER=${SN_HW_VER}
 EOF
 
-# Install Python dependencies for the test automation libraries.
+# Setup the test automation framework.
+WORKDIR sn-stack/test
 RUN <<EOF
-    for req in $(find sn-stack/test -type f -name pip-requirements.txt); do
+    mkdir /test
+    cp entrypoint.sh /test/.
+
+    # Install Python dependencies for the test automation libraries.
+    for req in $(find . -type f -name pip-requirements.txt); do
         pip3 install --no-deps --requirement="${req}"
     done
 EOF

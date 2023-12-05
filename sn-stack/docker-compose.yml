@@ -463,15 +463,14 @@ services:
       - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_CLI_SERVER=smartnic-p4
-      - PYTHONDONTWRITEBYTECODE=1
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
       - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
-      - ${SN_STACK_ROOT-${PWD}}/test:/test:ro
+      - ${SN_FW_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/fw}:/test/fw:ro
+      - ${SN_HW_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/hw}:/test/hw:ro
     entrypoint:
-      - robot
-      - --argumentfile=/test/robot-arguments.txt
+      - /test/entrypoint.sh
     profiles:
       - smartnic-test
 

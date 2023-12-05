@@ -568,15 +568,16 @@ root@smartnic-dpdk:/# pktgen -a $SN_PCIE_DEV.0 -a SN_PCIE_DEV.1 -l 4-8 -n 4 -d l
 
 Test Automation Framework
 =========================
-The `smartnic-fw-test` service incorporates the [Robot Framework](https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html) as an engine for executing test suites. The service mounts the `sn-stack/test` directory into the container as `/test`. The `suites` and `library` sub-directories contain the tests to be executed and the Python classes implementing the tests, respectively.
+The `smartnic-fw-test` service incorporates the [Robot Framework](https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html) as an engine for executing test suites. The service mounts the `sn-stack/test/fw` directory into the container as `/test/fw`. The `suites` and `library` sub-directories contain the tests to be executed and the Python classes implementing the tests, respectively.
 
-An application can optionally supply extra test suites and library. When the selected `sn-hw/artifacts.<board>.<app_name>.0.zip` archive contains a `robot-framework.tar.bz2` tarball, a new directory, named `sn-stack/test/extra/<app_name>`, will be created and the contents of the tarball extracted into it. The extra directory will be included into the `artifacts.esnet-smartnic-fw.package.0.zip` archive produced by a build of this repository.
+A hardware application can optionally supply their own test suites and library. When the selected `sn-hw/artifacts.<board>.<app_name>.0.zip` archive contains a `robot-framework.tar.bz2` tarball, the tarball will be extracted into the `sn-stack/test/hw` directory for inclusion into the `sn-stack` build artifact. This process will only be automatic during a Gitlab CI build, but can be manually performed by executing the `build-setup-hw-test.sh` script prior to running the `build.sh` script to build the container.
 
 A regular test run is started with:
 ```
 cd sn-stack
 ./test/run.sh
 ```
+Extra options can be passed to both the docker and robot command lines. Refer to `./test/run.sh --help` for details.
 
 A test run will produce three output files, located in `sn-stack/scratch`.
 - `report.html`: Summarizes a test execution run and provides links into the verbose `log.html` file.
@@ -586,17 +587,16 @@ A test run will produce three output files, located in `sn-stack/scratch`.
 Developing tests for automation
 -------------------------------
 There are two primary methods for developing tests:
-1. Without the `esnet-smartnic-fw` source tree.
+1. Direct.
 
-    This method requires only a standard deployment. Modifications to the existing test suites and libraries can be made directly to `sn-stack/test`. However, as the container can't be updated, changes are restricted to the set of Python packages that are currently installed into the container. Any need for new Python packages will require rebuilding the container.
+    With the direct method, the test source files within the `sn-stack` directory installed during deployment are modified in-place. While sufficient for making quick changes, this method is not recommended for longer term test development as it suffers from the possibility of losing all changes upon a re-deployment.
 
-1. With the `esnet-smartnic-fw` source tree.
+1. External.
 
-    This method requires a local copy of the source tree and the setup of the host environment for building the container (refer to the `README.md` at the top of the source tree). Since the container can be built, this method can add any new Python package dependencies as needed.
+    With the external method, a source tree containing test files is mounted into the container in place of the installed ones. This method is recommended for longer term test development as it allows keeping the sources separate and mitigates the danger of unexpected removals/overwrites.
 
-    This method also allows for adding extra tests by symbolically linking external directories into `sn-stack/test/extra`. Doing so allows keeping independent source trees separate from the base `esnet-smartnic-fw` sources. The caveat is due to a docker quirk that requires symbolic links to be relative in order for them to be properly mounted into the container. Otherwise, the `build.sh` script will handle setting up the container run-time environment to properly run the external extra tests.
+    This method makes use of extra environment variables to point the container startup at alternate paths. They are:
+    - `SN_FW_TEST_ROOT`: Path to alternate firmware test files to be mounted at `/test/fw` within the container.
+    - `SN_HW_TEST_ROOT`: Path to alternate hardware test files to be mounted at `/test/hw` within the container.
 
-A build of `esnet-smartnic-fw` will generate the following extra files under `sn-stack/test`:
-- `docker-arguments.txt`: This file contains command line arguments passed to docker by the `sn-stack/test/run.sh` script. It is created by the build and will be non-empty only when symlinks are found in `sn-stack/test/extra`. Manual edits to this file will be lost upon rebuild.
-- `pip-requirements.txt`: This file is a merge of all Python package dependencies from extra tests symlinked into the `sn-stack/test/extra` directory. This file is only used when building the docker container. Manual edits will be ignored.
-- `robot-arguments.txt`: This file contains command line arguments passed to the robot engine to execute a test run. Modifying this file will affect the flow of test execution. Manual edits to this file will be lost upon rebuild.
+In both cases, any new Python package dependencies added to a pip-requirements.txt file will be installed into the container prior to executing the tests. Note that this doesn't modify he container image, only the running instance. Adding new dependencies is only possible when network connectivity is available and the Python package index is accessible by the container.

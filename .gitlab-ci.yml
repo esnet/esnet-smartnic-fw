@@ -163,6 +163,9 @@ package:
       _EOF
     - cat .env
 
+    # Setup the HW application test directory.
+    - ./build-setup-hw-test.sh
+
     # Build the container image
     - ./build.sh $PUBLISH_URI$TAG_SUFFIX
 
