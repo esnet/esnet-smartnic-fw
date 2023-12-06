@@ -23,7 +23,7 @@ cmd+=( "$@" )
 # This step is only needed when developing tests. For normal execution, the
 # dependencies are already installed at build-time and pip would have nothing
 # to do at run-time.
-if wget --spider --quiet 'https://pypi.org'; then
+if curl --silent --output /dev/null 'https://pypi.org'; then
     for req in $(find /test -type f -name pip-requirements.txt); do
         pip3 install --quiet --no-deps --requirement="${req}"
     done

@@ -19,6 +19,7 @@ RUN <<EOT
     apt install -y --no-install-recommends \
       build-essential \
       cdbs \
+      curl \
       devscripts \
       equivs \
       fakeroot \
