@@ -4,6 +4,7 @@ set -e
 
 #-------------------------------------------------------------------------------
 PROG=$(basename "$0")
+this_dir=$(dirname $(readlink -f "$0"))
 
 #-------------------------------------------------------------------------------
 print_usage() {
@@ -17,20 +18,29 @@ print_help() {
     echo "    Execute Robot Framework tests."
     echo ""
     echo "Options:"
-    echo "    -d ARG, --docker-arg=ARG"
-    echo "        Specify extra arguments to pass to 'docker compose run'."
+    echo "    -c ARG, --compose-arg=ARG"
+    echo "        Specify extra arguments to pass to 'docker compose'."
     echo "    -h, --help"
     echo "        Show this help."
+    echo "    -p, --pip-install"
+    echo "        Allow installing Python package dependencies from pypi.org"
+    echo "        prior to executing tests. Intended for use in development."
+    echo "    -r ARG, --run-arg=ARG"
+    echo "        Specify extra arguments to pass to 'docker compose run'."
     echo "    --"
     echo "        Stop processing options. All remaining arguments will be"
     echo "        passed to the Robot Framework."
 }
 
 #-------------------------------------------------------------------------------
-docker_args=( '--no-deps' '--rm' )
+compose_args=( "--file=${PWD}/docker-compose.yml" )
+run_args=( '--no-deps' '--rm' )
 
 # Parse command line arguments.
-arguments=$(getopt -n "${PROG}" -o 'd:h' -l docker-arg: -l help -- "$@")
+arguments=$(getopt -n "${PROG}" \
+                -o 'c:hpr:' \
+                -l compose-arg: -l help -l pip-install -l run-arg: \
+                -- "$@")
 eval set -- "${arguments}"
 
 # Process optional arguments.
@@ -43,14 +53,24 @@ while true; do
             break
             ;;
 
-        -d | --docker-arg)
-            docker_args+=( "$1" )
+        -c | --compose-arg)
+            compose_args+=( "$1" )
             shift
             ;;
 
         -h | --help)
             print_help
             exit 0
+            ;;
+
+        -p | --pip-install)
+            compose_args+=( "--file=${this_dir}/docker-compose.network.yml" )
+            run_args+=( "--env=TEST_DO_PIP_INSTALL=y" )
+            ;;
+
+        -r | --run-arg)
+            run_args+=( "$1" )
+            shift
             ;;
 
         *)
@@ -65,4 +85,8 @@ robot_args+=( "$@" )
 
 #-------------------------------------------------------------------------------
 # Start the test execution service.
-docker compose run "${docker_args[@]}" smartnic-fw-test "${robot_args[@]}"
+docker \
+    compose "${compose_args[@]}" \
+    run "${run_args[@]}" \
+    smartnic-fw-test \
+    "${robot_args[@]}"
