@@ -33,7 +33,7 @@ print_help() {
 }
 
 #-------------------------------------------------------------------------------
-compose_args=( "--file=${PWD}/docker-compose.yml" )
+compose_args=()
 run_args=( '--no-deps' '--rm' )
 
 # Parse command line arguments.
@@ -64,7 +64,6 @@ while true; do
             ;;
 
         -p | --pip-install)
-            compose_args+=( "--file=${this_dir}/docker-compose.network.yml" )
             run_args+=( "--env=TEST_DO_PIP_INSTALL=y" )
             ;;
 
