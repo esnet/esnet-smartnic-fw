@@ -19,6 +19,7 @@ RUN <<EOT
     apt install -y --no-install-recommends \
       build-essential \
       cdbs \
+      curl \
       devscripts \
       equivs \
       fakeroot \
@@ -101,8 +102,17 @@ SN_HW_APP_NAME=${SN_HW_APP_NAME}
 SN_HW_VER=${SN_HW_VER}
 EOF
 
-# Install test automation packages.
-RUN pip3 install --no-deps --requirement=sn-stack/test/pip-requirements.txt
+# Setup the test automation framework.
+WORKDIR sn-stack/test
+RUN <<EOF
+    mkdir /test
+    cp entrypoint.sh /test/.
+
+    # Install Python dependencies for the test automation libraries.
+    for req in $(find . -type f -name pip-requirements.txt); do
+        pip3 install --no-deps --requirement="${req}"
+    done
+EOF
 
 # Install the MinIO client command line tool.
 ADD \
