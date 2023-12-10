@@ -34,7 +34,8 @@ RUN <<EOT
       libgrpc++1 \
       protobuf-compiler \
       protobuf-compiler-grpc \
-      pkg-config
+      pkg-config \
+      tree
 
     apt install -y --no-install-recommends \
       python3-pip \
