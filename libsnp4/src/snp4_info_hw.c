@@ -3,7 +3,7 @@
 #include "snp4.h"		/* API */
 #include "array_size.h"		/* ARRAY_SIZE */
 
-#include "vitisnetp4drv-intf-sdnet_0.h"	/* */
+#include "vitisnetp4drv-intf.h"	/* Vitis driver wrapper */
 
 static const char * tabs(unsigned int indent)
 {
@@ -123,7 +123,7 @@ static void vitisnetp4_print_target_table_config(XilVitisNetP4TargetTableConfig 
 
 void snp4_print_target_config (void)
 {
-	const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+	const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
 	struct XilVitisNetP4TargetConfig *tcfg = intf->target.config;
 
   printf("Endian: %s\n", vitisnetp4_endian_str(tcfg->Endian));
@@ -340,7 +340,7 @@ static enum snp4_status snp4_info_get_tables(struct snp4_info_table * tables, ui
 
 enum snp4_status snp4_info_get_pipeline(struct snp4_info_pipeline * pipeline)
 {
-	const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+	const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
 	struct XilVitisNetP4TargetConfig *cfg = intf->target.config;
 
   return snp4_info_get_tables(pipeline->tables,

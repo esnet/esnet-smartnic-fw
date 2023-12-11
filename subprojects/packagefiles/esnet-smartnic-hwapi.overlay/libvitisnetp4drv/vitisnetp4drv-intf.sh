@@ -26,7 +26,11 @@ cat <<EOF >"${intf_c}"
 #include "vitisnetp4_target.h"
 
 /*----------------------------------------------------------------------------*/
-static const struct ${intf_struct} __${intf_name} = {
+const struct ${intf_struct} ${intf_name} = {
+    .info = {
+        .name = "${ip_name}",
+    },
+
     .common = {
         .stub_env_if = XilVitisNetP4StubEnvIf,
     },
@@ -49,12 +53,6 @@ static const struct ${intf_struct} __${intf_name} = {
         .get_table_count = XilVitisNetP4TargetGetTableCount,
     },
 };
-
-/*----------------------------------------------------------------------------*/
-const struct ${intf_struct}* ${intf_name}(void)
-{
-    return &__${intf_name};
-}
 EOF
 
 #-------------------------------------------------------------------------------
@@ -68,7 +66,7 @@ cat <<EOF >"${intf_h}"
 extern "C" {
 #endif
 
-const struct ${intf_struct}* ${intf_name}(void);
+extern const struct ${intf_struct} ${intf_name};
 
 #ifdef __cplusplus
 } /* extern "C" */

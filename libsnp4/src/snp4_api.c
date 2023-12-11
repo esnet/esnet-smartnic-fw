@@ -10,7 +10,7 @@
 #include "snp4_io.h"		/* snp4_io_reg_* */
 #include "unused.h"		/* UNUSED() */
 
-#include "vitisnetp4drv-intf-sdnet_0.h"	/* */
+#include "vitisnetp4drv-intf.h"	/* Vitis driver wrapper */
 
 struct snp4_user_context {
   uintptr_t base_addr;
@@ -93,7 +93,7 @@ void * snp4_init(uintptr_t snp4_base_addr)
   }
 
   // Initialize the vitisnetp4 env
-  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
   if (intf->common.stub_env_if(vitisnetp4_env) != XIL_VITIS_NET_P4_SUCCESS) {
     goto out_fail_target;
   }
@@ -123,7 +123,7 @@ void * snp4_init(uintptr_t snp4_base_addr)
 bool snp4_deinit(void * snp4_handle)
 {
   XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
-  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
 
   if (intf->target.exit(vitisnetp4_target) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
@@ -135,7 +135,7 @@ bool snp4_deinit(void * snp4_handle)
 bool snp4_reset_all_tables(void * snp4_handle)
 {
   XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
-  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
 
   // Look up the number of tables in the design
   uint32_t num_tables;
@@ -160,7 +160,7 @@ bool snp4_reset_all_tables(void * snp4_handle)
 bool snp4_reset_one_table(void * snp4_handle, const char * table_name)
 {
   XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
-  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
 
   XilVitisNetP4TableCtx * table;
   if (intf->target.get_table_by_name(vitisnetp4_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
@@ -187,7 +187,7 @@ bool snp4_table_insert_kma(void * snp4_handle,
 			   bool replace)
 {
   XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
-  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
 
   // Get a handle for the target table
   XilVitisNetP4TableCtx * table;
@@ -242,7 +242,7 @@ bool snp4_table_delete_k(void * snp4_handle,
 			 size_t    UNUSED(mask_len))
 {
   XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
-  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
 
   // Get a handle for the target table
   XilVitisNetP4TableCtx * table;

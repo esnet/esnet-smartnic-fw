@@ -39,6 +39,7 @@ else
 endif
 
 #-------------------------------------------------------------------------------
+ip_lib_deps = []
 foreach ip_name: ip_names
     ip_dir_prefix = ip_dir_prefixes[ip_name]
     inc_dir = include_directories('.', ip_dir_prefix + 'include')
@@ -89,8 +90,29 @@ foreach ip_name: ip_names
         dependencies: declare_dependency(sources: intf[1]),
         include_directories: inc_dir,
     )
+    ip_lib_deps += [lib_dep]
     meson.override_dependency(lib_name, lib_dep)
 endforeach
+
+#-------------------------------------------------------------------------------
+# Generate a table for all wrapped Vitis driver interfaces.
+table_base = intf_base + '-table'
+table = custom_target(
+    table_base,
+    output: table_base + '.c',
+    command: [
+        this_dir / table_base + '.sh',
+        '@OUTPUT@',
+        ip_names,
+    ],
+)
+
+# Tie the public interface library into the dependency search.
+table_lib_dep = declare_dependency(
+    sources: table[0],
+    dependencies: ip_lib_deps,
+)
+meson.override_dependency(intf_base, table_lib_dep)
 
 #-------------------------------------------------------------------------------
 if do_merge

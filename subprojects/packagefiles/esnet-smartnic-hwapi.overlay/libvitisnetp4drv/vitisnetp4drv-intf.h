@@ -5,12 +5,18 @@
 #include "vitisnetp4_table.h"
 #include "vitisnetp4_target.h"
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /*----------------------------------------------------------------------------*/
 struct vitis_net_p4_drv_intf {
+    struct {
+        const char* name;
+    } info;
+
     struct {
         XilVitisNetP4ReturnType (*stub_env_if)(XilVitisNetP4EnvIf *EnvIfPtr);
     } common;
@@ -58,6 +64,10 @@ struct vitis_net_p4_drv_intf {
             XilVitisNetP4TargetCtx *CtxPtr, uint32_t *NumTablesPtr);
     } target;
 };
+
+/*----------------------------------------------------------------------------*/
+size_t vitis_net_p4_drv_intf_count(void);
+const struct vitis_net_p4_drv_intf* vitis_net_p4_drv_intf_get(unsigned int idx);
 
 #ifdef __cplusplus
 } /* extern "C" */
