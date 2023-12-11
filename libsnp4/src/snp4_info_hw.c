@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <string.h>		/* strdup */
-#include "sdnet_0_defs.h"	/* XilVitisNetP4TargetConfig_sdnet_0 */
 #include "snp4.h"		/* API */
 #include "array_size.h"		/* ARRAY_SIZE */
+
+#include "vitisnetp4drv-intf-sdnet_0.h"	/* */
 
 static const char * tabs(unsigned int indent)
 {
@@ -122,7 +123,8 @@ static void vitisnetp4_print_target_table_config(XilVitisNetP4TargetTableConfig 
 
 void snp4_print_target_config (void)
 {
-  struct XilVitisNetP4TargetConfig *tcfg = &XilVitisNetP4TargetConfig_sdnet_0;
+	const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+	struct XilVitisNetP4TargetConfig *tcfg = intf->target.config;
 
   printf("Endian: %s\n", vitisnetp4_endian_str(tcfg->Endian));
   printf("Tables: [n=%u]\n", tcfg->TableListSize);
@@ -338,7 +340,8 @@ static enum snp4_status snp4_info_get_tables(struct snp4_info_table * tables, ui
 
 enum snp4_status snp4_info_get_pipeline(struct snp4_info_pipeline * pipeline)
 {
-  struct XilVitisNetP4TargetConfig *cfg = &XilVitisNetP4TargetConfig_sdnet_0;
+	const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_sdnet_0();
+	struct XilVitisNetP4TargetConfig *cfg = intf->target.config;
 
   return snp4_info_get_tables(pipeline->tables,
 			      ARRAY_SIZE(pipeline->tables),
