@@ -31,13 +31,13 @@ public:
       exit(EXIT_FAILURE);
     }
 
-    snp4_handle = snp4_init((uintptr_t) &bar2->sdnet);
+    snp4_handle = snp4_init(0, (uintptr_t) &bar2->sdnet);
     if (snp4_handle == NULL) {
       std::cerr << "Failed to initialize snp4/vitisnetp4 library: " << pci_address << std::endl;
       exit(EXIT_FAILURE);
     }
 
-    auto rc = snp4_info_get_pipeline(&pipeline);
+    auto rc = snp4_info_get_pipeline(0, &pipeline);
     if (rc != SNP4_STATUS_OK) {
       std::cerr << "Failed to load snp4 pipeline info: " << rc << std::endl;
       exit(EXIT_FAILURE);

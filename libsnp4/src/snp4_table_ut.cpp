@@ -49,7 +49,7 @@ protected:
 
     rule.num_params = 0;
 
-    snp4_info_get_pipeline(&pipeline);
+    snp4_info_get_pipeline(0, &pipeline);
   }
 
   void TearDown() override {

@@ -121,10 +121,14 @@ static void vitisnetp4_print_target_table_config(XilVitisNetP4TargetTableConfig 
   vitisnetp4_print_table_config(&ttc->Config, indent+1);
 }
 
-void snp4_print_target_config (void)
+void snp4_print_target_config(unsigned int sdnet_idx)
 {
-	const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
-	struct XilVitisNetP4TargetConfig *tcfg = intf->target.config;
+  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(sdnet_idx);
+  if (intf == NULL) {
+    return;
+  }
+
+  struct XilVitisNetP4TargetConfig *tcfg = intf->target.config;
 
   printf("Endian: %s\n", vitisnetp4_endian_str(tcfg->Endian));
   printf("Tables: [n=%u]\n", tcfg->TableListSize);
@@ -338,10 +342,14 @@ static enum snp4_status snp4_info_get_tables(struct snp4_info_table * tables, ui
   return SNP4_STATUS_OK;
 }
 
-enum snp4_status snp4_info_get_pipeline(struct snp4_info_pipeline * pipeline)
+enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info_pipeline * pipeline)
 {
-	const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(0);
-	struct XilVitisNetP4TargetConfig *cfg = intf->target.config;
+  const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(sdnet_idx);
+  if (intf == NULL) {
+    return SNP4_STATUS_NULL_PIPELINE;
+  }
+
+  struct XilVitisNetP4TargetConfig *cfg = intf->target.config;
 
   return snp4_info_get_tables(pipeline->tables,
 			      ARRAY_SIZE(pipeline->tables),

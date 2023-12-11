@@ -204,7 +204,7 @@ static struct snp4_info_pipeline snp4_info_pipeline = {
   .num_tables = 7,
 };
 
-extern enum snp4_status snp4_info_get_pipeline(struct snp4_info_pipeline * pipeline)
+extern enum snp4_status snp4_info_get_pipeline(unsigned int UNUSED(sdnet_idx), struct snp4_info_pipeline * pipeline)
 {
   memcpy(pipeline, &snp4_info_pipeline, sizeof(*pipeline));
 

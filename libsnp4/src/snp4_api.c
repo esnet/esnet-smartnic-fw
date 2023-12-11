@@ -16,6 +16,7 @@ struct snp4_user_context {
   uintptr_t base_addr;
   XilVitisNetP4EnvIf env;
   XilVitisNetP4TargetCtx target;
+  unsigned int sdnet_idx;
   const struct vitis_net_p4_drv_intf* intf;
 };
 
@@ -74,7 +75,7 @@ static XilVitisNetP4ReturnType log_error(XilVitisNetP4EnvIf *UNUSED(EnvIfPtr), c
   return XIL_VITIS_NET_P4_SUCCESS;
 }
 
-void * snp4_init(uintptr_t snp4_base_addr)
+void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr)
 {
   struct snp4_user_context * snp4_user;
   snp4_user = (struct snp4_user_context *) calloc(1, sizeof(struct snp4_user_context));
@@ -82,7 +83,12 @@ void * snp4_init(uintptr_t snp4_base_addr)
     goto out_fail;
   }
   snp4_user->base_addr = snp4_base_addr;
-  snp4_user->intf = vitis_net_p4_drv_intf_get(0);
+
+  snp4_user->intf = vitis_net_p4_drv_intf_get(sdnet_idx);
+  if (snp4_user->intf == NULL) {
+    goto out_fail_user;
+  }
+  snp4_user->sdnet_idx = sdnet_idx;
 
   // Initialize the vitisnetp4 env
   if (snp4_user->intf->common.stub_env_if(&snp4_user->env) != XIL_VITIS_NET_P4_SUCCESS) {
