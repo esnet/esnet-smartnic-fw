@@ -87,7 +87,7 @@ void * snp4_init(uintptr_t snp4_base_addr)
   }
 
   XilVitisNetP4TargetCtx * vitisnetp4_target;
-  vitisnetp4_target = (XilVitisNetP4TargetCtx *) calloc(1, sizeof(XilVitisNetP4EnvIf));
+  vitisnetp4_target = (XilVitisNetP4TargetCtx *) calloc(1, sizeof(XilVitisNetP4TargetCtx));
   if (vitisnetp4_target == NULL) {
     goto out_fail_env;
   }
