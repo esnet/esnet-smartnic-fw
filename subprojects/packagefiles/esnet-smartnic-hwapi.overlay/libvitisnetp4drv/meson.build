@@ -28,10 +28,14 @@ if ip_names.length() > 0
     foreach ip_name: ip_names
         ip_dir_prefixes += {ip_name: ip_name + '/'}
     endforeach
+
+    do_merge = true
 else
     ip_name = 'sdnet_0'
     ip_names += ip_name
     ip_dir_prefixes += {ip_name: ''}
+
+    do_merge = false
 endif
 
 #-------------------------------------------------------------------------------
@@ -89,21 +93,55 @@ foreach ip_name: ip_names
 endforeach
 
 #-------------------------------------------------------------------------------
-dir_prefix = ip_dir_prefixes['sdnet_0']
+if do_merge
+    # Perform a merge of all Vitis driver libraries into a single one.
+    merge_base = lib_base + '-merge'
+    dot_marker = '.marker'
+    merge = custom_target(
+        merge_base,
+        output: dot_marker,
+        command: [
+            this_dir / merge_base + '.sh',
+            '@PRIVATE_DIR@',
+            '@OUTDIR@',
+            this_dir,
+            lib_base,
+            ip_names,
+        ],
+    )
 
-# Create a dependency for the Vitis driver library.
-drv_dep = cc.find_library(
-    lib_base,
-    dirs: this_dir / dir_prefix + 'lib',
-    static: true,
-)
+    # Create a dependency for the merged Vitis driver library.
+    merge_dir = merge[0].full_path().replace('/' + dot_marker, '')
+    merge_dep = declare_dependency(
+        sources: merge,
+        link_args: [
+            '-L' + merge_dir,
+            '-l' + lib_base,
+        ],
+    )
 
-# Tie the Vitis driver library into the dependency search.
-lib_dep = declare_dependency(
-    dependencies: [
-        drv_dep,
-        libm_dep,
-    ],
-    include_directories: include_directories(dir_prefix + 'include'),
-)
+    # Tie the merged Vitis driver library into the dependency search.
+    lib_dep = declare_dependency(
+        dependencies: [
+            merge_dep,
+            libm_dep,
+        ],
+    )
+else
+    # Create a dependency for the Vitis driver library.
+    drv_dep = cc.find_library(
+        lib_base,
+        dirs: this_dir / 'lib',
+        static: true,
+    )
+
+    # Tie the Vitis driver library into the dependency search.
+    lib_dep = declare_dependency(
+        dependencies: [
+            drv_dep,
+            libm_dep,
+        ],
+        include_directories: include_directories('include'),
+    )
+endif
 meson.override_dependency('lib' + lib_base, lib_dep)
