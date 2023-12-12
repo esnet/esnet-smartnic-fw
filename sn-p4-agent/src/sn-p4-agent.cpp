@@ -31,7 +31,11 @@ enum pipeline_id {
 
 class SmartnicP4Impl final : public SmartnicP4::Service {
 public:
-  explicit SmartnicP4Impl(const std::string& pci_address) {
+  explicit SmartnicP4Impl(const std::string& pci_address) :
+    bar2(),
+    snp4_handle{},
+    pipeline{} {
+
     bar2 = smartnic_map_bar2_by_pciaddr(pci_address.c_str());
     if (bar2 == NULL) {
       std::cerr << "Failed to map PCIe register space for device " << pci_address << std::endl;
@@ -51,11 +55,29 @@ public:
         exit(EXIT_FAILURE);
       }
 
-      auto rc = snp4_info_get_pipeline(id, &pipeline[id]);
+      pipeline[id] = new typeof(*pipeline[id]){};
+      auto rc = snp4_info_get_pipeline(id, pipeline[id]);
       if (rc != SNP4_STATUS_OK) {
         std::cerr << "Failed to load snp4 info for pipeline " << id << ": " << rc << std::endl;
         exit(EXIT_FAILURE);
       }
+    }
+  }
+
+  ~SmartnicP4Impl() {
+    for (unsigned int id = pipeline_id::FIRST; id != pipeline_id::MAX; ++id) {
+      if (pipeline[id] != NULL) {
+        delete pipeline[id];
+      }
+
+      if (snp4_handle[id] != NULL && !snp4_deinit(snp4_handle[id])) {
+        std::cerr << "Failed to deinit snp4/vitisnetp4 library for pipeline " << id << std::endl;
+        exit(EXIT_FAILURE);
+      }
+    }
+
+    if (bar2 != NULL) {
+      smartnic_unmap_bar2(bar2);
     }
   }
 
@@ -92,8 +114,8 @@ public:
 
     // Iterate over all tables
     auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
-    for (unsigned int tidx = 0; tidx < pipeline[id].num_tables; tidx++) {
-      struct snp4_info_table * t = &pipeline[id].tables[tidx];
+    for (unsigned int tidx = 0; tidx < pipeline[id]->num_tables; tidx++) {
+      struct snp4_info_table * t = &pipeline[id]->tables[tidx];
 
       // Add a new table object to the response
       ::PipelineInfo::TableInfo* pi_table = PipelineInfoResponse->add_tables();
@@ -218,7 +240,7 @@ public:
     // Pack the rule's matches and params
     auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
     struct sn_pack pack;
-    if (snp4_rule_pack(&pipeline[id], &rule, &pack) != SNP4_STATUS_OK) {
+    if (snp4_rule_pack(pipeline[id], &rule, &pack) != SNP4_STATUS_OK) {
       std::cerr << "FAIL (pack)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to pack rule into key/mask and params");
     }
@@ -252,7 +274,7 @@ public:
 
     // Find the requested table
     auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
-    auto table_info = snp4_info_get_table_by_name(&pipeline[id], table_name);
+    auto table_info = snp4_info_get_table_by_name(pipeline[id], table_name);
     if (table_info == NULL) {
       std::cerr << "FAIL (get_table_by_name)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Table not found");
@@ -303,7 +325,7 @@ public:
 private:
   volatile struct esnet_smartnic_bar2 * volatile bar2;
   void * snp4_handle[pipeline_id::MAX];
-  struct snp4_info_pipeline pipeline[pipeline_id::MAX];
+  struct snp4_info_pipeline * pipeline[pipeline_id::MAX];
 
   bool load_one_param(const Param& param, struct sn_param * p) {
     p->t = SN_PARAM_FORMAT_MPZ;
