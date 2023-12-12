@@ -22,32 +22,48 @@ using grpc::StatusCode;
 
 using namespace std;
 
+enum pipeline_id {
+  FIRST,
+  INGRESS = FIRST,
+  EGRESS,
+  MAX
+};
+
 class SmartnicP4Impl final : public SmartnicP4::Service {
 public:
   explicit SmartnicP4Impl(const std::string& pci_address) {
     bar2 = smartnic_map_bar2_by_pciaddr(pci_address.c_str());
     if (bar2 == NULL) {
-      std::cerr << "Failed to map PCIe register space for device: " << pci_address << std::endl;
+      std::cerr << "Failed to map PCIe register space for device " << pci_address << std::endl;
       exit(EXIT_FAILURE);
     }
 
-    snp4_handle = snp4_init(0, (uintptr_t) &bar2->sdnet);
-    if (snp4_handle == NULL) {
-      std::cerr << "Failed to initialize snp4/vitisnetp4 library: " << pci_address << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    // Bind the driver for each pipeline.
+    for (unsigned int id = pipeline_id::FIRST; id != pipeline_id::MAX; ++id) {
+      // TODO: Only support the first pipeline until the registers are sorted out.
+      if (id > pipeline_id::FIRST) {
+	break;
+      }
 
-    auto rc = snp4_info_get_pipeline(0, &pipeline);
-    if (rc != SNP4_STATUS_OK) {
-      std::cerr << "Failed to load snp4 pipeline info: " << rc << std::endl;
-      exit(EXIT_FAILURE);
+      snp4_handle[id] = snp4_init(id, (uintptr_t) &bar2->sdnet /* TODO: &bar2->sdnet[id] ??? */);
+      if (snp4_handle[id] == NULL) {
+        std::cerr << "Failed to initialize snp4/vitisnetp4 library for device " << pci_address << " for pipeline " << id << std::endl;
+        exit(EXIT_FAILURE);
+      }
+
+      auto rc = snp4_info_get_pipeline(id, &pipeline[id]);
+      if (rc != SNP4_STATUS_OK) {
+        std::cerr << "Failed to load snp4 info for pipeline " << id << ": " << rc << std::endl;
+        exit(EXIT_FAILURE);
+      }
     }
   }
 
   Status ClearAllTables(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, ClearResponse* /* clear_response */) override {
     std::cerr << "--- ClearAllTables" << std::endl;
 
-    if (!snp4_reset_all_tables(snp4_handle)) {
+    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    if (!snp4_reset_all_tables(snp4_handle[id])) {
       std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset all tables");
     } else {
@@ -61,7 +77,8 @@ public:
     std::cerr << clear_one_table->DebugString() << std::endl;
     std::cerr << "---" << std::endl;
 
-    if (!snp4_reset_one_table(snp4_handle, const_cast<char *>(clear_one_table->table_name().c_str()))) {
+    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    if (!snp4_reset_one_table(snp4_handle[id], const_cast<char *>(clear_one_table->table_name().c_str()))) {
       std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset table");
     } else {
@@ -74,8 +91,9 @@ public:
     std::cerr << "--- GetPipelineInfo" << std::endl;
 
     // Iterate over all tables
-    for (unsigned int tidx = 0; tidx < pipeline.num_tables; tidx++) {
-      struct snp4_info_table * t = &pipeline.tables[tidx];
+    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    for (unsigned int tidx = 0; tidx < pipeline[id].num_tables; tidx++) {
+      struct snp4_info_table * t = &pipeline[id].tables[tidx];
 
       // Add a new table object to the response
       ::PipelineInfo::TableInfo* pi_table = PipelineInfoResponse->add_tables();
@@ -198,13 +216,14 @@ public:
     rule.priority = ma->priority();
 
     // Pack the rule's matches and params
+    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
     struct sn_pack pack;
-    if (snp4_rule_pack(&pipeline, &rule, &pack) != SNP4_STATUS_OK) {
+    if (snp4_rule_pack(&pipeline[id], &rule, &pack) != SNP4_STATUS_OK) {
       std::cerr << "FAIL (pack)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to pack rule into key/mask and params");
     }
 
-    if (!snp4_table_insert_kma(snp4_handle,
+    if (!snp4_table_insert_kma(snp4_handle[id],
 			       rule.table_name,
 			       pack.key,
 			       pack.key_len,
@@ -232,7 +251,8 @@ public:
     auto table_name = const_cast<char *>(mo->table_name().c_str());
 
     // Find the requested table
-    auto table_info = snp4_info_get_table_by_name(&pipeline, table_name);
+    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    auto table_info = snp4_info_get_table_by_name(&pipeline[id], table_name);
     if (table_info == NULL) {
       std::cerr << "FAIL (get_table_by_name)" << std::endl << std::endl;
       return Status(StatusCode::INVALID_ARGUMENT, "Table not found");
@@ -266,7 +286,7 @@ public:
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to pack match fields into key/mask");
     }
 
-    if (!snp4_table_delete_k(snp4_handle,
+    if (!snp4_table_delete_k(snp4_handle[id],
 			     table_name,
 			     pack.key,
 			     pack.key_len,
@@ -282,8 +302,8 @@ public:
 
 private:
   volatile struct esnet_smartnic_bar2 * volatile bar2;
-  void * snp4_handle;
-  struct snp4_info_pipeline pipeline;
+  void * snp4_handle[pipeline_id::MAX];
+  struct snp4_info_pipeline pipeline[pipeline_id::MAX];
 
   bool load_one_param(const Param& param, struct sn_param * p) {
     p->t = SN_PARAM_FORMAT_MPZ;
