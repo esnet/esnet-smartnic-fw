@@ -39,7 +39,8 @@ public:
     for (unsigned int id = PipelineId_MIN; id <= PipelineId_MAX; ++id) {
       // TODO: Only support the first pipeline until the registers are sorted out.
       if (id > PipelineId_MIN) {
-	break;
+        std::cerr << "WARNING: Skipping pipeline ids > " << PipelineId_MIN << " until supported" << std::endl;
+        break;
       }
 
       snp4_handle[id] = snp4_init(id, (uintptr_t) &bar2->sdnet /* TODO: &bar2->sdnet[id] ??? */);
@@ -79,6 +80,11 @@ public:
     std::cerr << "--- ClearAllTables" << std::endl;
 
     auto id = PipelineId::INGRESS;
+    if (snp4_handle[id] == NULL) {
+      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
+    }
+
     if (!snp4_reset_all_tables(snp4_handle[id])) {
       std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset all tables");
@@ -93,7 +99,19 @@ public:
     std::cerr << request->DebugString() << std::endl;
     std::cerr << "---" << std::endl;
 
+    // Enums under proto3 use the "open" behaviour, which allows passing unknown values
+    // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
     auto id = request->pipeline_id();
+    if (id > PipelineId_MAX) {
+      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
+    }
+
+    if (snp4_handle[id] == NULL) {
+      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
+    }
+
     if (!snp4_reset_all_tables(snp4_handle[id])) {
       std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset all tables");
@@ -108,7 +126,19 @@ public:
     std::cerr << clear_one_table->DebugString() << std::endl;
     std::cerr << "---" << std::endl;
 
+    // Enums under proto3 use the "open" behaviour, which allows passing unknown values
+    // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
     auto id = clear_one_table->pipeline_id();
+    if (id > PipelineId_MAX) {
+      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
+    }
+
+    if (snp4_handle[id] == NULL) {
+      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
+    }
+
     if (!snp4_reset_one_table(snp4_handle[id], const_cast<char *>(clear_one_table->table_name().c_str()))) {
       std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset table");
@@ -122,8 +152,13 @@ public:
   Status GetPipelineInfo(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, PipelineInfo* PipelineInfoResponse) override {
     std::cerr << "--- GetPipelineInfo" << std::endl;
 
-    // Iterate over all tables
     auto id = PipelineId::INGRESS;
+    if (snp4_handle[id] == NULL) {
+      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
+    }
+
+    // Iterate over all tables
     for (unsigned int tidx = 0; tidx < pipeline[id]->num_tables; tidx++) {
       struct snp4_info_table * t = &pipeline[id]->tables[tidx];
 
@@ -208,8 +243,20 @@ public:
     std::cerr << request->DebugString() << std::endl;
     std::cerr << "---" << std::endl;
 
-    // Iterate over all tables
+    // Enums under proto3 use the "open" behaviour, which allows passing unknown values
+    // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
     auto id = request->pipeline_id();
+    if (id > PipelineId_MAX) {
+      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
+    }
+
+    if (snp4_handle[id] == NULL) {
+      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
+    }
+
+    // Iterate over all tables
     for (unsigned int tidx = 0; tidx < pipeline[id]->num_tables; tidx++) {
       struct snp4_info_table * t = &pipeline[id]->tables[tidx];
 
@@ -294,6 +341,19 @@ public:
     std::cerr << ma->DebugString() << std::endl;
     std::cerr << "---" << std::endl;
 
+    // Enums under proto3 use the "open" behaviour, which allows passing unknown values
+    // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
+    auto id = ma->pipeline_id();
+    if (id > PipelineId_MAX) {
+      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
+    }
+
+    if (snp4_handle[id] == NULL) {
+      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
+    }
+
     struct sn_rule rule;
 
     // Table Name
@@ -334,7 +394,6 @@ public:
     rule.priority = ma->priority();
 
     // Pack the rule's matches and params
-    auto id = ma->pipeline_id();
     struct sn_pack pack;
     if (snp4_rule_pack(pipeline[id], &rule, &pack) != SNP4_STATUS_OK) {
       std::cerr << "FAIL (pack)" << std::endl << std::endl;
@@ -365,11 +424,23 @@ public:
     std::cerr << mo->DebugString() << std::endl;
     std::cerr << "---" << std::endl;
 
+    // Enums under proto3 use the "open" behaviour, which allows passing unknown values
+    // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
+    auto id = mo->pipeline_id();
+    if (id > PipelineId_MAX) {
+      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
+    }
+
+    if (snp4_handle[id] == NULL) {
+      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
+    }
+
     // Table Name
     auto table_name = const_cast<char *>(mo->table_name().c_str());
 
     // Find the requested table
-    auto id = mo->pipeline_id();
     auto table_info = snp4_info_get_table_by_name(pipeline[id], table_name);
     if (table_info == NULL) {
       std::cerr << "FAIL (get_table_by_name)" << std::endl << std::endl;

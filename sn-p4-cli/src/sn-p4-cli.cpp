@@ -519,12 +519,6 @@ int main(int argc, char* argv[]) {
   // Parse the command line options
   CLI11_PARSE(app, argc, argv);
 
-  // TODO: Only support the first pipeline until the registers are sorted out.
-  if (pipeline_id != PipelineId::INGRESS) {
-    std::cerr << "WARNING: Multi-pipeline support is not complete. Only the ingress pipeline is currently supported." << std::endl;
-    return 1;
-  }
-
   // Set up a channel to the remote p4 agent and load the pipeline specification from the agent
   // NOTE: Most methods in the SmartnicP4Client class depend on having an accurate pipeline spec loaded
   SmartnicP4Client snp4(grpc::CreateChannel(server + ":" + std::to_string(port), grpc::InsecureChannelCredentials()));
