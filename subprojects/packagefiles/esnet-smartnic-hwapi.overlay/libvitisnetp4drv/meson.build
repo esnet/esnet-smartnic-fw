@@ -57,9 +57,14 @@ foreach ip_name: ip_names
             intf_name + '.map',
         ],
         command: [
-            this_dir / intf_base + '.sh',
+            this_dir / intf_base + '.py',
             ip_name,
             '@OUTPUT@',
+        ],
+        depend_files: [
+            intf_base + '.c.j2',
+            intf_base + '.h.j2',
+            intf_base + '.map.j2',
         ],
     )
 
@@ -97,9 +102,12 @@ table = custom_target(
     table_base,
     output: table_base + '.c',
     command: [
-        this_dir / table_base + '.sh',
+        this_dir / table_base + '.py',
         '@OUTPUT@',
         ip_names,
+    ],
+    depend_files: [
+        table_base + '.c.j2',
     ],
 )
 
