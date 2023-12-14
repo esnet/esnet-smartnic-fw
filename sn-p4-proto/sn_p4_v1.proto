@@ -2,13 +2,27 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
+enum PipelineId {
+  INGRESS = 0;
+  EGRESS = 1;
+}
+
+message ClearTablesRequest {
+  PipelineId pipeline_id = 1;
+}
+
 message ClearOneTableRequest {
   string table_name = 1;
+  PipelineId pipeline_id = 2;
 }
 
 message ClearResponse {
   int32 error_code = 1;
   string error_detail = 2;
+}
+
+message PipelineIdInfoRequest {
+  PipelineId pipeline_id = 1;
 }
 
 message PipelineInfo {
@@ -99,11 +113,14 @@ message MatchActionRule {
   uint32 priority = 5;
 
   bool replace = 6;
+
+  PipelineId pipeline_id = 7;
 }
 
 message MatchOnlyRule {
   string table_name = 1;
   repeated Match matches = 2;
+  PipelineId pipeline_id = 3;
 }
 
 message RuleOperationResponse {
@@ -112,9 +129,13 @@ message RuleOperationResponse {
 }
 
 service SmartnicP4 {
+  // The GetPipelineInfo rpc will be phased out. Use GetPipelineIdInfo instead.
   rpc GetPipelineInfo(google.protobuf.Empty) returns (PipelineInfo);
+  rpc GetPipelineIdInfo(PipelineIdInfoRequest) returns (PipelineInfo);
 
+  // The ClearAllTables rpc will be phased out. Use ClearTables instead.
   rpc ClearAllTables(google.protobuf.Empty) returns (ClearResponse);
+  rpc ClearTables(ClearTablesRequest) returns (ClearResponse);
   rpc ClearOneTable(ClearOneTableRequest) returns (ClearResponse);
 
   rpc InsertRule(MatchActionRule) returns (RuleOperationResponse);

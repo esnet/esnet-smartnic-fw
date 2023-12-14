@@ -22,13 +22,6 @@ using grpc::StatusCode;
 
 using namespace std;
 
-enum pipeline_id {
-  FIRST,
-  INGRESS = FIRST,
-  EGRESS,
-  MAX
-};
-
 class SmartnicP4Impl final : public SmartnicP4::Service {
 public:
   explicit SmartnicP4Impl(const std::string& pci_address) :
@@ -43,9 +36,9 @@ public:
     }
 
     // Bind the driver for each pipeline.
-    for (unsigned int id = pipeline_id::FIRST; id != pipeline_id::MAX; ++id) {
+    for (unsigned int id = PipelineId_MIN; id <= PipelineId_MAX; ++id) {
       // TODO: Only support the first pipeline until the registers are sorted out.
-      if (id > pipeline_id::FIRST) {
+      if (id > PipelineId_MIN) {
 	break;
       }
 
@@ -65,7 +58,7 @@ public:
   }
 
   ~SmartnicP4Impl() {
-    for (unsigned int id = pipeline_id::FIRST; id != pipeline_id::MAX; ++id) {
+    for (unsigned int id = PipelineId_MIN; id <= PipelineId_MAX; ++id) {
       if (pipeline[id] != NULL) {
         delete pipeline[id];
       }
@@ -81,10 +74,26 @@ public:
     }
   }
 
+  /* This rpc will be phased out. Use ClearTables instead. */
   Status ClearAllTables(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, ClearResponse* /* clear_response */) override {
     std::cerr << "--- ClearAllTables" << std::endl;
 
-    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    auto id = PipelineId::INGRESS;
+    if (!snp4_reset_all_tables(snp4_handle[id])) {
+      std::cerr << "FAIL" << std::endl << std::endl;
+      return Status(StatusCode::UNKNOWN, "Failed to reset all tables");
+    } else {
+      std::cerr << "OK" << std::endl << std::endl;
+      return Status::OK;
+    }
+  }
+
+  Status ClearTables(ServerContext* /* context */, const ClearTablesRequest* request, ClearResponse* /* response */) override {
+    std::cerr << "--- ClearTables" << std::endl;
+    std::cerr << request->DebugString() << std::endl;
+    std::cerr << "---" << std::endl;
+
+    auto id = request->pipeline_id();
     if (!snp4_reset_all_tables(snp4_handle[id])) {
       std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset all tables");
@@ -99,7 +108,7 @@ public:
     std::cerr << clear_one_table->DebugString() << std::endl;
     std::cerr << "---" << std::endl;
 
-    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    auto id = clear_one_table->pipeline_id();
     if (!snp4_reset_one_table(snp4_handle[id], const_cast<char *>(clear_one_table->table_name().c_str()))) {
       std::cerr << "FAIL" << std::endl << std::endl;
       return Status(StatusCode::UNKNOWN, "Failed to reset table");
@@ -109,16 +118,103 @@ public:
     }
   }
 
+  /* This rpc will be phased out. Use GetPipelineIdInfo instead. */
   Status GetPipelineInfo(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, PipelineInfo* PipelineInfoResponse) override {
     std::cerr << "--- GetPipelineInfo" << std::endl;
 
     // Iterate over all tables
-    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    auto id = PipelineId::INGRESS;
     for (unsigned int tidx = 0; tidx < pipeline[id]->num_tables; tidx++) {
       struct snp4_info_table * t = &pipeline[id]->tables[tidx];
 
       // Add a new table object to the response
       ::PipelineInfo::TableInfo* pi_table = PipelineInfoResponse->add_tables();
+
+      pi_table->set_name(t->name);
+
+      switch(t->endian) {
+      case SNP4_INFO_TABLE_ENDIAN_LITTLE:
+	pi_table->set_endian(PipelineInfo_TableInfo_Endian_LITTLE);
+	break;
+      case SNP4_INFO_TABLE_ENDIAN_BIG:
+	pi_table->set_endian(PipelineInfo_TableInfo_Endian_BIG);
+	break;
+      }
+
+      // Populate the match specs
+      for (unsigned int midx = 0; midx < t->num_matches; midx++) {
+	struct snp4_info_match * m = &t->matches[midx];
+
+	// Add a new match spec to the response
+	::PipelineInfo::TableInfo::MatchSpec* pi_match = pi_table->add_match_specs();
+
+	switch (m->type) {
+	case SNP4_INFO_MATCH_TYPE_BITFIELD:
+	  pi_match->set_type(PipelineInfo_TableInfo_MatchSpec_MatchType_BITFIELD);
+	  break;
+	case SNP4_INFO_MATCH_TYPE_CONSTANT:
+	  pi_match->set_type(PipelineInfo_TableInfo_MatchSpec_MatchType_CONSTANT);
+	  break;
+	case SNP4_INFO_MATCH_TYPE_PREFIX:
+	  pi_match->set_type(PipelineInfo_TableInfo_MatchSpec_MatchType_PREFIX);
+	  break;
+	case SNP4_INFO_MATCH_TYPE_RANGE:
+	  pi_match->set_type(PipelineInfo_TableInfo_MatchSpec_MatchType_RANGE);
+	  break;
+	case SNP4_INFO_MATCH_TYPE_TERNARY:
+	  pi_match->set_type(PipelineInfo_TableInfo_MatchSpec_MatchType_TERNARY);
+	  break;
+	case SNP4_INFO_MATCH_TYPE_UNUSED:
+	  pi_match->set_type(PipelineInfo_TableInfo_MatchSpec_MatchType_UNUSED);
+	  break;
+	case SNP4_INFO_MATCH_TYPE_INVALID:
+	  // Ignore invalid ones
+	  break;
+	}
+	pi_match->set_bits(m->bits);
+      }
+
+      // Populate the action specs
+      for (unsigned int aidx = 0; aidx < t->num_actions; aidx++) {
+	struct snp4_info_action * a = &t->actions[aidx];
+
+	// Add a new action spec to the response
+	::PipelineInfo::TableInfo::ActionSpec* pi_action = pi_table->add_action_specs();
+
+	pi_action->set_name(a->name);
+
+	// Populate the parameters for this action
+	for (unsigned int pidx = 0; pidx < a->num_params; pidx++) {
+	  struct snp4_info_param * p = &a->params[pidx];
+
+	  // Add a new param spec to the response
+	  ::PipelineInfo::TableInfo::ActionSpec::ParameterSpec* pi_param = pi_action->add_parameter_specs();
+
+	  pi_param->set_name(p->name);
+	  pi_param->set_bits(p->bits);
+	}
+      }
+
+      pi_table->set_priority_required(t->priority_required);
+      pi_table->set_priority_bits(t->priority_bits);
+
+    }
+    std::cerr << "OK" << std::endl << std::endl;
+    return Status::OK;
+  }
+
+  Status GetPipelineIdInfo(ServerContext* /* context */, const PipelineIdInfoRequest* request, PipelineInfo* response) override {
+    std::cerr << "--- GetPipelineIdInfo" << std::endl;
+    std::cerr << request->DebugString() << std::endl;
+    std::cerr << "---" << std::endl;
+
+    // Iterate over all tables
+    auto id = request->pipeline_id();
+    for (unsigned int tidx = 0; tidx < pipeline[id]->num_tables; tidx++) {
+      struct snp4_info_table * t = &pipeline[id]->tables[tidx];
+
+      // Add a new table object to the response
+      ::PipelineInfo::TableInfo* pi_table = response->add_tables();
 
       pi_table->set_name(t->name);
 
@@ -238,7 +334,7 @@ public:
     rule.priority = ma->priority();
 
     // Pack the rule's matches and params
-    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    auto id = ma->pipeline_id();
     struct sn_pack pack;
     if (snp4_rule_pack(pipeline[id], &rule, &pack) != SNP4_STATUS_OK) {
       std::cerr << "FAIL (pack)" << std::endl << std::endl;
@@ -273,7 +369,7 @@ public:
     auto table_name = const_cast<char *>(mo->table_name().c_str());
 
     // Find the requested table
-    auto id = pipeline_id::INGRESS; // TODO: This should come from the client.
+    auto id = mo->pipeline_id();
     auto table_info = snp4_info_get_table_by_name(pipeline[id], table_name);
     if (table_info == NULL) {
       std::cerr << "FAIL (get_table_by_name)" << std::endl << std::endl;
@@ -324,8 +420,8 @@ public:
 
 private:
   volatile struct esnet_smartnic_bar2 * volatile bar2;
-  void * snp4_handle[pipeline_id::MAX];
-  struct snp4_info_pipeline * pipeline[pipeline_id::MAX];
+  void * snp4_handle[PipelineId_ARRAYSIZE];
+  struct snp4_info_pipeline * pipeline[PipelineId_ARRAYSIZE];
 
   bool load_one_param(const Param& param, struct sn_param * p) {
     p->t = SN_PARAM_FORMAT_MPZ;

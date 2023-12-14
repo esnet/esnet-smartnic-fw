@@ -1,5 +1,6 @@
 #include <deque>
 #include <iostream>
+#include <optional>
 #include <assert.h>		// assert
 #include <stdio.h>
 #include <stdlib.h>		// exit, EXIT_FAILURE
@@ -30,6 +31,7 @@ public:
   bool DisplayPipelineInfo() {
     assert(pi_valid);
 
+    std::cout << "Pipeline ID: " << pipeline_id << std::endl;
     std::cout << "Tables: " << pi.tables_size() << std::endl;
     for (auto &table : pi.tables()) {
       std::cout << "\t" << table.name() << std::endl;
@@ -52,13 +54,18 @@ public:
     return true;
   }
 
-  bool GetPipelineInfo() {
+  bool GetPipelineInfo(PipelineId id) {
     ClientContext context;
-    Status status = stub_->GetPipelineInfo(&context, google::protobuf::Empty(), &pi);
+    PipelineIdInfoRequest req;
+
+    req.set_pipeline_id(id);
+    Status status = stub_->GetPipelineIdInfo(&context, req, &pi);
     if (!status.ok()) {
-      std::cout << status.error_code() << ": GetPipelineInfo rpc failed: " <<status.error_message() << std::endl;
+      std::cout << status.error_code() << ": GetPipelineIdInfo rpc failed: " <<status.error_message() << std::endl;
       return false;
     }
+
+    pipeline_id = id;
     pi_valid = true;
     return true;
   }
@@ -95,15 +102,18 @@ public:
 
   bool ClearAllTables() {
     ClientContext context;
+    ClearTablesRequest clr_req;
     ClearResponse clr_rsp;
-    Status status = stub_->ClearAllTables(&context, google::protobuf::Empty(), &clr_rsp);
+
+    clr_req.set_pipeline_id(pipeline_id);
+    Status status = stub_->ClearTables(&context, clr_req, &clr_rsp);
     if (!status.ok()) {
-      std::cout << status.error_code() << ": ClearAllTables rpc failed: " <<status.error_message() << std::endl;
+      std::cout << status.error_code() << ": ClearTables rpc failed: " <<status.error_message() << std::endl;
       return false;
     }
 
     if (clr_rsp.error_code() != 0) {
-      std::cout << "ClearAllTables failed with error_code: " <<
+      std::cout << "ClearTables failed with error_code: " <<
 	std::to_string(clr_rsp.error_code()) <<
 	"(" << clr_rsp.error_detail() << ")" << std::endl;
       return false;
@@ -124,6 +134,7 @@ public:
       return false;
     }
 
+    clr_one.set_pipeline_id(pipeline_id);
     clr_one.set_table_name(table_name);
 
     Status status = stub_->ClearOneTable(&context, clr_one, &clr_rsp);
@@ -183,6 +194,7 @@ public:
       }
     }
 
+    ma_rule.set_pipeline_id(pipeline_id);
     ma_rule.set_table_name(table_name);
     for (auto & match_str : matches) {
       auto match = ma_rule.add_matches();
@@ -262,6 +274,7 @@ public:
       return false;
     }
 
+    mo_rule.set_pipeline_id(pipeline_id);
     mo_rule.set_table_name(table_name);
     for (auto & match_str : matches) {
       auto match = mo_rule.add_matches();
@@ -424,6 +437,7 @@ private:
   std::unique_ptr<SmartnicP4::Stub> stub_;
   bool pi_valid = false;
   PipelineInfo pi;
+  PipelineId pipeline_id;
 
   const std::string table_endian_to_string(PipelineInfo::TableInfo::Endian e) {
     switch (e) {
@@ -457,6 +471,15 @@ int main(int argc, char* argv[]) {
 
   uint16_t port = 50051;
   app.add_option("-p,--port", port, "The port number to connect to")->envname("SN_P4_CLI_PORT");
+
+  std::map<std::string, PipelineId> pipeline_id_map{
+    {"ingress", PipelineId::INGRESS},
+    {"egress", PipelineId::EGRESS},
+  };
+  PipelineId pipeline_id{PipelineId::INGRESS};
+  app.add_option("-i,--pipeline-id", pipeline_id, "The index or name of the pipeline to operate on")
+    ->transform(CLI::CheckedTransformer(pipeline_id_map, CLI::ignore_case))
+    ->envname("SN_P4_CLI_PIPELINE");
 
   CLI::App* info = app.add_subcommand("info", "Display pipeline information obtained from the server");
   CLI::App* clear_all = app.add_subcommand("clear-all", "Clear the contents of all tables");
@@ -496,12 +519,17 @@ int main(int argc, char* argv[]) {
   // Parse the command line options
   CLI11_PARSE(app, argc, argv);
 
+  // TODO: Only support the first pipeline until the registers are sorted out.
+  if (pipeline_id != PipelineId::INGRESS) {
+    std::cerr << "WARNING: Multi-pipeline support is not complete. Only the ingress pipeline is currently supported." << std::endl;
+    return 1;
+  }
+
   // Set up a channel to the remote p4 agent and load the pipeline specification from the agent
   // NOTE: Most methods in the SmartnicP4Client class depend on having an accurate pipeline spec loaded
   SmartnicP4Client snp4(grpc::CreateChannel(server + ":" + std::to_string(port), grpc::InsecureChannelCredentials()));
-  if (!snp4.GetPipelineInfo()) {
-    std::cout << "Error: Unable to load p4 pipeline structure from remote agent" << std::endl;
-    std::exit(EXIT_FAILURE);
+  if (!snp4.GetPipelineInfo(pipeline_id)) {
+    std::cerr << "Error: Unable to load p4 pipeline structure from remote agent" << std::endl;
     return 1;
   }
 
@@ -522,7 +550,7 @@ int main(int argc, char* argv[]) {
     snp4.P4BMFileApply(file_name);
   } else {
     // Unexpected subcommand
-    std::cout << "Unhandled subcommand" << std::endl;
+    std::cerr << "Unhandled subcommand" << std::endl;
     return 1;
   }
 
