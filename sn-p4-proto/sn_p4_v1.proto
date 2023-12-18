@@ -7,7 +7,7 @@ enum PipelineId {
   EGRESS = 1;
 }
 
-message ClearTablesRequest {
+message ClearAllPipelineTablesRequest {
   PipelineId pipeline_id = 1;
 }
 
@@ -133,9 +133,9 @@ service SmartnicP4 {
   rpc GetPipelineInfo(google.protobuf.Empty) returns (PipelineInfo);
   rpc GetPipelineIdInfo(PipelineIdInfoRequest) returns (PipelineInfo);
 
-  // The ClearAllTables rpc will be phased out. Use ClearTables instead.
+  // The ClearAllTables rpc will be phased out. Use ClearAllPipelineTables instead.
   rpc ClearAllTables(google.protobuf.Empty) returns (ClearResponse);
-  rpc ClearTables(ClearTablesRequest) returns (ClearResponse);
+  rpc ClearAllPipelineTables(ClearAllPipelineTablesRequest) returns (ClearResponse);
   rpc ClearOneTable(ClearOneTableRequest) returns (ClearResponse);
 
   rpc InsertRule(MatchActionRule) returns (RuleOperationResponse);

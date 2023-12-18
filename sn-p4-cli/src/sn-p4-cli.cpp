@@ -102,18 +102,18 @@ public:
 
   bool ClearAllTables() {
     ClientContext context;
-    ClearTablesRequest clr_req;
+    ClearAllPipelineTablesRequest clr_req;
     ClearResponse clr_rsp;
 
     clr_req.set_pipeline_id(pipeline_id);
-    Status status = stub_->ClearTables(&context, clr_req, &clr_rsp);
+    Status status = stub_->ClearAllPipelineTables(&context, clr_req, &clr_rsp);
     if (!status.ok()) {
-      std::cout << status.error_code() << ": ClearTables rpc failed: " <<status.error_message() << std::endl;
+      std::cout << status.error_code() << ": ClearAllPipelineTables rpc failed: " <<status.error_message() << std::endl;
       return false;
     }
 
     if (clr_rsp.error_code() != 0) {
-      std::cout << "ClearTables failed with error_code: " <<
+      std::cout << "ClearAllPipelineTables failed with error_code: " <<
 	std::to_string(clr_rsp.error_code()) <<
 	"(" << clr_rsp.error_detail() << ")" << std::endl;
       return false;

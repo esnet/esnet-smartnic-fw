@@ -75,7 +75,7 @@ public:
     }
   }
 
-  /* This rpc will be phased out. Use ClearTables instead. */
+  /* This rpc will be phased out. Use ClearAllPipelineTables instead. */
   Status ClearAllTables(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, ClearResponse* /* clear_response */) override {
     std::cerr << "--- ClearAllTables" << std::endl;
 
@@ -94,8 +94,8 @@ public:
     }
   }
 
-  Status ClearTables(ServerContext* /* context */, const ClearTablesRequest* request, ClearResponse* /* response */) override {
-    std::cerr << "--- ClearTables" << std::endl;
+  Status ClearAllPipelineTables(ServerContext* /* context */, const ClearAllPipelineTablesRequest* request, ClearResponse* /* response */) override {
+    std::cerr << "--- ClearAllPipelineTables" << std::endl;
     std::cerr << request->DebugString() << std::endl;
     std::cerr << "---" << std::endl;
 
