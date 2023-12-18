@@ -1,0 +1,36 @@
+#include "{{ intf_h.name }}"
+
+#include "{{ ip_name }}_defs.h"
+#include "vitisnetp4_common.h"
+#include "vitisnetp4_table.h"
+#include "vitisnetp4_target.h"
+
+/*----------------------------------------------------------------------------*/
+const struct vitis_net_p4_drv_intf vitis_net_p4_drv_intf_{{ ip_name }} = {
+    .info = {
+        .name = "{{ ip_name }}",
+    },
+
+    .common = {
+        .stub_env_if = XilVitisNetP4StubEnvIf,
+    },
+
+    .table = {
+        .reset = XilVitisNetP4TableReset,
+        .update = XilVitisNetP4TableUpdate,
+        .delete = XilVitisNetP4TableDelete,
+        .insert = XilVitisNetP4TableInsert,
+        .get_action_id = XilVitisNetP4TableGetActionId,
+        .get_mode = XilVitisNetP4TableGetMode,
+    },
+
+    .target = {
+        .config = &XilVitisNetP4TargetConfig_{{ ip_name }},
+        .init = XilVitisNetP4TargetInit,
+        .exit = XilVitisNetP4TargetExit,
+        .get_table_by_index = XilVitisNetP4TargetGetTableByIndex,
+        .get_table_by_name = XilVitisNetP4TargetGetTableByName,
+        .get_table_count = XilVitisNetP4TargetGetTableCount,
+    },
+};
+

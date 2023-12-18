@@ -7,12 +7,17 @@
 
 #include <stdio.h>		/* fprintf */
 #include "snp4.h"		/* API */
-#include "sdnet_0_defs.h"	/* XilVitisNetP4TargetConfig_sdnet_0 */
 #include "snp4_io.h"		/* snp4_io_reg_* */
 #include "unused.h"		/* UNUSED() */
 
+#include "vitisnetp4drv-intf.h"	/* Vitis driver wrapper */
+
 struct snp4_user_context {
   uintptr_t base_addr;
+  XilVitisNetP4EnvIf env;
+  XilVitisNetP4TargetCtx target;
+  unsigned int sdnet_idx;
+  const struct vitis_net_p4_drv_intf* intf;
 };
 
 static XilVitisNetP4ReturnType device_write(XilVitisNetP4EnvIf *EnvIfPtr, XilVitisNetP4AddressType address, uint32_t data) {
@@ -70,7 +75,7 @@ static XilVitisNetP4ReturnType log_error(XilVitisNetP4EnvIf *UNUSED(EnvIfPtr), c
   return XIL_VITIS_NET_P4_SUCCESS;
 }
 
-void * snp4_init(uintptr_t snp4_base_addr)
+void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr)
 {
   struct snp4_user_context * snp4_user;
   snp4_user = (struct snp4_user_context *) calloc(1, sizeof(struct snp4_user_context));
@@ -79,39 +84,29 @@ void * snp4_init(uintptr_t snp4_base_addr)
   }
   snp4_user->base_addr = snp4_base_addr;
 
-  XilVitisNetP4EnvIf * vitisnetp4_env;
-  vitisnetp4_env = (XilVitisNetP4EnvIf *) calloc(1, sizeof(XilVitisNetP4EnvIf));
-  if (vitisnetp4_env == NULL) {
+  snp4_user->intf = vitis_net_p4_drv_intf_get(sdnet_idx);
+  if (snp4_user->intf == NULL) {
+    goto out_fail_user;
+  }
+  snp4_user->sdnet_idx = sdnet_idx;
+
+  // Initialize the vitisnetp4 env
+  if (snp4_user->intf->common.stub_env_if(&snp4_user->env) != XIL_VITIS_NET_P4_SUCCESS) {
+    goto out_fail_user;
+  }
+  snp4_user->env.WordWrite32 = (XilVitisNetP4WordWrite32Fp) &device_write;
+  snp4_user->env.WordRead32  = (XilVitisNetP4WordRead32Fp)  &device_read;
+  snp4_user->env.UserCtx     = (XilVitisNetP4UserCtxType)   snp4_user;
+  snp4_user->env.LogError    = (XilVitisNetP4LogFp)         &log_error;
+  snp4_user->env.LogInfo     = (XilVitisNetP4LogFp)         &log_info;
+
+  // Initialize the vitisnetp4 target
+  if (snp4_user->intf->target.init(&snp4_user->target, &snp4_user->env, snp4_user->intf->target.config) != XIL_VITIS_NET_P4_SUCCESS) {
     goto out_fail_user;
   }
 
-  XilVitisNetP4TargetCtx * vitisnetp4_target;
-  vitisnetp4_target = (XilVitisNetP4TargetCtx *) calloc(1, sizeof(XilVitisNetP4EnvIf));
-  if (vitisnetp4_target == NULL) {
-    goto out_fail_env;
-  }
+  return (void *) snp4_user;
 
-  // Initialize the vitisnetp4 env
-  if (XilVitisNetP4StubEnvIf(vitisnetp4_env) != XIL_VITIS_NET_P4_SUCCESS) {
-    goto out_fail_target;
-  }
-  vitisnetp4_env->WordWrite32 = (XilVitisNetP4WordWrite32Fp) &device_write;
-  vitisnetp4_env->WordRead32  = (XilVitisNetP4WordRead32Fp)  &device_read;
-  vitisnetp4_env->UserCtx     = (XilVitisNetP4UserCtxType)   snp4_user;
-  vitisnetp4_env->LogError    = (XilVitisNetP4LogFp)         &log_error;
-  vitisnetp4_env->LogInfo     = (XilVitisNetP4LogFp)         &log_info;
-
-  // Initialize the vitisnetp4 target
-  if (XilVitisNetP4TargetInit(vitisnetp4_target, vitisnetp4_env, &XilVitisNetP4TargetConfig_sdnet_0) != XIL_VITIS_NET_P4_SUCCESS) {
-    goto out_fail_target;
-  }
-
-  return (void *) vitisnetp4_target;
-
- out_fail_target:
-  free(vitisnetp4_target);
- out_fail_env:
-  free(vitisnetp4_env);
  out_fail_user:
   free(snp4_user);
  out_fail:
@@ -120,32 +115,32 @@ void * snp4_init(uintptr_t snp4_base_addr)
 
 bool snp4_deinit(void * snp4_handle)
 {
-  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
-
-  if (XilVitisNetP4TargetExit(vitisnetp4_target) != XIL_VITIS_NET_P4_SUCCESS) {
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
+  if (snp4_user->intf->target.exit(&snp4_user->target) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
+  free(snp4_user);
 
   return true;
 }
 
 bool snp4_reset_all_tables(void * snp4_handle)
 {
-  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
 
   // Look up the number of tables in the design
   uint32_t num_tables;
-  if (XilVitisNetP4TargetGetTableCount(vitisnetp4_target, &num_tables) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->target.get_table_count(&snp4_user->target, &num_tables) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
   // Reset all of the tables in the design
   for (uint32_t i = 0; i < num_tables; i++) {
     XilVitisNetP4TableCtx * table;
-    if (XilVitisNetP4TargetGetTableByIndex(vitisnetp4_target, i, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+    if (snp4_user->intf->target.get_table_by_index(&snp4_user->target, i, &table) != XIL_VITIS_NET_P4_SUCCESS) {
       return false;
     }
-    if (XilVitisNetP4TableReset(table) != XIL_VITIS_NET_P4_SUCCESS) {
+    if (snp4_user->intf->table.reset(table) != XIL_VITIS_NET_P4_SUCCESS) {
       return false;
     }
   }
@@ -155,14 +150,14 @@ bool snp4_reset_all_tables(void * snp4_handle)
 
 bool snp4_reset_one_table(void * snp4_handle, const char * table_name)
 {
-  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
 
   XilVitisNetP4TableCtx * table;
-  if (XilVitisNetP4TargetGetTableByName(vitisnetp4_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->target.get_table_by_name(&snp4_user->target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
-  if (XilVitisNetP4TableReset(table) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->table.reset(table) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
@@ -181,22 +176,22 @@ bool snp4_table_insert_kma(void * snp4_handle,
 			   uint32_t priority,
 			   bool replace)
 {
-  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
 
   // Get a handle for the target table
   XilVitisNetP4TableCtx * table;
-  if (XilVitisNetP4TargetGetTableByName(vitisnetp4_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->target.get_table_by_name(&snp4_user->target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
   // Convert the action name to an id
   uint32_t action_id;
-  if (XilVitisNetP4TableGetActionId(table, (char *)action_name, &action_id) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->table.get_action_id(table, (char *)action_name, &action_id) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
   XilVitisNetP4TableMode table_mode;
-  if (XilVitisNetP4TableGetMode(table, &table_mode) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->table.get_mode(table, &table_mode) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
@@ -215,12 +210,12 @@ bool snp4_table_insert_kma(void * snp4_handle,
 
   if (replace) {
     /* Replace an existing entry */
-    if (XilVitisNetP4TableUpdate(table, key, mask, action_id, params) != XIL_VITIS_NET_P4_SUCCESS) {
+    if (snp4_user->intf->table.update(table, key, mask, action_id, params) != XIL_VITIS_NET_P4_SUCCESS) {
       return false;
     }
   } else {
     /* Insert an entirely new entry */
-    if (XilVitisNetP4TableInsert(table, key, mask, priority, action_id, params) != XIL_VITIS_NET_P4_SUCCESS) {
+    if (snp4_user->intf->table.insert(table, key, mask, priority, action_id, params) != XIL_VITIS_NET_P4_SUCCESS) {
       return false;
     }
   }
@@ -235,16 +230,16 @@ bool snp4_table_delete_k(void * snp4_handle,
 			 uint8_t * mask,
 			 size_t    UNUSED(mask_len))
 {
-  XilVitisNetP4TargetCtx * vitisnetp4_target = (XilVitisNetP4TargetCtx *) snp4_handle;
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
 
   // Get a handle for the target table
   XilVitisNetP4TableCtx * table;
-  if (XilVitisNetP4TargetGetTableByName(vitisnetp4_target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->target.get_table_by_name(&snp4_user->target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
   XilVitisNetP4TableMode table_mode;
-  if (XilVitisNetP4TableGetMode(table, &table_mode) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->table.get_mode(table, &table_mode) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 
@@ -261,7 +256,7 @@ bool snp4_table_delete_k(void * snp4_handle,
     break;
   }
 
-  if (XilVitisNetP4TableDelete(table, key, mask) != XIL_VITIS_NET_P4_SUCCESS) {
+  if (snp4_user->intf->table.delete(table, key, mask) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
   }
 

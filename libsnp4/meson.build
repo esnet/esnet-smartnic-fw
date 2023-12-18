@@ -19,7 +19,7 @@ libsnp4 = shared_library(
   sources,
   dependencies : [
     libgmp_dep,
-    dependency('libvitisnetp4drv'),
+    dependency('vitisnetp4drv-intf'),
     libsnutil_dep,
   ],
   include_directories : [

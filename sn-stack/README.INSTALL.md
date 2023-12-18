@@ -387,6 +387,8 @@ docker compose exec smartnic-fw bash
 
 The `sn-p4-cli` tool will automatically look for an environment variable called `SN_P4_CLI_SERVER` which can be set to the hostname of the `sn-p4-agent` that will perform all of the requested actions on the real hardware.  In the `smartnic-fw` container, this value will already be set for you.
 
+By default, all operations performed by the `sn-p4-cli` tool will target the ingress pipeline. A different pipeline can be operated on by using the `--pipeline-id` option to select an alternate. Use the `--help` option to see which pipelines are supported.
+
 # Inspecting the pipeline structure with the "info" subcommand
 
 The `info` subcommand is used to display the pipeline structure, including table names, match fields (and their types), action names and the list of parameters for each action.  This information can be used to formulate new rule definitions for the other subcommands.

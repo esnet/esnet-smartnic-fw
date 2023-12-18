@@ -20,7 +20,7 @@ extern "C"
 #include <stddef.h>		/* size_t */
 #include <stdio.h>		/* FILE */
 
-extern void * snp4_init(uintptr_t snp4_base_addr);
+extern void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr);
 extern bool snp4_deinit(void * snp4_handle);
 extern bool snp4_reset_all_tables(void * snp4_handle);
 extern bool snp4_reset_one_table(void * snp4_handle, const char * table_name);
@@ -41,7 +41,7 @@ extern bool snp4_table_delete_k(void * snp4_handle,
 				size_t    key_len,
 				uint8_t * mask,
 				size_t    mask_len);
-extern void snp4_print_target_config (void);
+extern void snp4_print_target_config (unsigned int sdnet_idx);
 
 // Define some limits for the supported pipeline properties handled by this library
 // NOTE: These are not necessarily related to the limits of the underlying hardware
@@ -151,7 +151,7 @@ enum snp4_status {
   SNP4_STATUS_INFO_INVALID_ENDIAN,
 };
 
-extern enum snp4_status snp4_info_get_pipeline(struct snp4_info_pipeline * pipeline);
+extern enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info_pipeline * pipeline);
 extern const struct snp4_info_table * snp4_info_get_table_by_name(const struct snp4_info_pipeline * pipeline, const char * table_name);
 extern const struct snp4_info_action * snp4_info_get_action_by_name(const struct snp4_info_table * table, const char * action_name);
 
