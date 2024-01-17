@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation    A simple test suite file for firmware.
-Library          fw.Library
+Library          fw.hello.Library
 
 
 *** Test Cases ***
