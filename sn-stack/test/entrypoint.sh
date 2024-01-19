@@ -2,6 +2,8 @@
 
 set -e -o pipefail
 
+source /sn-fw/buildinfo.env
+
 #-------------------------------------------------------------------------------
 # Build up the command line to invoke the Robot Framework engine.
 cmd=( 'robot' )
@@ -9,8 +11,14 @@ cmd=( 'robot' )
 # Redirect report and log files.
 cmd+=( '--outputdir=/scratch' )
 
+# Give the aggregated test suite a sane name.
+cmd+=( "--name=esnet-smartnic-fw-${SN_HW_BOARD}-${SN_HW_APP_NAME}-${SN_HW_VER}" )
+
 # Setup the Python module search paths.
 cmd+=( $(find /test -type d -name library | sed -e 's:^:--pythonpath=:') )
+
+# Insert the global suite setup/teardown.
+cmd+=( '/test/fw/__init__.robot' )
 
 # Setup the Robot Test Data file search paths.
 cmd+=( $(find /test -type d -regex '.+/suites/[^/]+$') )

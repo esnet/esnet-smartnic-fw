@@ -17,17 +17,17 @@ RUN <<EOT
     apt upgrade -y
 
     apt install -y --no-install-recommends \
+      bash-completion \
       build-essential \
       cdbs \
       curl \
       devscripts \
       equivs \
       fakeroot \
+      less \
       libdistro-info-perl \
+      libpython3-dev \
       ninja-build \
-      python3-click \
-      python3-yaml \
-      python3-jinja2 \
       libgmp-dev \
       libprotobuf-dev \
       libgrpc++-dev \
@@ -43,7 +43,7 @@ RUN <<EOT
 
     pip3 install \
       meson \
-      pyyaml-include \
+      poetry \
       yq
 EOT
 
@@ -76,6 +76,14 @@ ENV SN_FW_VER ${SN_FW_VER}
 COPY . /sn-fw/source
 WORKDIR /sn-fw/source
 
+# Build and install the Python regmap library.
+RUN <<EOF
+    set -ex
+    cd regio
+    poetry build
+    pip3 install --find-links ./dist regio[shells]
+EOF
+
 RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
     set -ex
     meson subprojects purge --confirm
@@ -87,6 +95,12 @@ RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
     meson compile --clean -C /sn-fw/build
     meson install -C /sn-fw/build
     ldconfig
+
+    # Install the generated Python regmap.
+    pip3 install --find-links /usr/local/share/esnet-smartnic/python regmap_esnet_smartnic
+
+    # Install bash completion for the tool.
+    regio-esnet-smartnic -t zero completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
 EOF
 
 COPY <<EOF /sn-fw/buildinfo.env
@@ -106,6 +120,7 @@ EOF
 # Setup the test automation framework.
 WORKDIR sn-stack/test
 RUN <<EOF
+    set -ex
     mkdir /test
     cp entrypoint.sh /test/.
 
