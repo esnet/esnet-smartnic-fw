@@ -1,6 +1,7 @@
 from robot.api import logger
 
-import regio.regmap as regmap
+from regio.regmap.io import FileMmapIOForSpec
+from regio.regmap.proxy import start_io, stop_io
 import regmap_esnet_smartnic.toplevel as top
 
 BAR_INFO = tuple(sorted(top.BAR_INFO.items(), key=lambda pair: pair[0]))
@@ -21,12 +22,12 @@ class Device:
 
             if self.pci_id == 'none': # For testing without hardware.
                 path = f'/scratch/regio-esnet-smartnic.{self.pci_id}.{bar}.bin'
-                io = regmap.FileMmapIOForSpec(spec, path)
+                io = FileMmapIOForSpec(spec, path)
             else:
                 io = None
 
             proxy = info['new_proxy'](self.pci_id, spec, io)
-            regmap.start_io(proxy)
+            start_io(proxy)
             setattr(self, bar, proxy)
 
             logger.info(f'Started IO for device {self.pci_id} on {bar} using regmap spec {spec}.')
@@ -35,7 +36,7 @@ class Device:
         for bid, _ in reversed(BAR_INFO):
             bar = self.BAR_FMT.format(bid)
             proxy = getattr(self, bar)
-            regmap.stop_io(proxy)
+            stop_io(proxy)
             delattr(self, bar)
 
             logger.info(f'Stopped IO for device {self.pci_id} on {bar}.')
