@@ -1,0 +1,162 @@
+#---------------------------------------------------------------------------------------------------
+__all__ = (
+    'main',
+)
+
+import click
+import grpc
+import json
+import pathlib
+import types
+
+from .sn_cfg_v1_pb2_grpc import SmartnicConfigStub
+
+from . import completions
+
+SUB_COMMAND_MODULES = (
+    completions,
+)
+
+#---------------------------------------------------------------------------------------------------
+HELP_CONFIG_TLS_ROOT_CERTS = '{"client":{"tls":{"root-certs":"<PATH-TO-PEM-FILE>"}}}'
+HELP_CONFIG_AUTH_TOKEN     = '{"client":{"auth":{"token":"<TOKEN>"}}}'
+
+#---------------------------------------------------------------------------------------------------
+def connect_client(client):
+    config = {}
+    if not client.args.no_config_file:
+        config_file = pathlib.Path(client.args.config_file)
+        if config_file.exists():
+            with config_file.open() as fo:
+                config = json.load(fo)
+
+    config = config.get('client', {})
+    config_auth = config.get('auth', {})
+    config_tls = config.get('tls', {})
+
+    # Setup the authentication token.
+    auth_token = client.args.auth_token
+    if auth_token is None:
+        auth_token = config_auth.get('token')
+    if auth_token is None:
+        raise click.ClickException(
+            'Missing token needed for authenticating with the server. Specify the token to use '
+            f'with the --auth-token option or add to the config file as {HELP_CONFIG_AUTH_TOKEN}.')
+
+    # Setup the root certificates needed for verifying the server.
+    if client.args.tls_insecure:
+        # The current implementation of the Python SSLChannelCredentials (implemented by a cython
+        # wrapper around the gRPC core C library) does not expose the peer verification options from
+        # the grpc_ssl_credentials_create function, which would have allowed ignoring the server's
+        # certificate by simply providing a custom verification callback. Since the cython interface
+        # isn't compatible with ctypes, the grpc_ssl_credentials_create function can't be called
+        # directly. This is worked around by simply fetching the server's certificate and using it
+        # as the CA chain.
+        import ssl
+        server_certs = ssl.get_server_certificate((client.args.address, client.args.port))
+        tls_root_certs = bytes(server_certs, 'utf-8')
+    else:
+        tls_root_certs = client.args.tls_root_certs
+        if tls_root_certs is None:
+            tls_root_certs = config_tls.get('root-certs')
+        if tls_root_certs is not None:
+            tls_root_certs = pathlib.Path(tls_root_certs).read_bytes()
+
+    # Setup channel option to override the hostname used during verification.
+    # https://grpc.github.io/grpc/core/group__grpc__arg__keys.html#ga218bf55b665134a11baf07ada5980825
+    options = ()
+    if client.args.tls_hostname_override is not None:
+        options += (('grpc.ssl_target_name_override', client.args.tls_hostname_override,),)
+
+    # Setup the credentials and authentication methods.
+    tls_creds = grpc.ssl_channel_credentials(root_certificates=tls_root_certs)
+    call_creds = grpc.access_token_call_credentials(auth_token)
+    channel_creds = grpc.composite_channel_credentials(tls_creds, call_creds)
+
+    # Setup the TLS encrypted channel.
+    address = f'{client.args.address}:{client.args.port}'
+    channel = grpc.secure_channel(address, channel_creds, options)
+
+    # Create the RPC proxy.
+    client.stub = SmartnicConfigStub(channel)
+
+#---------------------------------------------------------------------------------------------------
+@click.group(
+    context_settings={
+        'help_option_names': ('--help', '-h'),
+    },
+)
+@click.option(
+    '--address',
+    default='ip6-localhost',
+    show_default=True,
+    help='Address of the server to connect to.',
+)
+@click.option(
+    '--port',
+    type=click.INT,
+    default=50100,
+    show_default=True,
+    help='Port the server listens on.',
+)
+@click.option(
+    '--tls-insecure',
+    is_flag=True,
+    help='Disable verification of the server certificate during TLS handshake.',
+)
+@click.option(
+    '--tls-root-certs',
+    help=f'''
+    Path to a file containing the concatenation of all X.509 root certificates needed for
+    authenticating the server when in secure mode. When not specified, value is taken from
+    config file as {HELP_CONFIG_TLS_ROOT_CERTS} or defaulted to the system standard certificates.
+    ''',
+)
+@click.option(
+    '--tls-hostname-override',
+    help='Override the hostname of the server used for verification during TLS handshake.',
+)
+@click.option(
+    '--auth-token',
+    help=f'''
+    Token to use for authenticating remote procedure calls sent to the server. Default taken
+    from config file as {HELP_CONFIG_AUTH_TOKEN}.
+    '''
+)
+@click.option(
+    '--no-config-file',
+    is_flag=True,
+    help='Disable support for loading client configuration from a file.',
+)
+@click.option(
+    '--config-file',
+    type=click.Path(dir_okay=False),
+    default='sn-cfg.json',
+    show_default=True,
+    help='Client JSON configuration file.',
+)
+@click.pass_context
+def click_main(ctx, **kargs):
+    ctx.obj = types.SimpleNamespace(args=types.SimpleNamespace(**kargs))
+
+@click_main.group
+@click.pass_context
+def configure(ctx):
+    connect_client(ctx.obj)
+
+@click_main.group
+@click.pass_context
+def show(ctx):
+    connect_client(ctx.obj)
+
+#---------------------------------------------------------------------------------------------------
+def main():
+    class Commands: ...
+    cmds = Commands()
+    cmds.main = click_main
+    cmds.configure = configure
+    cmds.show = show
+
+    for mod in SUB_COMMAND_MODULES:
+        mod.add_sub_commands(cmds)
+    cmds.main()
