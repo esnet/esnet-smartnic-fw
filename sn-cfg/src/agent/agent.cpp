@@ -53,6 +53,12 @@ using namespace std;
 #define HELP_CONFIG_TLS_KEY        "{\"server\":{\"tls\":{\"key\":\"<PATH-TO-PEM-FILE>\"}}}"
 #define HELP_CONFIG_AUTH_TOKENS    "{\"server\":{\"auth\":{\"tokens\":[\"<TOKEN1>\", ...]}}}"
 
+#define ENV_VAR_ADDRESS        "SN_CFG_SERVER_ADDRESS"
+#define ENV_VAR_PORT           "SN_CFG_SERVER_PORT"
+#define ENV_VAR_TLS_CERT_CHAIN "SN_CFG_SERVER_TLS_CERT_CHAIN"
+#define ENV_VAR_TLS_KEY        "SN_CFG_SERVER_TLS_KEY"
+#define ENV_VAR_AUTH_TOKENS    "SN_CFG_SERVER_AUTH_TOKENS"
+
 //--------------------------------------------------------------------------------------------------
 struct Arguments {
     struct Server {
@@ -293,28 +299,38 @@ static void agent_server_add(CLI::App& app, Arguments::Server& args, vector<Comm
     // Setup the optional arguments.
     cmd->add_option(
         "--address", args.address,
-        "Address the agent will bind to.")->
+        "Address the agent will bind to. Can also be set via the " ENV_VAR_ADDRESS " environment "
+        "variable.")->
+        envname(ENV_VAR_ADDRESS)->
         default_val(args.address);
     cmd->add_option(
         "--port", args.port,
-        "Port the agent will listen on.")->
+        "Port the agent will listen on. Can also be set via the " ENV_VAR_PORT " environment "
+        "variable.")->
+        envname(ENV_VAR_PORT)->
         default_val(args.port);
 
     cmd->add_option(
         "--tls-cert-chain", args.tls_cert_chain,
         "Server X.509 certificate chain for TLS authentication. The chain must contain the server "
         "certificate followed by all intermediate signing certificates in order (certificate i+1 "
-        "was used to sign certificate i in the chain, with i=0 being the server). Default taken "
-        "from config file as " HELP_CONFIG_TLS_CERT_CHAIN ".");
+        "was used to sign certificate i in the chain, with i=0 being the server). Can also be set "
+        "via the " ENV_VAR_TLS_CERT_CHAIN " environment variable. Default taken from config file "
+        "as " HELP_CONFIG_TLS_CERT_CHAIN ".")->
+        envname(ENV_VAR_TLS_CERT_CHAIN);
     cmd->add_option(
         "--tls-key", args.tls_key,
-        "Private key paired to the public key contained within the server X.509 certificate. "
-        "Default taken from config file as " HELP_CONFIG_TLS_KEY ".");
+        "Private key paired to the public key contained within the server X.509 certificate. Can "
+        "also be set via the " ENV_VAR_TLS_KEY " environment variable. Default taken from config "
+        "file as " HELP_CONFIG_TLS_KEY ".")->
+        envname(ENV_VAR_TLS_KEY);
 
     cmd->add_option(
         "--auth-token", args.auth_tokens,
         "Token to use for authenticating remote procedure calls received from clients. Repeat for "
-        "each token. Default taken from config file as " HELP_CONFIG_AUTH_TOKENS ".");
+        "each token. Can also be set as a space-separated list via the " ENV_VAR_AUTH_TOKENS
+        " environment variable. Default taken from config file as " HELP_CONFIG_AUTH_TOKENS ".")->
+        envname(ENV_VAR_AUTH_TOKENS);
 
     cmd->add_flag(
         "--no-config-file", args.no_config_file,

@@ -96,6 +96,22 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kSwitchConfig:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_switch_config(req.switch_config(), rdwr);
+                break;
+
+            case BatchOperation::BOP_SET:
+                batch_set_switch_config(req.switch_config(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         default:
             error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST);
             break;

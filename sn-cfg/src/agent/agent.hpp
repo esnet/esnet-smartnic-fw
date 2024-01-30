@@ -39,6 +39,12 @@ public:
     Status GetPortStatus(
         ServerContext*, const PortStatusRequest*, ServerWriter<PortStatusResponse>*) override;
 
+    // Switch configuration.
+    Status GetSwitchConfig(
+        ServerContext*, const SwitchConfigRequest*, ServerWriter<SwitchConfigResponse>*) override;
+    Status SetSwitchConfig(
+        ServerContext*, const SwitchConfigRequest*, ServerWriter<SwitchConfigResponse>*) override;
+
 private:
     vector<Device> devices;
 
@@ -66,6 +72,13 @@ private:
     void get_port_status(const PortStatusRequest&, function<void(const PortStatusResponse&)>);
     void batch_get_port_status(
         const PortStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void get_switch_config(const SwitchConfigRequest&, function<void(const SwitchConfigResponse&)>);
+    void batch_get_switch_config(
+        const SwitchConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void set_switch_config(const SwitchConfigRequest&, function<void(const SwitchConfigResponse&)>);
+    void batch_set_switch_config(
+        const SwitchConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 };
 
 #endif // AGENT_HPP

@@ -17,12 +17,14 @@ from . import completions
 from . import device
 from . import host
 from . import port
+from . import switch
 
 SUB_COMMAND_MODULES = (
     completions,
     device,
     host,
     port,
+    switch,
 )
 
 #---------------------------------------------------------------------------------------------------

@@ -24,6 +24,9 @@ ERROR_MAP = {
     # Port configuration error codes.
     ErrorCode.EC_INVALID_PORT_ID: 'invalid-port-id',
     ErrorCode.EC_MISSING_PORT_CONFIG: 'missing-port-config',
+
+    # Switch configuration error codes.
+    ErrorCode.EC_MISSING_SWITCH_CONFIG: 'missing-switch-config',
 }
 
 def error_code_str(ec):
