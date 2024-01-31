@@ -16,6 +16,10 @@ ERROR_MAP = {
 
     # Device configuration error codes.
     ErrorCode.EC_INVALID_DEVICE_ID: 'invalid-device-id',
+
+    # Host configuration error codes.
+    ErrorCode.EC_INVALID_HOST_ID: 'invalid-host-id',
+    ErrorCode.EC_MISSING_HOST_CONFIG: 'missing-host-config',
 }
 
 def error_code_str(ec):

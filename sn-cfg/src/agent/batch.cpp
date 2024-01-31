@@ -52,6 +52,22 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kHostConfig:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_host_config(req.host_config(), rdwr);
+                break;
+
+            case BatchOperation::BOP_SET:
+                batch_set_host_config(req.host_config(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         default:
             error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST);
             break;

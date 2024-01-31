@@ -15,10 +15,12 @@ from .sn_cfg_v1_pb2_grpc import SmartnicConfigStub
 
 from . import completions
 from . import device
+from . import host
 
 SUB_COMMAND_MODULES = (
     completions,
     device,
+    host,
 )
 
 #---------------------------------------------------------------------------------------------------

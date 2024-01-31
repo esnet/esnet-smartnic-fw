@@ -83,6 +83,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids) {
         cout << "------> " << bus_id << endl;
         devices.push_back({
             .bus_id = bus_id,
+            .nhosts = 2,
             .base = NULL,
         });
     }

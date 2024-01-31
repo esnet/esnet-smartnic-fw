@@ -25,6 +25,12 @@ public:
     Status GetDeviceStatus(
         ServerContext*, const DeviceStatusRequest*, ServerWriter<DeviceStatusResponse>*) override;
 
+    // Host configuration.
+    Status GetHostConfig(
+        ServerContext*, const HostConfigRequest*, ServerWriter<HostConfigResponse>*) override;
+    Status SetHostConfig(
+        ServerContext*, const HostConfigRequest*, ServerWriter<HostConfigResponse>*) override;
+
 private:
     vector<Device> devices;
 
@@ -35,6 +41,13 @@ private:
     void get_device_status(const DeviceStatusRequest&, function<void(const DeviceStatusResponse&)>);
     void batch_get_device_status(
         const DeviceStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void get_host_config(const HostConfigRequest&, function<void(const HostConfigResponse&)>);
+    void batch_get_host_config(
+        const HostConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void set_host_config(const HostConfigRequest&, function<void(const HostConfigResponse&)>);
+    void batch_set_host_config(
+        const HostConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 };
 
 #endif // AGENT_HPP
