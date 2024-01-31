@@ -31,6 +31,14 @@ public:
     Status SetHostConfig(
         ServerContext*, const HostConfigRequest*, ServerWriter<HostConfigResponse>*) override;
 
+    // Port configuration.
+    Status GetPortConfig(
+        ServerContext*, const PortConfigRequest*, ServerWriter<PortConfigResponse>*) override;
+    Status SetPortConfig(
+        ServerContext*, const PortConfigRequest*, ServerWriter<PortConfigResponse>*) override;
+    Status GetPortStatus(
+        ServerContext*, const PortStatusRequest*, ServerWriter<PortStatusResponse>*) override;
+
 private:
     vector<Device> devices;
 
@@ -48,6 +56,16 @@ private:
     void set_host_config(const HostConfigRequest&, function<void(const HostConfigResponse&)>);
     void batch_set_host_config(
         const HostConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void get_port_config(const PortConfigRequest&, function<void(const PortConfigResponse&)>);
+    void batch_get_port_config(
+        const PortConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void set_port_config(const PortConfigRequest&, function<void(const PortConfigResponse&)>);
+    void batch_set_port_config(
+        const PortConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_port_status(const PortStatusRequest&, function<void(const PortStatusResponse&)>);
+    void batch_get_port_status(
+        const PortStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 };
 
 #endif // AGENT_HPP

@@ -84,6 +84,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids) {
         devices.push_back({
             .bus_id = bus_id,
             .nhosts = 2,
+            .nports = 2,
             .base = NULL,
         });
     }

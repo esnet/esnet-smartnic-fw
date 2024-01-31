@@ -68,6 +68,34 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kPortConfig:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_port_config(req.port_config(), rdwr);
+                break;
+
+            case BatchOperation::BOP_SET:
+                batch_set_port_config(req.port_config(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kPortStatus:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_port_status(req.port_status(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         default:
             error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST);
             break;

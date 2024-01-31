@@ -20,6 +20,10 @@ ERROR_MAP = {
     # Host configuration error codes.
     ErrorCode.EC_INVALID_HOST_ID: 'invalid-host-id',
     ErrorCode.EC_MISSING_HOST_CONFIG: 'missing-host-config',
+
+    # Port configuration error codes.
+    ErrorCode.EC_INVALID_PORT_ID: 'invalid-port-id',
+    ErrorCode.EC_MISSING_PORT_CONFIG: 'missing-port-config',
 }
 
 def error_code_str(ec):
