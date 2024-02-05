@@ -35,6 +35,7 @@ RUN <<EOT
       protobuf-compiler \
       protobuf-compiler-grpc \
       pkg-config \
+      socat \
       tree
 
     apt install -y --no-install-recommends \
