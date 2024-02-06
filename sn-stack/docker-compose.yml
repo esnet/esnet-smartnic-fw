@@ -43,6 +43,37 @@ services:
           -e "set auto-open-ports 0" \
           -e "set jtag-port-filter ${HW_TARGET_SERIAL:-Xilinx/}"
 
+  xilinx-sc-console:
+    <<: *smartnic-fw-service
+    init: true
+    user: root
+    privileged: true
+    restart: unless-stopped
+    network_mode: none
+    environment:
+      - HW_TARGET_SERIAL=${HW_TARGET_SERIAL:-*}
+    volumes:
+      - /dev:/dev
+    entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
+      - |
+        if [ "$$HW_TARGET_SERIAL" == "*" ] ; then
+          export HW_USB_SERIAL="*"
+        else
+          # trim the extra trailing "A" from the quirky JTAG serial number to get the actual USB serial number
+          export HW_USB_SERIAL="$${HW_TARGET_SERIAL%A}"
+        fi
+        ls -l /dev/serial/by-id/
+        export HW_SC_UART_DEV="$$(ls /dev/serial/by-id/usb-Xilinx_*_$${HW_USB_SERIAL}-if01-port0)"
+        echo "Logging console output from device $${HW_SC_UART_DEV}"
+        [ -r $$HW_SC_UART_DEV ] || exit 1
+        socat stdout $${HW_SC_UART_DEV},sane,rawer,b115200,cs8,parenb=0,igncr
+
   smartnic-unpack:
     <<: *smartnic-fw-service
     hostname: smartnic-unpack
