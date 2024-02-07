@@ -27,6 +27,8 @@ print_help() {
     echo "        prior to executing tests. Intended for use in development."
     echo "    -r ARG, --run-arg=ARG"
     echo "        Specify extra arguments to pass to 'docker compose run'."
+    echo "    -s, --shell"
+    echo "        Enter the container using the Bash shell as entrypoint."
     echo "    --"
     echo "        Stop processing options. All remaining arguments will be"
     echo "        passed to the Robot Framework."
@@ -38,8 +40,8 @@ run_args=( '--no-deps' '--rm' )
 
 # Parse command line arguments.
 arguments=$(getopt -n "${PROG}" \
-                -o 'c:hpr:' \
-                -l compose-arg: -l help -l pip-install -l run-arg: \
+                -o 'c:hpr:s' \
+                -l compose-arg: -l help -l pip-install -l run-arg: -l shell \
                 -- "$@")
 eval set -- "${arguments}"
 
@@ -70,6 +72,10 @@ while true; do
         -r | --run-arg)
             run_args+=( "$1" )
             shift
+            ;;
+
+        -s | --shell)
+            run_args+=( "--entrypoint=bash -l" )
             ;;
 
         *)
