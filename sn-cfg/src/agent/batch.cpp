@@ -28,8 +28,24 @@ Status SmartnicConfigImpl::Batch(
 
         auto op = req.op();
         switch (req.item_case()) {
-        case BatchRequest::ItemCase::kDummy:
+        case BatchRequest::ItemCase::kDeviceInfo:
             switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_device_info(req.device_info(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kDeviceStatus:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_device_status(req.device_status(), rdwr);
+                break;
+
             default:
                 error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
                 break;

@@ -10,6 +10,56 @@ enum ErrorCode {
     // Batch error codes.
     EC_UNKNOWN_BATCH_REQUEST = 100;
     EC_UNKNOWN_BATCH_OP = 101;
+
+    // Device configuration error codes.
+    EC_INVALID_DEVICE_ID = 200;
+}
+
+//--------------------------------------------------------------------------------------------------
+message DevicePciInfo {
+    string bus_id = 1;
+    uint32 vendor_id = 2; // Only low 16-bits are valid (uint16 not supported by protobuf).
+    uint32 device_id = 3; // Only low 16-bits are valid (uint16 not supported by protobuf).
+}
+
+message DeviceBuildInfo {
+    uint32 number = 1; // Value from syscfg.usr_access.
+    uint32 status = 2; // Value from syscfg.build_status.
+    repeated uint32 dna = 3; // Array of length 3, value from syscfg.dna[3] (same ordering).
+}
+
+message DeviceInfo {
+    DevicePciInfo pci = 1;
+    DeviceBuildInfo build = 2;
+}
+
+message DeviceInfoRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+}
+
+message DeviceInfoResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    DeviceInfo info = 3;
+}
+
+message DeviceSystemMonitor {
+    uint32 index = 1; // System monitor index.
+    float temperature = 2; // Value from sysmon0.temperature.
+}
+
+message DeviceStatus {
+    repeated DeviceSystemMonitor sysmons = 1; // One per valid system monitor.
+}
+
+message DeviceStatusRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+}
+
+message DeviceStatusResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    DeviceStatus status = 3;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -25,7 +75,9 @@ message BatchRequest {
     // Field IDs 2-9 are reserved for future use.
 
     oneof item {
-        uint32 dummy = 10; // For compile. Remove when adding real requests.
+        // General device configuration.
+        DeviceInfoRequest device_info = 10;
+        DeviceStatusRequest device_status = 11;
     };
 }
 
@@ -35,7 +87,9 @@ message BatchResponse {
     // Field IDs 2-9 are reserved for future use.
 
     oneof item {
-        uint32 dummy = 10; // For compile. Remove when adding real responses.
+        // General device configuration.
+        DeviceInfoResponse device_info = 10;
+        DeviceStatusResponse device_status = 11;
     };
 }
 
@@ -43,4 +97,8 @@ message BatchResponse {
 service SmartnicConfig {
     // Batching of multiple RPCs.
     rpc Batch(stream BatchRequest) returns (stream BatchResponse);
+
+    // General device configuration.
+    rpc GetDeviceInfo(DeviceInfoRequest) returns (stream DeviceInfoResponse);
+    rpc GetDeviceStatus(DeviceStatusRequest) returns (stream DeviceStatusResponse);
 }

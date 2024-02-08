@@ -43,6 +43,7 @@ executable(
     files([
         'src/agent/agent.cpp',
         'src/agent/batch.cpp',
+        'src/agent/device.cpp',
     ]),
     dependencies: [
         cli11_dep,
@@ -87,7 +88,9 @@ custom_target(
         'src/client/__init__.py',
         'src/client/client.py',
         'src/client/completions.py',
+        'src/client/device.py',
         'src/client/error.py',
+        'src/client/utils.py',
         protoc_py_gen.process('sn_cfg_v1.proto'),
     ],
     output: [

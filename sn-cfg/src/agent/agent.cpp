@@ -56,6 +56,8 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 struct Arguments {
     struct Server {
+        vector<string> bus_ids;
+
         string address;
         unsigned int port;
 
@@ -75,7 +77,15 @@ struct Command {
 };
 
 //--------------------------------------------------------------------------------------------------
-SmartnicConfigImpl::SmartnicConfigImpl() {
+SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids) {
+    cout << endl << "--- PCI bus IDs:" << endl;
+    for (auto bus_id : bus_ids) {
+        cout << "------> " << bus_id << endl;
+        devices.push_back({
+            .bus_id = bus_id,
+            .base = NULL,
+        });
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -246,7 +256,7 @@ static int agent_server_run(const Arguments& args) {
     builder.AddListeningPort(address, credentials);
 
     // Attach the gRPC configuration service.
-    SmartnicConfigImpl service;
+    SmartnicConfigImpl service(args.server.bus_ids);
     builder.RegisterService(&service);
 
     // Create the server and bind it's address.
@@ -265,6 +275,12 @@ static int agent_server_run(const Arguments& args) {
     ShutdownProtobufLibrary();
 
     return 0;
+}
+
+//--------------------------------------------------------------------------------------------------
+static string pci_bus_id_check([[maybe_unused]] const string& value) {
+    // TODO: validate the pci bus id format
+    return string(); // Non-empty error message on error. Empty on success.
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -306,6 +322,17 @@ static void agent_server_add(CLI::App& app, Arguments::Server& args, vector<Comm
         "Server JSON configuration file.")->
         default_val(args.config_file);
 
+    // Setup the positional arguments.
+    cmd->add_option(
+        "bus-ids", args.bus_ids,
+        "PCI bus IDs of the devices to be managed by the agent. Each ID must be given in the form "
+        "<domain>:<bus>:<device>.<function>=<HHHH>:<HH>:<HH>.<H>, where H is a single hexadecimal "
+        "digit and the ranges of each fields are: domain in [0000,ffff], bus in [00,ff], device in "
+        "[00,1f] and function in [0,7].")->
+        check(pci_bus_id_check)-> // or transform?, each?
+        expected(1, -1)->
+        required();
+
     // Register the sub-command.
     commands.push_back({.cmd = cmd, .run = agent_server_run});
 }
@@ -316,6 +343,8 @@ int main(int argc, char *argv[]) {
     vector<Command> commands;
     Arguments args{
         .server = {
+            .bus_ids = {},
+
             .address = "[::]",
             .port = 50100,
 
