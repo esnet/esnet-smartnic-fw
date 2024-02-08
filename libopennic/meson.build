@@ -42,5 +42,4 @@ libopennic_dep = declare_dependency(
   include_directories : [ext_incdir],
   link_with : [
     libopennic,
-    libsnutil,
   ])
