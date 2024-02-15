@@ -9,6 +9,8 @@ import json
 import pathlib
 import types
 
+from .error import error_code_str
+from .sn_cfg_v1_pb2 import ErrorCode
 from .sn_cfg_v1_pb2_grpc import SmartnicConfigStub
 
 from . import completions
@@ -139,6 +141,39 @@ def connect_client(client):
 def click_main(ctx, **kargs):
     ctx.obj = types.SimpleNamespace(args=types.SimpleNamespace(**kargs))
 
+@click_main.group(chain=True)
+def batch(): ...
+
+@batch.result_callback()
+@click.pass_context
+def batch_callback(ctx, results):
+    # The "results" sequence contains the return values from each command handler in the order they
+    # were invoked. Each value is a pair of the form (request-generator, response-processor) for
+    # each of the sub-commands parsed from the command line.
+    client = ctx.obj
+
+    def generate():
+        for gen, _ in results:
+            yield from gen
+
+    def process():
+        for _, proc in results:
+            yield proc
+
+    connect_client(client)
+    try:
+        for resp in client.stub.Batch(generate()):
+            if resp.error_code != ErrorCode.EC_OK:
+                raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+
+            for proc in process():
+                if proc(resp):
+                    break
+            else:
+                raise click.ClickException('Unhandled batch item: ' + str(resp.WhichOneof('item')))
+    except grpc.RpcError as e:
+        raise click.ClickException(str(e))
+
 @click_main.group
 @click.pass_context
 def configure(ctx):
@@ -154,6 +189,7 @@ def main():
     class Commands: ...
     cmds = Commands()
     cmds.main = click_main
+    cmds.batch = batch
     cmds.configure = configure
     cmds.show = show
 

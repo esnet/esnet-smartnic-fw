@@ -42,6 +42,7 @@ executable(
     'sn-cfg-agent',
     files([
         'src/agent/agent.cpp',
+        'src/agent/batch.cpp',
     ]),
     dependencies: [
         cli11_dep,
