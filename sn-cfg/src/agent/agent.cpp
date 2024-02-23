@@ -17,6 +17,8 @@
 
 #include <json/json.h>
 
+#include "smartnic.h"
+
 using namespace google::protobuf;
 using namespace grpc;
 using namespace std;
@@ -87,17 +89,30 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids) {
     cout << endl << "--- PCI bus IDs:" << endl;
     for (auto bus_id : bus_ids) {
         cout << "------> " << bus_id << endl;
+        auto bar2 = smartnic_map_bar2_by_pciaddr(bus_id.c_str());
+        if (bar2 == NULL) {
+            cerr << "ERROR: Failed to map PCIe BAR2 register space for device " << bus_id << endl;
+            exit(EXIT_FAILURE);
+        }
+
         devices.push_back({
             .bus_id = bus_id,
             .nhosts = 2,
             .nports = 2,
-            .base = NULL,
+            .napps = 2,
+            .bar2 = bar2,
         });
     }
 }
 
 //--------------------------------------------------------------------------------------------------
 SmartnicConfigImpl::~SmartnicConfigImpl() {
+    for (auto dev : devices) {
+        if (dev.bar2 != NULL) {
+            smartnic_unmap_bar2(dev.bar2);
+            dev.bar2 = NULL;
+        }
+    }
 }
 
 //--------------------------------------------------------------------------------------------------

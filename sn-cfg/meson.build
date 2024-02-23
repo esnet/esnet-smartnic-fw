@@ -37,6 +37,7 @@ cpp = meson.get_compiler('cpp')
 libgrpcpp_reflection_dep = cpp.find_library('grpc++_reflection')
 cli11_dep = dependency('cli11')
 jsoncpp_dep = dependency('jsoncpp')
+regmap_dep = dependency('regmap')
 
 executable(
     'sn-cfg-agent',
@@ -52,7 +53,9 @@ executable(
         cli11_dep,
         jsoncpp_dep,
         libgrpcpp_reflection_dep,
+        libopennic_dep,
         proto_cpp,
+        regmap_dep,
     ],
     # Force linking all libs so that the unreferenced grpc++_reflection lib gets linked
     link_args: '-Wl,--no-as-needed',

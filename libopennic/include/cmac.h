@@ -11,10 +11,14 @@ extern "C" {
 extern bool cmac_reset(volatile struct cmac_block * cmac);
 extern bool cmac_loopback_enable(volatile struct cmac_block * cmac);
 extern bool cmac_loopback_disable(volatile struct cmac_block * cmac);
+extern bool cmac_loopback_is_enabled(volatile struct cmac_block * cmac);
 extern bool cmac_enable(volatile struct cmac_block * cmac);
 extern bool cmac_disable(volatile struct cmac_block * cmac);
+extern bool cmac_is_enabled(volatile struct cmac_block * cmac);
 extern bool cmac_rsfec_enable(volatile struct cmac_block * cmac);
 extern bool cmac_rsfec_disable(volatile struct cmac_block * cmac);
+extern bool cmac_rsfec_is_enabled(volatile struct cmac_block * cmac);
+extern bool cmac_rx_status_is_link_up(volatile struct cmac_block * cmac);
 
 #ifdef __cplusplus
 }

@@ -1,9 +1,10 @@
 #include "agent.hpp"
 
-#include <iostream>
-
 #include <grpc/grpc.h>
 #include "sn_cfg_v1.grpc.pb.h"
+
+#include "esnet_smartnic_toplevel.h"
+#include "qdma.h"
 
 using namespace grpc;
 using namespace std;
@@ -29,8 +30,10 @@ void SmartnicConfigImpl::get_host_config(
     }
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
         int begin_host_id = 0;
-        int end_host_id = devices[dev_id].nhosts - 1;
+        int end_host_id = dev.nhosts - 1;
         int host_id = req.host_id(); // 0-based index. -1 means all host interfaces.
         if (host_id > end_host_id) {
             HostConfigResponse resp;
@@ -47,13 +50,33 @@ void SmartnicConfigImpl::get_host_config(
 
         for (host_id = begin_host_id; host_id <= end_host_id; ++host_id) {
             HostConfigResponse resp;
+            auto err = ErrorCode::EC_OK;
 
-            auto config = resp.mutable_config();
-            auto dma = config->mutable_dma();
-            dma->set_base_queue(128 * (host_id - 1));
-            dma->set_num_queues(128);
+            volatile typeof(dev.bar2->qdma_func0)* qdma;
+            switch (host_id) {
+            case 0: qdma = &dev.bar2->qdma_func0; break;
+            case 1: qdma = &dev.bar2->qdma_func1; break;
+            default:
+                err = ErrorCode::EC_UNSUPPORTED_HOST_ID;
+                goto write_response;
+            }
 
-            resp.set_error_code(ErrorCode::EC_OK);
+            unsigned int base_queue;
+            unsigned int num_queues;
+            if (!qdma_get_queues(qdma, &base_queue, &num_queues)) {
+                err = ErrorCode::EC_FAILED_GET_DMA_QUEUES;
+                goto write_response;
+            }
+
+            {
+                auto config = resp.mutable_config();
+                auto dma = config->mutable_dma();
+                dma->set_base_queue(base_queue);
+                dma->set_num_queues(num_queues);
+            }
+
+        write_response:
+            resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_host_id(host_id);
 
@@ -114,9 +137,19 @@ void SmartnicConfigImpl::set_host_config(
     }
     auto config = req.config();
 
+    if (!config.has_dma()) {
+        HostConfigResponse resp;
+        resp.set_error_code(ErrorCode::EC_MISSING_HOST_DMA_CONFIG);
+        write_resp(resp);
+        return;
+    }
+    auto dma = config.dma();
+
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
         int begin_host_id = 0;
-        int end_host_id = devices[dev_id].nhosts - 1;
+        int end_host_id = dev.nhosts - 1;
         int host_id = req.host_id(); // 0-based index. -1 means all host interfaces.
         if (host_id > end_host_id) {
             HostConfigResponse resp;
@@ -131,21 +164,25 @@ void SmartnicConfigImpl::set_host_config(
             end_host_id = host_id;
         }
 
-        auto dma = config.dma();
         for (host_id = begin_host_id; host_id <= end_host_id; ++host_id) {
             HostConfigResponse resp;
+            auto err = ErrorCode::EC_OK;
 
-            cerr <<
-                "----------------------------------------" << endl <<
-                "--- " << __func__ << " Host ID: " << host_id <<
-                " on device ID " << dev_id << endl;
+            volatile typeof(dev.bar2->qdma_func0)* qdma;
+            switch (host_id) {
+            case 0: qdma = &dev.bar2->qdma_func0; break;
+            case 1: qdma = &dev.bar2->qdma_func1; break;
+            default:
+                err = ErrorCode::EC_UNSUPPORTED_HOST_ID;
+                goto write_response;
+            }
 
-            cerr <<
-                "--- " << __func__ << endl <<
-                "dma_base_queue = " << dma.base_queue() <<
-                ", dma_num_queues = " << dma.num_queues() << endl;
+            if (!qdma_set_queues(qdma, dma.base_queue(), dma.num_queues())) {
+                err = ErrorCode::EC_FAILED_SET_DMA_QUEUES;
+            }
 
-            resp.set_error_code(ErrorCode::EC_OK);
+        write_response:
+            resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_host_id(host_id);
 

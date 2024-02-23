@@ -1,11 +1,39 @@
 #include "agent.hpp"
 
+#include <cstdint>
+#include <fstream>
 #include <iostream>
+#include <sstream>
+#include <string>
 
 #include <grpc/grpc.h>
 #include "sn_cfg_v1.grpc.pb.h"
 
+#include "esnet_smartnic_toplevel.h"
+#include "syscfg_block.h"
+#include "sysmon.h"
+
 using namespace grpc;
+using namespace std;
+
+//--------------------------------------------------------------------------------------------------
+static uint16_t read_hex_pci_id(const string& bus_id, const string& file) {
+    string path = "/sys/bus/pci/devices/" + bus_id + '/' + file;
+    ifstream in(path, ios::in);
+    if (!in.is_open()) {
+        cerr << "ERROR: Failed to open file '" << path << "'." << endl;
+        return 0xffff;
+    }
+
+    ostringstream out;
+    out << in.rdbuf();
+    if (in.fail()) {
+        cerr << "ERROR: Failed to read file '" << path << "'." << endl;
+        return 0xffff;
+    }
+
+    return stoi(out.str(), 0, 16);
+}
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::get_device_info(
@@ -28,19 +56,22 @@ void SmartnicConfigImpl::get_device_info(
     }
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
         DeviceInfoResponse resp;
         auto info = resp.mutable_info();
 
         auto pci = info->mutable_pci();
-        pci->set_bus_id(devices[dev_id].bus_id);
-        pci->set_vendor_id(0x1234);
-        pci->set_device_id(dev_id);
+        pci->set_bus_id(dev.bus_id);
+        pci->set_vendor_id(read_hex_pci_id(dev.bus_id, "vendor"));
+        pci->set_device_id(read_hex_pci_id(dev.bus_id, "device"));
 
         auto build = info->mutable_build();
-        build->set_number(0x12345678);
-        build->set_status(0x9abcdef0);
-        for (auto i = 0; i < 3; ++i) {
-            build->add_dna(i);
+        volatile auto syscfg = &dev.bar2->syscfg;
+
+        build->set_number(syscfg->usr_access);
+        build->set_status(syscfg->build_status);
+        for (auto d = 0; d < SYSCFG_DNA_COUNT; ++d) {
+            build->add_dna(syscfg->dna[d]);
         }
 
         resp.set_error_code(ErrorCode::EC_OK);
@@ -95,14 +126,21 @@ void SmartnicConfigImpl::get_device_status(
     }
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
         DeviceStatusResponse resp;
         auto status = resp.mutable_status();
 
-        for (auto i = 0; i < 5; ++i) {
-            auto sysmon = status->add_sysmons();
-            sysmon->set_index(i);
-            sysmon->set_temperature((i + 1) * 10.0);
-        }
+        auto sysmon = status->add_sysmons();
+        sysmon->set_index(0);
+        sysmon->set_temperature(sysmon_get_temp(&dev.bar2->sysmon0));
+
+        sysmon = status->add_sysmons();
+        sysmon->set_index(1);
+        sysmon->set_temperature(sysmon_get_temp(&dev.bar2->sysmon1));
+
+        sysmon = status->add_sysmons();
+        sysmon->set_index(2);
+        sysmon->set_temperature(sysmon_get_temp(&dev.bar2->sysmon2));
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);

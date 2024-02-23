@@ -1,9 +1,10 @@
 #include "agent.hpp"
 
-#include <iostream>
-
 #include <grpc/grpc.h>
 #include "sn_cfg_v1.grpc.pb.h"
+
+#include "cmac.h"
+#include "esnet_smartnic_toplevel.h"
 
 using namespace grpc;
 using namespace std;
@@ -29,8 +30,10 @@ void SmartnicConfigImpl::get_port_config(
     }
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
         int begin_port_id = 0;
-        int end_port_id = devices[dev_id].nports - 1;
+        int end_port_id = dev.nports - 1;
         int port_id = req.port_id(); // 0-based index. -1 means all ports.
         if (port_id > end_port_id) {
             PortConfigResponse resp;
@@ -47,13 +50,32 @@ void SmartnicConfigImpl::get_port_config(
 
         for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
             PortConfigResponse resp;
+            auto err = ErrorCode::EC_OK;
 
-            auto config = resp.mutable_config();
-            config->set_state(PortState::PORT_STATE_DISABLE);
-            config->set_fec(PortFec::PORT_FEC_NONE);
-            config->set_loopback(PortLoopback::PORT_LOOPBACK_NONE);
+            volatile typeof(dev.bar2->cmac0)* cmac;
+            switch (port_id) {
+            case 0: cmac = &dev.bar2->cmac0; break;
+            case 1: cmac = &dev.bar2->cmac1; break;
+            default:
+                err = ErrorCode::EC_UNSUPPORTED_PORT_ID;
+                goto write_response;
+            }
 
-            resp.set_error_code(ErrorCode::EC_OK);
+            {
+                auto config = resp.mutable_config();
+                config->set_state(cmac_is_enabled(cmac) ?
+                                  PortState::PORT_STATE_ENABLE :
+                                  PortState::PORT_STATE_DISABLE);
+                config->set_fec(cmac_rsfec_is_enabled(cmac) ?
+                                PortFec::PORT_FEC_REED_SOLOMON :
+                                PortFec::PORT_FEC_NONE);
+                config->set_loopback(cmac_loopback_is_enabled(cmac) ?
+                                     PortLoopback::PORT_LOOPBACK_NEAR_END_PMA :
+                                     PortLoopback::PORT_LOOPBACK_NONE);
+            }
+
+        write_response:
+            resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_port_id(port_id);
 
@@ -115,8 +137,10 @@ void SmartnicConfigImpl::set_port_config(
     auto config = req.config();
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
         int begin_port_id = 0;
-        int end_port_id = devices[dev_id].nports - 1;
+        int end_port_id = dev.nports - 1;
         int port_id = req.port_id(); // 0-based index. -1 means all ports.
         if (port_id > end_port_id) {
             PortConfigResponse resp;
@@ -133,19 +157,70 @@ void SmartnicConfigImpl::set_port_config(
 
         for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
             PortConfigResponse resp;
+            auto err = ErrorCode::EC_OK;
 
-            cerr <<
-                "----------------------------------------" << endl <<
-                "--- " << __func__ << " Port ID: " << port_id <<
-                " on device ID " << dev_id << endl;
+            volatile typeof(dev.bar2->cmac0)* cmac;
+            switch (port_id) {
+            case 0: cmac = &dev.bar2->cmac0; break;
+            case 1: cmac = &dev.bar2->cmac1; break;
+            default:
+                err = ErrorCode::EC_UNSUPPORTED_PORT_ID;
+                goto write_response;
+            }
 
-            cerr <<
-                "--- " << __func__ << endl <<
-                "state = " << PortState_Name(config.state()) << endl <<
-                "fec = " << PortFec_Name(config.fec()) << endl <<
-                "loopback = " << PortLoopback_Name(config.loopback()) << endl;
+            switch (config.state()) {
+            case PortState::PORT_STATE_UNKNOWN: // Field is unset.
+                break;
 
-            resp.set_error_code(ErrorCode::EC_OK);
+            case PortState::PORT_STATE_DISABLE:
+                cmac_disable(cmac);
+                break;
+
+            case PortState::PORT_STATE_ENABLE:
+                cmac_enable(cmac);
+                break;
+
+            default:
+                err = ErrorCode::EC_UNSUPPORTED_PORT_STATE;
+                goto write_response;
+            }
+
+            switch (config.fec()) {
+            case PortFec::PORT_FEC_UNKNOWN: // Field is unset.
+                break;
+
+            case PortFec::PORT_FEC_NONE:
+                cmac_rsfec_disable(cmac);
+                break;
+
+            case PortFec::PORT_FEC_REED_SOLOMON:
+                cmac_rsfec_enable(cmac);
+                break;
+
+            default:
+                err = ErrorCode::EC_UNSUPPORTED_PORT_FEC;
+                goto write_response;
+            }
+
+            switch (config.loopback()) {
+            case PortLoopback::PORT_LOOPBACK_UNKNOWN: // Field is unset.
+                break;
+
+            case PortLoopback::PORT_LOOPBACK_NONE:
+                cmac_loopback_disable(cmac);
+                break;
+
+            case PortLoopback::PORT_LOOPBACK_NEAR_END_PMA:
+                cmac_loopback_enable(cmac);
+                break;
+
+            default:
+                err = ErrorCode::EC_UNSUPPORTED_PORT_LOOPBACK;
+                goto write_response;
+            }
+
+        write_response:
+            resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_port_id(port_id);
 
@@ -199,8 +274,10 @@ void SmartnicConfigImpl::get_port_status(
     }
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
         int begin_port_id = 0;
-        int end_port_id = devices[dev_id].nports - 1;
+        int end_port_id = dev.nports - 1;
         int port_id = req.port_id(); // 0-based index. -1 means all ports.
         if (port_id > end_port_id) {
             PortStatusResponse resp;
@@ -217,11 +294,26 @@ void SmartnicConfigImpl::get_port_status(
 
         for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
             PortStatusResponse resp;
+            auto err = ErrorCode::EC_OK;
 
-            auto status = resp.mutable_status();
-            status->set_link(PortLink::PORT_LINK_DOWN);
+            volatile typeof(dev.bar2->cmac0)* cmac;
+            switch (port_id) {
+            case 0: cmac = &dev.bar2->cmac0; break;
+            case 1: cmac = &dev.bar2->cmac1; break;
+            default:
+                err = ErrorCode::EC_UNSUPPORTED_PORT_ID;
+                goto write_response;
+            }
 
-            resp.set_error_code(ErrorCode::EC_OK);
+            {
+                auto status = resp.mutable_status();
+                status->set_link(cmac_rx_status_is_link_up(cmac) ?
+                                 PortLink::PORT_LINK_UP :
+                                 PortLink::PORT_LINK_DOWN);
+            }
+
+        write_response:
+            resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_port_id(port_id);
 

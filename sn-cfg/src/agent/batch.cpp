@@ -1,7 +1,5 @@
 #include "agent.hpp"
 
-#include <iostream>
-
 #include <grpc/grpc.h>
 #include "sn_cfg_v1.grpc.pb.h"
 
