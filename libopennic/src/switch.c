@@ -1,8 +1,10 @@
 #include "switch.h"
 
 #include "array_size.h"
+#include "memory-barriers.h"
 #include "smartnic_322mhz_block.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 //--------------------------------------------------------------------------------------------------
 static bool switch_interface_id_from_igr_sw_tid(struct switch_interface_id* intf,
@@ -491,4 +493,86 @@ bool switch_set_egress_connection(volatile struct smartnic_322mhz_block* blk,
     }
 
     return true;
+}
+
+//--------------------------------------------------------------------------------------------------
+void switch_set_defaults_one_to_one(volatile struct smartnic_322mhz_block* blk) {
+    unsigned int tid;
+
+    // Reset all ingress connections to drop prior to changing the switch configuration.
+    for (tid = 0; tid < ARRAY_SIZE(blk->igr_sw_tdest); ++tid) {
+        blk->igr_sw_tdest[tid]._v = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_DROP;
+    }
+    barrier();
+
+    // Apply ingress source defaults.
+    const union smartnic_322mhz_igr_sw_tid igr_sw_tid_defaults[] = {
+        {.value = SMARTNIC_322MHZ_IGR_SW_TID_VALUE_CMAC_0}, // CMAC 0
+        {.value = SMARTNIC_322MHZ_IGR_SW_TID_VALUE_CMAC_1}, // CMAC 1
+        {.value = SMARTNIC_322MHZ_IGR_SW_TID_VALUE_HOST_0}, // HOST 0
+        {.value = SMARTNIC_322MHZ_IGR_SW_TID_VALUE_HOST_1}, // HOST 1
+    };
+    for (tid = 0; tid < ARRAY_SIZE(blk->igr_sw_tid); ++tid) {
+        blk->igr_sw_tid[tid]._v = igr_sw_tid_defaults[tid]._v;
+    }
+
+    // Apply ingress connection defaults.
+    const union smartnic_322mhz_igr_sw_tdest igr_sw_tdest_defaults[] = {
+        {.value = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_0},      // CMAC 0
+        {.value = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_0},      // CMAC 1
+        {.value = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_BYPASS}, // HOST 0
+        {.value = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_BYPASS}, // HOST 1
+    };
+    for (tid = 0; tid < ARRAY_SIZE(blk->igr_sw_tdest); ++tid) {
+        blk->igr_sw_tdest[tid]._v = igr_sw_tdest_defaults[tid]._v;
+    }
+
+    // Apply egress connection defaults to the bypass processor.
+    const union smartnic_322mhz_bypass_tdest bypass_tdest_defaults[] = {
+        {.value = SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_HOST_0}, // CMAC 0
+        {.value = SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_HOST_1}, // CMAC 1
+        {.value = SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_CMAC_0}, // HOST 0
+        {.value = SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_CMAC_1}, // HOST 1
+    };
+    for (tid = 0; tid < ARRAY_SIZE(blk->bypass_tdest); ++tid) {
+        blk->bypass_tdest[tid]._v = bypass_tdest_defaults[tid]._v;
+    }
+
+    // Apply egress connection defaults to the application 0 processor.
+    const union smartnic_322mhz_app_0_tdest_remap app_0_tdest_remap_defaults[] = {
+        {.value = SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_CMAC_0}, // CMAC 0
+        {.value = SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_CMAC_1}, // CMAC 1
+        {.value = SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_HOST_0}, // HOST 0
+        {.value = SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_HOST_1}, // HOST 1
+    };
+    for (tid = 0; tid < ARRAY_SIZE(blk->app_0_tdest_remap); ++tid) {
+        blk->app_0_tdest_remap[tid]._v = app_0_tdest_remap_defaults[tid]._v;
+    }
+
+    // Apply egress connection defaults to the application 1 processor.
+    const union smartnic_322mhz_app_1_tdest_remap app_1_tdest_remap_defaults[] = {
+        {.value = SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_CMAC_0}, // CMAC 0
+        {.value = SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_CMAC_1}, // CMAC 1
+        {.value = SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_HOST_0}, // HOST 0
+        {.value = SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_HOST_1}, // HOST 1
+    };
+    for (tid = 0; tid < ARRAY_SIZE(blk->app_1_tdest_remap); ++tid) {
+        blk->app_1_tdest_remap[tid]._v = app_1_tdest_remap_defaults[tid]._v;
+    }
+
+    // Set up FIFO flow control thresholds for egress switch output FIFOs
+#define EGR_FC_THRESH_UNLIMITED UINT32_MAX
+#define EGR_FC_THRESH_FIFO_MAX  1020
+    uint32_t egr_fc_thresh_defaults[] = {
+        EGR_FC_THRESH_UNLIMITED, // CMAC 0
+        EGR_FC_THRESH_UNLIMITED, // CMAC 1
+        EGR_FC_THRESH_FIFO_MAX,  // HOST 0
+        EGR_FC_THRESH_UNLIMITED, // HOST 1
+    };
+    for (tid = 0; tid < ARRAY_SIZE(blk->egr_fc_thresh); ++tid) {
+        blk->egr_fc_thresh[tid] = egr_fc_thresh_defaults[tid];
+    }
+
+    // Disable split-join support.
+    blk->hdr_length = 0;
 }

@@ -55,6 +55,9 @@ ERROR_MAP = {
     ErrorCode.EC_UNSUPPORTED_EGR_CONN_TO_INTF: 'unsupported-egress-connection-to-interface',
     ErrorCode.EC_FAILED_GET_EGR_CONN: 'failed-get-egress-connection',
     ErrorCode.EC_FAILED_SET_EGR_CONN: 'failed-set-egress-connection',
+
+    # Defaults configuration error codes.
+    ErrorCode.EC_UNKNOWN_DEFAULTS_PROFILE: 'unknown-defaults-profile',
 }
 
 def error_code_str(ec):

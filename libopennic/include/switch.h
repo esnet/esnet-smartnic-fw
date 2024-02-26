@@ -57,6 +57,8 @@ bool switch_set_egress_connection(volatile struct smartnic_322mhz_block* blk,
                                   const struct switch_interface_id* from_intf,
                                   const struct switch_interface_id* to_intf);
 
+void switch_set_defaults_one_to_one(volatile struct smartnic_322mhz_block* blk);
+
 #ifdef __cplusplus
 }
 #endif

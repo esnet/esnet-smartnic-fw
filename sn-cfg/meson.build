@@ -44,6 +44,7 @@ executable(
     files([
         'src/agent/agent.cpp',
         'src/agent/batch.cpp',
+        'src/agent/defaults.cpp',
         'src/agent/device.cpp',
         'src/agent/host.cpp',
         'src/agent/port.cpp',
@@ -100,6 +101,7 @@ custom_target(
         'src/client/__init__.py',
         'src/client/client.py',
         'src/client/completions.py',
+        'src/client/defaults.py',
         'src/client/device.py',
         'src/client/error.py',
         'src/client/host.py',

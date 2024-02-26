@@ -14,6 +14,7 @@ from .sn_cfg_v1_pb2 import ErrorCode
 from .sn_cfg_v1_pb2_grpc import SmartnicConfigStub
 
 from . import completions
+from . import defaults
 from . import device
 from . import host
 from . import port
@@ -21,6 +22,7 @@ from . import switch
 
 SUB_COMMAND_MODULES = (
     completions,
+    defaults,
     device,
     host,
     port,

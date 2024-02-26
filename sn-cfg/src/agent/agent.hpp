@@ -19,6 +19,10 @@ public:
     // Batching of multiple RPCs.
     Status Batch(ServerContext*, ServerReaderWriter<BatchResponse, BatchRequest>*) override;
 
+    // Defaults configuration.
+    Status SetDefaults(
+        ServerContext*, const DefaultsRequest*, ServerWriter<DefaultsResponse>*) override;
+
     // General device configuration.
     Status GetDeviceInfo(
         ServerContext*, const DeviceInfoRequest*, ServerWriter<DeviceInfoResponse>*) override;
@@ -47,6 +51,10 @@ public:
 
 private:
     vector<Device> devices;
+
+    void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
+    void batch_set_defaults(
+        const DefaultsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void get_device_info(const DeviceInfoRequest&, function<void(const DeviceInfoResponse&)>);
     void batch_get_device_info(
