@@ -453,6 +453,31 @@ services:
     profiles:
       - smartnic-mgr-dpdk-portlink
 
+  smartnic-lldp:
+    <<: *smartnic-fw-service
+    init: true
+    depends_on:
+      smartnic-devbind:
+        condition: service_healthy
+    # Python needs a tty to print logs to stdout
+    tty: true
+    # Run in the same network namespace as the smartnic-dpdk-portlink container this
+    # service can send using the tap interfaces created there.
+    network_mode: "service:smartnic-dpdk-portlink"
+    environment:
+      - SN_LLDP_SLOTADDR=$FPGA_PCIE_DEV
+      - SN_LLDP_HOST=${SN_HOST:-sn-host-unset}
+      - SN_LLDP_TTL=20
+    volumes:
+      - ${SN_STACK_ROOT-${PWD}}/smartnic-lldp/scripts:/scripts:ro
+      # scapy depends on protocols and services for part of its init
+      - /etc/protocols:/etc/protocols
+      - /etc/services:/etc/services
+    entrypoint:
+      - /scripts/sn_lldp.py
+    profiles:
+      - smartnic-mgr-dpdk-portlink
+
   smartnic-fw:
     <<: *smartnic-fw-service
     hostname: smartnic-fw
