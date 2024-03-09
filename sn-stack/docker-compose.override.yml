@@ -8,7 +8,7 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 10.99.0.0/16
-          gateway: 10.99.0.1
-        - subnet: fdd5:b4c0:1237:763f::/64
-          gateway: fdd5:b4c0:1237:763f::1
+        - subnet: 10.9${UNIQUE:-0}.0.0/16
+          gateway: 10.9${UNIQUE:-0}.0.1
+        - subnet: fdd5:b4c${UNIQUE:-0}:1237:763f::/64
+          gateway: fdd5:b4c${UNIQUE:-0}:1237:763f::1
