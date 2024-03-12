@@ -59,6 +59,12 @@ executable(
     install: true,
 )
 
+install_data(
+    'sn-cfg-server-entrypoint.sh',
+    install_mode: ['rwxr-xr-x', 0, 0],
+    install_dir: '/usr/local/sbin',
+)
+
 #---------------------------------------------------------------------------------------------------
 # Python Protobuf and gRPC
 # As per https://grpc.io/docs/languages/python/basics/

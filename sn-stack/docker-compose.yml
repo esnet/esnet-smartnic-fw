@@ -493,6 +493,9 @@ services:
       - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_CLI_SERVER=smartnic-p4
+      - SN_CFG_CLI_ADDRESS=smartnic-cfg
+      - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
+      - SN_CFG_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -549,6 +552,46 @@ services:
       - smartnic-mgr-vfio-unlock
       - smartnic-no-vfio
 
+  smartnic-cfg:
+    <<: *smartnic-fw-service
+    hostname: smartnic-cfg
+    depends_on:
+      smartnic-hw:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    user: root
+    privileged: true
+    ports:
+      - "${SN_CFG_SERVER_PORT-50100}:50100"
+    environment:
+      - SN_CFG_SERVER_HOST=${SN_HOST}
+      - SN_CFG_SERVER_AUTH_TOKENS=${SN_CFG_AUTH_TOKEN}
+      - SN_CFG_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
+      - SN_TLS_PATH_PREFIX=${SN_TLS_PATH_PREFIX-}
+      - SN_TLS_CERT=${SN_TLS_CERT:-cert.pem}
+      - SN_TLS_CHAIN=${SN_TLS_CHAIN:-chain.pem}
+      - SN_TLS_FULLCHAIN=${SN_TLS_FULLCHAIN:-fullchain.pem}
+      - SN_TLS_KEY=${SN_TLS_KEY:-privkey.pem}
+    volumes:
+      - /sys/bus/pci:/sys/bus/pci
+      - /dev:/dev
+      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+      - type: bind
+        source: ${SN_TLS_HOST_DIR:-${PWD}/tls-certs}
+        target: /etc/tls-certs-host
+        read_only: true
+        bind:
+          create_host_path: false
+    entrypoint:
+      - /usr/local/sbin/sn-cfg-server-entrypoint.sh
+    profiles:
+      - smartnic-mgr-dpdk-portlink
+      - smartnic-mgr-dpdk-manual
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      - smartnic-no-vfio
+
   smartnic-fw-test:
     <<: *smartnic-fw-service
     restart: no
@@ -561,6 +604,9 @@ services:
       - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_CLI_SERVER=smartnic-p4
+      - SN_CFG_CLI_ADDRESS=smartnic-cfg
+      - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
+      - SN_CFG_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev

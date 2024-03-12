@@ -51,7 +51,8 @@ def connect_client(client):
     if auth_token is None:
         raise click.ClickException(
             'Missing token needed for authenticating with the server. Specify the token to use '
-            f'with the --auth-token option or add to the config file as {HELP_CONFIG_AUTH_TOKEN}.')
+            'with the --auth-token option, via environment variable or add to the config file '
+            f'as {HELP_CONFIG_AUTH_TOKEN}.')
 
     # Setup the root certificates needed for verifying the server.
     if client.args.tls_insecure:
@@ -100,14 +101,16 @@ def connect_client(client):
     '--address',
     default='ip6-localhost',
     show_default=True,
-    help='Address of the server to connect to.',
+    show_envvar=True,
+    help='Address of the server to connect to. Can also be set via environment variable.',
 )
 @click.option(
     '--port',
     type=click.INT,
     default=50100,
     show_default=True,
-    help='Port the server listens on.',
+    show_envvar=True,
+    help='Port the server listens on. Can also be set via environment variable.',
 )
 @click.option(
     '--tls-insecure',
@@ -116,21 +119,28 @@ def connect_client(client):
 )
 @click.option(
     '--tls-root-certs',
+    show_envvar=True,
     help=f'''
     Path to a file containing the concatenation of all X.509 root certificates needed for
-    authenticating the server when in secure mode. When not specified, value is taken from
-    config file as {HELP_CONFIG_TLS_ROOT_CERTS} or defaulted to the system standard certificates.
+    authenticating the server when in secure mode. Can also be set via environment variable. When
+    not specified, value is taken from config file as {HELP_CONFIG_TLS_ROOT_CERTS} or defaulted to
+    the system standard certificates.
     ''',
 )
 @click.option(
     '--tls-hostname-override',
-    help='Override the hostname of the server used for verification during TLS handshake.',
+    show_envvar=True,
+    help='''
+    Override the hostname of the server used for verification during TLS handshake. Can also be set
+    via environment variable.
+    ''',
 )
 @click.option(
     '--auth-token',
+    show_envvar=True,
     help=f'''
-    Token to use for authenticating remote procedure calls sent to the server. Default taken
-    from config file as {HELP_CONFIG_AUTH_TOKEN}.
+    Token to use for authenticating remote procedure calls sent to the server. Can also be set via
+    environment variable. Default taken from config file as {HELP_CONFIG_AUTH_TOKEN}.
     '''
 )
 @click.option(
@@ -203,4 +213,4 @@ def main():
 
     for mod in SUB_COMMAND_MODULES:
         mod.add_sub_commands(cmds)
-    cmds.main()
+    cmds.main(auto_envvar_prefix='SN_CFG_CLI')
