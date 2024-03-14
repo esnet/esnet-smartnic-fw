@@ -255,6 +255,7 @@ services:
           sleep infinity
         fi
     profiles:
+      - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-user
       - smartnic-mgr-vfio-unlock
@@ -350,6 +351,7 @@ services:
         sleep infinity
     profiles:
       - smartnic-mgr-user
+      - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-vfio-unlock
 
@@ -415,6 +417,67 @@ services:
     profiles:
       - smartnic-mgr-dpdk-manual
 
+  smartnic-dpdk-portlink:
+    <<: *smartnic-dpdk-service
+    hostname: smartnic-dpdk-portlink
+    init: true
+    user: root
+    privileged: true
+    depends_on:
+      smartnic-devbind:
+        condition: service_healthy
+    volumes:
+      - /sys/bus/pci:/sys/bus/pci
+      - /var/run/dpdk:/var/run/dpdk
+      - /sys/devices/system/node:/sys/devices/system/node
+      - /sys/bus/pci/drivers:/sys/bus/pci/drivers
+      - /dev:/dev
+      - /sys/kernel/mm/hugepages:/sys/kernel/mm/hugepages
+      - /lib/modules:/lib/modules
+      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+    entrypoint:
+      - dpdk-testpmd
+      - --file-prefix=sn-$FPGA_PCIE_DEV.0
+      - --allow=$FPGA_PCIE_DEV.0
+      - --allow=$FPGA_PCIE_DEV.1
+      - --vdev=net_tap0,iface=sn-pf0
+      - --vdev=net_tap1,iface=sn-pf1
+      #- --log-level=lib.eal:debug
+      - --
+      #- --cmdline-file=/scratch/testpmd.cmds.txt
+      - --port-topology=paired
+      - --portlist=0,2,1,3
+      - --forward-mode=io
+      # The stats must be enabled or else dpdk-testpmd exits immediately after forwarding 1 packet
+      - --stats-period=60
+    profiles:
+      - smartnic-mgr-dpdk-portlink
+
+  smartnic-lldp:
+    <<: *smartnic-fw-service
+    init: true
+    depends_on:
+      smartnic-devbind:
+        condition: service_healthy
+    # Python needs a tty to print logs to stdout
+    tty: true
+    # Run in the same network namespace as the smartnic-dpdk-portlink container this
+    # service can send using the tap interfaces created there.
+    network_mode: "service:smartnic-dpdk-portlink"
+    environment:
+      - SN_LLDP_SLOTADDR=$FPGA_PCIE_DEV
+      - SN_LLDP_HOST=${SN_HOST:-sn-host-unset}
+      - SN_LLDP_TTL=20
+    volumes:
+      - ${SN_STACK_ROOT-${PWD}}/smartnic-lldp/scripts:/scripts:ro
+      # scapy depends on protocols and services for part of its init
+      - /etc/protocols:/etc/protocols
+      - /etc/services:/etc/services
+    entrypoint:
+      - /scripts/sn_lldp.py
+    profiles:
+      - smartnic-mgr-dpdk-portlink
+
   smartnic-fw:
     <<: *smartnic-fw-service
     hostname: smartnic-fw
@@ -444,6 +507,7 @@ services:
       - |
         sleep infinity
     profiles:
+      - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-user
       - smartnic-mgr-vfio-unlock
@@ -479,6 +543,7 @@ services:
       - |
         sn-p4-agent $$SN_P4_AGENT_SLOTADDR
     profiles:
+      - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-user
       - smartnic-mgr-vfio-unlock
