@@ -18,7 +18,7 @@ services:
     user: root
     privileged: true
     ports:
-      - "${HW_SERVER_PORT-3121}:3121"
+      - "${HW_SERVER_PORT-50000}:3121"
     volumes:
       - /dev:/dev
       - /sys/bus/usb:/sys/bus/usb
@@ -111,7 +111,7 @@ services:
         condition: service_started
     volumes:
       - bitfiles:/bitfiles:ro
-      - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
+      - ${SN_STACK_ROOT-${PWD}}/smartnic-hw/scripts:/scripts:ro
     network_mode: none
     command:
       - /bin/bash
@@ -226,7 +226,7 @@ services:
       - /status
     volumes:
       - bitfiles:/bitfiles:ro
-      - ${SN_STACK_ROOT-.}/smartnic-hw/scripts:/scripts:ro
+      - ${SN_STACK_ROOT-${PWD}}/smartnic-hw/scripts:/scripts:ro
     healthcheck:
       test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
       interval: 10s
@@ -458,6 +458,8 @@ services:
     init: true
     user: root
     privileged: true
+    ports:
+      - "${P4_AGENT_PORT-50050}:50051"
     restart: unless-stopped
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0

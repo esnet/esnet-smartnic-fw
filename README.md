@@ -55,25 +55,27 @@ Docker Compose
 
 The `docker-compose.yml` file for the smartnic build and the sn-stack depends on features that are only supported in the compose v2 plugin.
 
+NOTE: The existing `docker-compose-plugin` package from your OS distribution may already be newer than the version stated below.  It is generally OK to use a newer version from your package manager if available rather than overriding the plugin in your user directory.
+
 Install the `docker compose` plugin like this for a single user:
 
 ```
 mkdir -p ~/.docker/cli-plugins/
-curl -SL https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+curl -SL https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
 chmod +x ~/.docker/cli-plugins/docker-compose
 ```
 
 Alternatively, you can install the `docker compose` plugin system-wide like this:
 ```
 sudo mkdir -p /usr/local/lib/docker/cli-plugins
-sudo curl  -o /usr/local/lib/docker/cli-plugins/docker-compose -SL https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-linux-x86_64
+sudo curl  -o /usr/local/lib/docker/cli-plugins/docker-compose -SL https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64
 sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 ```
 
 Verify your docker compose installation by running this as an ordinary (non-root) user without using `sudo`.  For this install, the version output should be
 ```
 $ docker compose version
-Docker Compose version v2.17.2
+Docker Compose version v2.20.2
 ```
 
 Git Submodules
