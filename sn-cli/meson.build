@@ -14,6 +14,7 @@ int_incdir = []
 
 cc = meson.get_compiler('c')
 libgmp_dep = cc.find_library('gmp')
+libm_dep = cc.find_library('m')
 
 sn_cli_bin = executable(
   'sn-cli',
@@ -24,6 +25,7 @@ sn_cli_bin = executable(
   dependencies : [
     libgmp_dep,
     libopennic_dep,
+    libm_dep,
     libsnp4_dep,
     libsnutil_dep,
     dependency('regmap'),

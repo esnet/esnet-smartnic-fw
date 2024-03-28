@@ -51,7 +51,6 @@ libsnp4_dep = declare_dependency(
   include_directories : [ext_incdir],
   link_with : [
     libsnp4,
-    libsnutil,
   ])
 
 gtest = dependency('gtest', fallback : ['gtest', 'gtest_main_dep'], main : true, required : true)

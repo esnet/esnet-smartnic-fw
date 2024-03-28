@@ -1,7 +1,9 @@
 sources = files(
   [
     'src/cmac.c',
+    'src/qdma.c',
     'src/smartnic_probe.c',
+    'src/switch.c',
     'src/sysmon.c',
     'src/pcie.c',
   ]
@@ -26,6 +28,8 @@ libopennic = shared_library(
 install_headers(
   [
     'include/cmac.h',
+    'include/qdma.h',
+    'include/switch.h',
     'include/sysmon.h',
     'include/smartnic.h',
   ],
@@ -42,5 +46,4 @@ libopennic_dep = declare_dependency(
   include_directories : [ext_incdir],
   link_with : [
     libopennic,
-    libsnutil,
   ])

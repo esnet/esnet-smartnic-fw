@@ -27,6 +27,8 @@ RUN <<EOT
       less \
       libdistro-info-perl \
       libpython3-dev \
+      lsof \
+      net-tools \
       ninja-build \
       libgmp-dev \
       libprotobuf-dev \
@@ -35,6 +37,7 @@ RUN <<EOT
       protobuf-compiler \
       protobuf-compiler-grpc \
       pkg-config \
+      screen \
       socat \
       tree
 
@@ -43,6 +46,7 @@ RUN <<EOT
       python3-setuptools
 
     pip3 install \
+      grpcio-tools \
       meson \
       poetry \
       yq
@@ -97,11 +101,12 @@ RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
     meson install -C /sn-fw/build
     ldconfig
 
-    # Install the generated Python regmap.
-    pip3 install --find-links /usr/local/share/esnet-smartnic/python regmap_esnet_smartnic
+    # Install the generated Python regmap and configuration client.
+    pip3 install --find-links /usr/local/share/esnet-smartnic/python regmap_esnet_smartnic sn_cfg
 
-    # Install bash completion for the tool.
+    # Install bash completions.
     regio-esnet-smartnic -t zero completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
+    sn-cfg completions bash >/usr/share/bash-completion/completions/sn-cfg
 EOF
 
 COPY <<EOF /sn-fw/buildinfo.env
