@@ -6,6 +6,7 @@
 #include "vitisnetp4_target.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,6 +16,7 @@ extern "C" {
 struct vitis_net_p4_drv_intf {
     struct {
         const char* name;
+        uintptr_t offset;
     } info;
 
     struct {

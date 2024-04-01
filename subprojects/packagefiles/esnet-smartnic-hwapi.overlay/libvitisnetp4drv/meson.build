@@ -9,34 +9,85 @@ intf_base = lib_base + '-intf'
 # Find system dependencies.
 cc = meson.get_compiler('c')
 libm_dep = cc.find_library('m', required: false)
+regmap_dep = dependency('regmap')
 
 #-------------------------------------------------------------------------------
 # Find Vitis drivers. There are two layouts:
-# - legacy: include and lib directories are peers with this file.
-# - new:    sdnet_* directories are peers with this file. The include and lib
-#           directories are beneath each sdnet_*.
-ip_names = run_command(
+# - legacy: Include and lib directories for the ingress pipeline are peers with
+#           this file. This will generate a single vitisnetp4 driver wrapper.
+# - new:    sdnet_* directories for different pipelines are peers with this
+#           file. The include and lib directories are beneath each sdnet_*. This
+#           will generate a vitisnetp4 driver wrapper per pipeline. Currently,
+#           only a combination of 2 pipelines is supported: ingress and egress.
+#           The ordering follows the definition of the PipelineId enum from the
+#           protobuf sn-p4-proto/sn_p4_v1.proto file. When an unknown pipeline
+#           name is encountered, a build-time error will be forced to ensure that
+#           the driver software is updated appropriately to support it.
+EXPECTED_IP_NAMES = [
+    'sdnet_igr', # enum PipelineId INGRESS
+    'sdnet_egr', # enum PipelineId EGRESS
+]
+MAX_IP_NAMES = EXPECTED_IP_NAMES.length()
+
+found_ip_names = run_command(
     'bash', '-c',
     'find ' + this_dir +
     ' -mindepth 1 -maxdepth 1 ' +
     ' -name \'sdnet_*\' -printf \'%P\\n\'' +
     ' | sort -V',
     check: true).stdout().splitlines()
+n_ip_names = found_ip_names.length()
 
 ip_dir_prefixes = {}
-if ip_names.length() > 0
-    foreach ip_name: ip_names
-        ip_dir_prefixes += {ip_name: ip_name + '/'}
-    endforeach
-else
+ip_names = []
+regmap_names = {}
+if n_ip_names == 0
+    # Legacy naming for backwards compatibility.
     ip_name = 'sdnet_0'
-    ip_names += ip_name
+    ip_names += [ip_name]
     ip_dir_prefixes += {ip_name: ''}
+    regmap_names += {ip_name: 'sdnet'}
+elif n_ip_names > MAX_IP_NAMES
+    # Fail the build if an unsupported number of drivers is found.
+    error('Too many vitisnetp4 drivers. Expected no more than @0@, found @1@.'.
+          format(MAX_IP_NAMES, n_ip_names))
+else
+    # Fail the build if an unsupported IP name is found.
+    foreach ip_name: found_ip_names
+        if ip_name not in EXPECTED_IP_NAMES
+            error('Unknown vitisnetp4 IP name "@0@". Expected names are: @1@.'.
+                  format(ip_name, EXPECTED_IP_NAMES))
+        endif
+    endforeach
+
+    # Force the ordering of the names rather than relying on the lexicographical
+    # sorting. This is to ensure that each pipeline is given a known position in
+    # the vitisnetp4 driver wrapper table. Alternatively, pipelines can be found
+    # by name (i.e. use "sdnet_egr" to find the egress pipeline driver wrapper).
+    # The ordering of strings in the ip_names list follows the definition of the
+    # PipelineId enum from the protobuf sn-p4-proto/sn_p4_v1.proto file (refer
+    # to the comment for EXPECTED_IP_NAMES). Empty strings indicate that an sdnet
+    # is not implemented, resulting in a NULL entry in the driver wrapper table.
+    foreach ip_name: EXPECTED_IP_NAMES
+        if ip_name in found_ip_names
+            ip_names += [ip_name]
+            ip_dir_prefixes += {ip_name: ip_name + '/'}
+            regmap_names += {ip_name: ip_name}
+        else
+            # Leave a placeholder for the unimplemented sdnet. A NULL entry will
+            # be made in the driver wrapper table.
+            ip_names += ['']
+        endif
+    endforeach
 endif
 
 #-------------------------------------------------------------------------------
 ip_lib_deps = []
 foreach ip_name: ip_names
+    if ip_name == ''
+        continue
+    endif
+
     ip_dir_prefix = ip_dir_prefixes[ip_name]
     inc_dir = include_directories('.', ip_dir_prefix + 'include')
 
@@ -59,6 +110,7 @@ foreach ip_name: ip_names
         command: [
             this_dir / intf_base + '.py',
             ip_name,
+            regmap_names[ip_name],
             '@OUTPUT@',
         ],
         depend_files: [
@@ -80,6 +132,7 @@ foreach ip_name: ip_names
         dependencies: [
             drv_dep,
             libm_dep,
+            regmap_dep,
         ],
         include_directories: inc_dir,
         install : true,

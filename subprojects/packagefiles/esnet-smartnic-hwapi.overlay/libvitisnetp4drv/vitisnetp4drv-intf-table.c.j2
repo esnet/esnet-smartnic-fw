@@ -1,7 +1,9 @@
 #include "vitisnetp4drv-intf.h"
 
 {%- for ip_name in ip_names: %}
+  {%- if ip_name != '' %}
 #include "vitisnetp4drv-intf-{{ ip_name }}.h"
+  {%- endif %}
 {%- endfor %}
 
 #define N_ENTRIES (sizeof(__table) / sizeof(__table[0]))
@@ -9,7 +11,11 @@
 /*----------------------------------------------------------------------------*/
 static const struct vitis_net_p4_drv_intf* const __table[] = {
 {%- for ip_name in ip_names: %}
+  {%- if ip_name == '' %}
+    NULL,
+  {%- else %}
     &vitis_net_p4_drv_intf_{{ ip_name }},
+  {%- endif %}
 {%- endfor %}
 };
 
