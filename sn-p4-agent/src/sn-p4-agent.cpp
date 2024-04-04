@@ -36,14 +36,12 @@ public:
     }
 
     // Bind the driver for each pipeline.
-    for (unsigned int id = PipelineId_MIN; id <= PipelineId_MAX; ++id) {
-      // TODO: Only support the first pipeline until the registers are sorted out.
-      if (id > PipelineId_MIN) {
-        std::cerr << "WARNING: Skipping pipeline ids > " << PipelineId_MIN << " until supported" << std::endl;
-        break;
+    for (unsigned int id = 0; id < snp4_sdnet_count(); ++id) {
+      if (!snp4_sdnet_present(id)) {
+        continue;
       }
 
-      snp4_handle[id] = snp4_init(id, (uintptr_t) &bar2->sdnet /* TODO: &bar2->sdnet[id] ??? */);
+      snp4_handle[id] = snp4_init(id, (uintptr_t)bar2);
       if (snp4_handle[id] == NULL) {
         std::cerr << "Failed to initialize snp4/vitisnetp4 library for device " << pci_address << " for pipeline " << id << std::endl;
         exit(EXIT_FAILURE);

@@ -6,12 +6,14 @@ import sys
 
 #-------------------------------------------------------------------------------
 ip_name = sys.argv[1]
-intf_c = pathlib.Path(sys.argv[2])
-intf_h = pathlib.Path(sys.argv[3])
-intf_map = pathlib.Path(sys.argv[4])
+regmap_name = sys.argv[2]
+intf_c = pathlib.Path(sys.argv[3])
+intf_h = pathlib.Path(sys.argv[4])
+intf_map = pathlib.Path(sys.argv[5])
 
 context = {
     'ip_name': ip_name,
+    'regmap_name': regmap_name,
     'intf_h': intf_h,
     'intf_h_def': intf_h.name.
                   translate(str.maketrans({'-':'_', '.':'_'})).

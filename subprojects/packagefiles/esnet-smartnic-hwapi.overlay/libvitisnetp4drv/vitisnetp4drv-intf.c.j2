@@ -1,14 +1,18 @@
 #include "{{ intf_h.name }}"
 
 #include "{{ ip_name }}_defs.h"
+#include "esnet_smartnic_toplevel.h"
 #include "vitisnetp4_common.h"
 #include "vitisnetp4_table.h"
 #include "vitisnetp4_target.h"
+
+#include <stddef.h>
 
 /*----------------------------------------------------------------------------*/
 const struct vitis_net_p4_drv_intf vitis_net_p4_drv_intf_{{ ip_name }} = {
     .info = {
         .name = "{{ ip_name }}",
+        .offset = offsetof(struct esnet_smartnic_bar2, {{ regmap_name }}),
     },
 
     .common = {

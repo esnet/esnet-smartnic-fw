@@ -20,6 +20,8 @@ extern "C"
 #include <stddef.h>		/* size_t */
 #include <stdio.h>		/* FILE */
 
+extern size_t snp4_sdnet_count(void);
+extern bool snp4_sdnet_present(unsigned int sdnet_idx);
 extern void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr);
 extern bool snp4_deinit(void * snp4_handle);
 extern bool snp4_reset_all_tables(void * snp4_handle);
