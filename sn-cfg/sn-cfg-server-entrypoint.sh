@@ -3,7 +3,7 @@
 set -e -o pipefail
 
 #---------------------------------------------------------------------------------------------------
-certs_dir='/etc/tls-certs'
+certs_dir='/etc/letsencrypt'
 certs_mnt_dir="${certs_dir}-host"
 cert="${certs_dir}/${SN_TLS_PATH_PREFIX}${SN_TLS_CERT}"
 cert_fullchain="${certs_dir}/${SN_TLS_PATH_PREFIX}${SN_TLS_FULLCHAIN}"

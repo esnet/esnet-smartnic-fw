@@ -578,8 +578,8 @@ services:
       - /dev:/dev
       - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
       - type: bind
-        source: ${SN_TLS_HOST_DIR:-${PWD}/tls-certs}
-        target: /etc/tls-certs-host
+        source: ${SN_TLS_HOST_DIR:-${PWD}/letsencrypt}
+        target: /etc/letsencrypt-host
         read_only: true
         bind:
           create_host_path: false
