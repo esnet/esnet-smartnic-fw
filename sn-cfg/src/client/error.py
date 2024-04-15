@@ -3,7 +3,7 @@ __all__ = (
     'error_code_str'
 )
 
-from .sn_cfg_v1_pb2 import ErrorCode
+from sn_cfg_proto import ErrorCode
 
 #---------------------------------------------------------------------------------------------------
 ERROR_MAP = {

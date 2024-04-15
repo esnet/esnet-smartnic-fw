@@ -14,9 +14,7 @@ pyproject_toml="${priv_dir}/pyproject.toml"
 
 mkdir -p "${pkg_dir}"
 
-# This is needed to work-around the meson requirement that output files can't contain a directory
-# prefix. Since the protobuf files are emitted directly to the Python package directory, this loop
-# will only copy over files from the source tree.
+# Copy over static Python library files from the source tree.
 for input in "${inputs[@]}"; do
     base=$(basename "${input}")
     dst="${pkg_dir}/${base}"
@@ -37,6 +35,7 @@ authors = []
 click = "^8.1.7"
 grpcio = "^1.60.0"
 python = "^3.8"
+sn_cfg_proto = "^0.1.0"
 
 [tool.poetry.scripts]
 sn-cfg = "sn_cfg.client:main"

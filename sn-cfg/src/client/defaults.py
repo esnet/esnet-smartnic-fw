@@ -6,15 +6,16 @@ __all__ = (
 import click
 import grpc
 
-from .device import device_id_option
-from .error import error_code_str
-from .sn_cfg_v1_pb2 import (
+from sn_cfg_proto import (
     BatchOperation,
     BatchRequest,
     DefaultsProfile,
     DefaultsRequest,
     ErrorCode,
 )
+
+from .device import device_id_option
+from .error import error_code_str
 from .utils import apply_options
 
 #---------------------------------------------------------------------------------------------------
