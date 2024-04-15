@@ -50,3 +50,4 @@ protobuf_py_install_dir = 'share/esnet-smartnic/python'
 #---------------------------------------------------------------------------------------------------
 # Sub-directories containing specific protobuf sources.
 subdir('sn-cfg-proto')
+subdir('sn-p4-proto')

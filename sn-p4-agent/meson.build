@@ -17,7 +17,7 @@ sn_p4_agent = executable(
     libgrpcpp_reflection_dep,
     libopennic_dep,
     libsnp4_dep,
-    sn_p4_v1_proto,
+    sn_p4_proto_cpp,
     dependency('regmap'),
   ],
   # Force linking all libs so that the unreferenced grpc++_reflection lib gets linked
