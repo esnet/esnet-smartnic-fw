@@ -9,10 +9,9 @@ import json
 import pathlib
 import types
 
-from .error import error_code_str
-from .sn_cfg_v1_pb2 import ErrorCode
-from .sn_cfg_v1_pb2_grpc import SmartnicConfigStub
+from sn_cfg_proto import ErrorCode, SmartnicConfigStub
 
+from .error import error_code_str
 from . import completions
 from . import defaults
 from . import device

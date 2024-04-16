@@ -7,8 +7,7 @@ __all__ = (
 import click
 import grpc
 
-from .error import error_code_str
-from .sn_cfg_v1_pb2 import (
+from sn_cfg_proto import (
     BatchOperation,
     BatchRequest,
     DeviceInfo,
@@ -17,6 +16,8 @@ from .sn_cfg_v1_pb2 import (
     DeviceStatusRequest,
     ErrorCode,
 )
+
+from .error import error_code_str
 from .utils import apply_options
 
 HEADER_SEP = '-' * 40

@@ -5,6 +5,7 @@ set -e
 #---------------------------------------------------------------------------------------------------
 pkg_name="$1"; shift
 pkg_ver="$1"; shift
+pkg_desc="$1"; shift
 priv_dir="$1"; shift
 out_dir="$1"; shift
 inputs=( "$@" )
@@ -17,6 +18,12 @@ mkdir -p "${pkg_dir}"
 # Copy over static Python library files from the source tree.
 for input in "${inputs[@]}"; do
     base=$(basename "${input}")
+
+    # Filter-out the protobuf/grpc generated files.
+    if [[ "${base}" =~ '_pb2' ]]; then
+        continue;
+    fi
+
     dst="${pkg_dir}/${base}"
     if ! [[ -e "${dst}" ]]; then
         cp -v "${input}" "${pkg_dir}/."
@@ -28,17 +35,14 @@ cat <<EOF >"${pyproject_toml}"
 [tool.poetry]
 name = "${pkg_name}"
 version = "${pkg_ver}"
-description = "Python interface to the SmartNIC Configuration agent."
+description = "Python interface to ${pkg_desc} protobuf structures."
 authors = []
 
+include = ["*_pb2*"] # Include the protobuf/grpc generated files into the package.
+
 [tool.poetry.dependencies]
-click = "^8.1.7"
 grpcio = "^1.60.0"
 python = "^3.8"
-sn_cfg_proto = "^0.1.0"
-
-[tool.poetry.scripts]
-sn-cfg = "sn_cfg.client:main"
 
 [build-system]
 requires = ["poetry-core"]

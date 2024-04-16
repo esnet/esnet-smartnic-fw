@@ -102,7 +102,11 @@ RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
     ldconfig
 
     # Install the generated Python regmap and configuration client.
-    pip3 install --find-links /usr/local/share/esnet-smartnic/python regmap_esnet_smartnic sn_cfg
+    pip3 install \
+      --find-links /usr/local/share/esnet-smartnic/python \
+      regmap_esnet_smartnic \
+      sn_cfg \
+      sn_p4
 
     # Install bash completions.
     regio-esnet-smartnic -t zero completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic

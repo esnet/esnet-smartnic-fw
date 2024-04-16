@@ -1,2 +1,4 @@
 #---------------------------------------------------------------------------------------------------
-import sn_cfg_proto as proto
+import sn_p4_proto as proto
+
+from .client import *

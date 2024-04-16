@@ -1,2 +1,3 @@
 #---------------------------------------------------------------------------------------------------
-import sn_cfg_proto as proto
+from sn_cfg_v1_pb2 import *
+from sn_cfg_v1_pb2_grpc import *

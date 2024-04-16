@@ -28,17 +28,13 @@ cat <<EOF >"${pyproject_toml}"
 [tool.poetry]
 name = "${pkg_name}"
 version = "${pkg_ver}"
-description = "Python interface to the SmartNIC Configuration agent."
+description = "Python interface to the SmartNIC P4 agent."
 authors = []
 
 [tool.poetry.dependencies]
-click = "^8.1.7"
 grpcio = "^1.60.0"
 python = "^3.8"
-sn_cfg_proto = "^0.1.0"
-
-[tool.poetry.scripts]
-sn-cfg = "sn_cfg.client:main"
+sn_p4_proto = "^0.1.0"
 
 [build-system]
 requires = ["poetry-core"]
