@@ -122,6 +122,22 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kPortStats:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_port_stats(req.port_stats(), rdwr);
+                break;
+
+            case BatchOperation::BOP_CLEAR:
+                batch_clear_port_stats(req.port_stats(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         case BatchRequest::ItemCase::kSwitchConfig:
             switch (op) {
             case BatchOperation::BOP_GET:

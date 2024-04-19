@@ -117,6 +117,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const stri
             .stats = {
                 .domain = NULL,
                 .hosts = {},
+                .ports = {},
             },
         };
 
@@ -133,6 +134,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const stri
         }
 
         init_host(dev);
+        init_port(dev);
 
         stats_domain_clear_counters(dev->stats.domain);
         stats_domain_start(dev->stats.domain);
@@ -147,6 +149,7 @@ SmartnicConfigImpl::~SmartnicConfigImpl() {
         auto dev = devices.back();
 
         deinit_host(dev);
+        deinit_port(dev);
         stats_domain_free(dev->stats.domain);
 
         smartnic_unmap_bar2(dev->bar2);

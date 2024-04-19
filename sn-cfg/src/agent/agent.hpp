@@ -46,6 +46,10 @@ public:
         ServerContext*, const PortConfigRequest*, ServerWriter<PortConfigResponse>*) override;
     Status GetPortStatus(
         ServerContext*, const PortStatusRequest*, ServerWriter<PortStatusResponse>*) override;
+    Status GetPortStats(
+        ServerContext*, const PortStatsRequest*, ServerWriter<PortStatsResponse>*) override;
+    Status ClearPortStats(
+        ServerContext*, const PortStatsRequest*, ServerWriter<PortStatsResponse>*) override;
 
     // Statistics configuration.
     Status GetStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
@@ -87,6 +91,8 @@ private:
     void batch_clear_host_stats(
         const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
+    void init_port(Device* dev);
+    void deinit_port(Device* dev);
     void get_port_config(const PortConfigRequest&, function<void(const PortConfigResponse&)>);
     void batch_get_port_config(
         const PortConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
@@ -96,6 +102,12 @@ private:
     void get_port_status(const PortStatusRequest&, function<void(const PortStatusResponse&)>);
     void batch_get_port_status(
         const PortStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_port_stats(const PortStatsRequest&, function<void(const PortStatsResponse&)>);
+    void batch_get_port_stats(
+        const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void clear_port_stats(const PortStatsRequest&, function<void(const PortStatsResponse&)>);
+    void batch_clear_port_stats(
+        const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void get_stats(const StatsRequest&, function<void(const StatsResponse&)>);
     void batch_get_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);

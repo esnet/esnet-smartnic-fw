@@ -1,4 +1,8 @@
 #include "agent.hpp"
+#include "device.hpp"
+
+#include <cstdlib>
+#include <sstream>
 
 #include <grpc/grpc.h>
 #include "sn_cfg_v1.grpc.pb.h"
@@ -8,6 +12,44 @@
 
 using namespace grpc;
 using namespace std;
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::init_port(Device* dev) {
+    for (unsigned int port_id = 0; port_id < dev->nports; ++port_id) {
+        volatile typeof(dev->bar2->cmac0)* cmac;
+        switch (port_id) {
+        case 0: cmac = &dev->bar2->cmac0; break;
+        case 1: cmac = &dev->bar2->cmac1; break;
+        default:
+            cerr << "ERROR: Unsupported port ID " << port_id << "." << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        ostringstream name;
+        name << "port" << port_id;
+
+        auto stats = new DeviceStats;
+        stats->name = name.str();
+        stats->zone = cmac_stats_zone_alloc(dev->stats.domain, cmac, stats->name.c_str());
+        if (stats->zone == NULL) {
+            cerr << "ERROR: Failed to alloc stats zone for port ID " << port_id << "."  << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        dev->stats.ports.push_back(stats);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::deinit_port(Device* dev) {
+    while (!dev->stats.ports.empty()) {
+        auto stats = dev->stats.ports.back();
+        cmac_stats_zone_free(stats->zone);
+
+        dev->stats.ports.pop_back();
+        delete stats;
+    }
+}
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::get_port_config(
@@ -341,6 +383,185 @@ Status SmartnicConfigImpl::GetPortStatus(
     const PortStatusRequest* req,
     ServerWriter<PortStatusResponse>* writer) {
     get_port_status(*req, [&writer](const PortStatusResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+struct GetPortStatsContext {
+    Stats* stats;
+};
+
+extern "C" {
+    static int __get_port_stats_counters(const struct stats_for_each_spec* spec,
+                                         uint64_t value, void* arg) {
+        GetPortStatsContext* ctx = static_cast<GetPortStatsContext*>(arg);
+
+        auto cnt = ctx->stats->add_counters();
+        cnt->set_domain(spec->domain->name);
+        cnt->set_zone(spec->zone->name);
+        cnt->set_block(spec->block->name);
+        cnt->set_name(spec->counter->name);
+        cnt->set_value(value);
+
+        return 0;
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::get_port_stats(
+    const PortStatsRequest& req,
+    function<void(const PortStatsResponse&)> write_resp) {
+    int begin_dev_id = 0;
+    int end_dev_id = devices.size() - 1;
+    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
+
+    if (dev_id > end_dev_id) {
+        PortStatsResponse resp;
+        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
+        write_resp(resp);
+        return;
+    }
+
+    if (dev_id > -1) {
+        begin_dev_id = dev_id;
+        end_dev_id = dev_id;
+    }
+
+    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
+        int begin_port_id = 0;
+        int end_port_id = dev->nports - 1;
+        int port_id = req.port_id(); // 0-based index. -1 means all ports.
+        if (port_id > end_port_id) {
+            PortStatsResponse resp;
+            resp.set_error_code(ErrorCode::EC_INVALID_PORT_ID);
+            resp.set_dev_id(dev_id);
+            write_resp(resp);
+            continue;
+        }
+
+        if (port_id > -1) {
+            begin_port_id = port_id;
+            end_port_id = port_id;
+        }
+
+        for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
+            PortStatsResponse resp;
+            auto stats = dev->stats.ports[port_id];
+            GetPortStatsContext ctx = {
+                .stats = resp.mutable_stats(),
+            };
+
+            stats_zone_for_each_counter(stats->zone, __get_port_stats_counters, &ctx);
+
+            resp.set_error_code(ErrorCode::EC_OK);
+            resp.set_dev_id(dev_id);
+            resp.set_port_id(port_id);
+
+            write_resp(resp);
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::batch_get_port_stats(
+    const PortStatsRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    get_port_stats(req, [&rdwr](const PortStatsResponse& resp) -> void {
+        BatchResponse bresp;
+        auto stats = bresp.mutable_port_stats();
+        stats->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicConfigImpl::GetPortStats(
+    [[maybe_unused]] ServerContext* ctx,
+    const PortStatsRequest* req,
+    ServerWriter<PortStatsResponse>* writer) {
+    get_port_stats(*req, [&writer](const PortStatsResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::clear_port_stats(
+    const PortStatsRequest& req,
+    function<void(const PortStatsResponse&)> write_resp) {
+    int begin_dev_id = 0;
+    int end_dev_id = devices.size() - 1;
+    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
+
+    if (dev_id > end_dev_id) {
+        PortStatsResponse resp;
+        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
+        write_resp(resp);
+        return;
+    }
+
+    if (dev_id > -1) {
+        begin_dev_id = dev_id;
+        end_dev_id = dev_id;
+    }
+
+    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
+        int begin_port_id = 0;
+        int end_port_id = dev->nports - 1;
+        int port_id = req.port_id(); // 0-based index. -1 means all ports.
+        if (port_id > end_port_id) {
+            PortStatsResponse resp;
+            resp.set_error_code(ErrorCode::EC_INVALID_PORT_ID);
+            resp.set_dev_id(dev_id);
+            write_resp(resp);
+            continue;
+        }
+
+        if (port_id > -1) {
+            begin_port_id = port_id;
+            end_port_id = port_id;
+        }
+
+        for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
+            auto stats = dev->stats.ports[port_id];
+            stats_zone_clear_counters(stats->zone);
+
+            PortStatsResponse resp;
+            resp.set_error_code(ErrorCode::EC_OK);
+            resp.set_dev_id(dev_id);
+            resp.set_port_id(port_id);
+
+            write_resp(resp);
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::batch_clear_port_stats(
+    const PortStatsRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    clear_port_stats(req, [&rdwr](const PortStatsResponse& resp) -> void {
+        BatchResponse bresp;
+        auto stats = bresp.mutable_port_stats();
+        stats->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicConfigImpl::ClearPortStats(
+    [[maybe_unused]] ServerContext* ctx,
+    const PortStatsRequest* req,
+    ServerWriter<PortStatsResponse>* writer) {
+    clear_port_stats(*req, [&writer](const PortStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;
