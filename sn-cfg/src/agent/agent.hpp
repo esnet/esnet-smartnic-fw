@@ -60,6 +60,10 @@ public:
         ServerContext*, const SwitchConfigRequest*, ServerWriter<SwitchConfigResponse>*) override;
     Status SetSwitchConfig(
         ServerContext*, const SwitchConfigRequest*, ServerWriter<SwitchConfigResponse>*) override;
+    Status GetSwitchStats(
+        ServerContext*, const SwitchStatsRequest*, ServerWriter<SwitchStatsResponse>*) override;
+    Status ClearSwitchStats(
+        ServerContext*, const SwitchStatsRequest*, ServerWriter<SwitchStatsResponse>*) override;
 
 private:
     vector<Device*> devices;
@@ -114,12 +118,20 @@ private:
     void clear_stats(const StatsRequest&, function<void(const StatsResponse&)>);
     void batch_clear_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
+    void init_switch(Device* dev);
+    void deinit_switch(Device* dev);
     void get_switch_config(const SwitchConfigRequest&, function<void(const SwitchConfigResponse&)>);
     void batch_get_switch_config(
         const SwitchConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void set_switch_config(const SwitchConfigRequest&, function<void(const SwitchConfigResponse&)>);
     void batch_set_switch_config(
         const SwitchConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_switch_stats(const SwitchStatsRequest&, function<void(const SwitchStatsResponse&)>);
+    void batch_get_switch_stats(
+        const SwitchStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void clear_switch_stats(const SwitchStatsRequest&, function<void(const SwitchStatsResponse&)>);
+    void batch_clear_switch_stats(
+        const SwitchStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 };
 
 #endif // AGENT_HPP

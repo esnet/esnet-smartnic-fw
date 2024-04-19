@@ -1,4 +1,7 @@
 #include "agent.hpp"
+#include "device.hpp"
+
+#include <cstdlib>
 
 #include <grpc/grpc.h>
 #include "sn_cfg_v1.grpc.pb.h"
@@ -8,6 +11,28 @@
 
 using namespace grpc;
 using namespace std;
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::init_switch(Device* dev) {
+    auto stats = new DeviceStats;
+    stats->name = "switch";
+    stats->zone = switch_stats_zone_alloc(dev->stats.domain, dev->bar2, stats->name.c_str());
+    if (stats->zone == NULL) {
+        cerr << "ERROR: Failed to alloc stats zone for switch." << endl;
+        exit(EXIT_FAILURE);
+    }
+
+    dev->stats.sw = stats;
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::deinit_switch(Device* dev) {
+    auto stats = dev->stats.sw;
+    dev->stats.sw = NULL;
+
+    switch_stats_zone_free(stats->zone);
+    delete stats;
+}
 
 //--------------------------------------------------------------------------------------------------
 static bool interface_to_switch_id(const Device& dev,
@@ -463,6 +488,143 @@ Status SmartnicConfigImpl::SetSwitchConfig(
     const SwitchConfigRequest* req,
     ServerWriter<SwitchConfigResponse>* writer) {
     set_switch_config(*req, [&writer](const SwitchConfigResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+struct GetSwitchStatsContext {
+    Stats* stats;
+};
+
+extern "C" {
+    static int __get_switch_stats_counters(const struct stats_for_each_spec* spec,
+                                           uint64_t value, void* arg) {
+        GetSwitchStatsContext* ctx = static_cast<GetSwitchStatsContext*>(arg);
+
+        auto cnt = ctx->stats->add_counters();
+        cnt->set_domain(spec->domain->name);
+        cnt->set_zone(spec->zone->name);
+        cnt->set_block(spec->block->name);
+        cnt->set_name(spec->counter->name);
+        cnt->set_value(value);
+
+        return 0;
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::get_switch_stats(
+    const SwitchStatsRequest& req,
+    function<void(const SwitchStatsResponse&)> write_resp) {
+    int begin_dev_id = 0;
+    int end_dev_id = devices.size() - 1;
+    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
+
+    if (dev_id > end_dev_id) {
+        SwitchStatsResponse resp;
+        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
+        write_resp(resp);
+        return;
+    }
+
+    if (dev_id > -1) {
+        begin_dev_id = dev_id;
+        end_dev_id = dev_id;
+    }
+
+    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+        SwitchStatsResponse resp;
+        GetSwitchStatsContext ctx = {
+            .stats = resp.mutable_stats(),
+        };
+
+        stats_zone_for_each_counter(dev->stats.sw->zone, __get_switch_stats_counters, &ctx);
+
+        resp.set_error_code(ErrorCode::EC_OK);
+        resp.set_dev_id(dev_id);
+
+        write_resp(resp);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::batch_get_switch_stats(
+    const SwitchStatsRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    get_switch_stats(req, [&rdwr](const SwitchStatsResponse& resp) -> void {
+        BatchResponse bresp;
+        auto stats = bresp.mutable_switch_stats();
+        stats->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicConfigImpl::GetSwitchStats(
+    [[maybe_unused]] ServerContext* ctx,
+    const SwitchStatsRequest* req,
+    ServerWriter<SwitchStatsResponse>* writer) {
+    get_switch_stats(*req, [&writer](const SwitchStatsResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::clear_switch_stats(
+    const SwitchStatsRequest& req,
+    function<void(const SwitchStatsResponse&)> write_resp) {
+    int begin_dev_id = 0;
+    int end_dev_id = devices.size() - 1;
+    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
+
+    if (dev_id > end_dev_id) {
+        SwitchStatsResponse resp;
+        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
+        write_resp(resp);
+        return;
+    }
+
+    if (dev_id > -1) {
+        begin_dev_id = dev_id;
+        end_dev_id = dev_id;
+    }
+
+    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+        stats_zone_clear_counters(dev->stats.sw->zone);
+
+        SwitchStatsResponse resp;
+        resp.set_error_code(ErrorCode::EC_OK);
+        resp.set_dev_id(dev_id);
+
+        write_resp(resp);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::batch_clear_switch_stats(
+    const SwitchStatsRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    clear_switch_stats(req, [&rdwr](const SwitchStatsResponse& resp) -> void {
+        BatchResponse bresp;
+        auto stats = bresp.mutable_switch_stats();
+        stats->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicConfigImpl::ClearSwitchStats(
+    [[maybe_unused]] ServerContext* ctx,
+    const SwitchStatsRequest* req,
+    ServerWriter<SwitchStatsResponse>* writer) {
+    clear_switch_stats(*req, [&writer](const SwitchStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;

@@ -2,6 +2,7 @@
 #define INCLUDE_SWITCH_H
 
 #include "smartnic.h"
+#include "stats.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -58,6 +59,11 @@ bool switch_set_egress_connection(volatile struct smartnic_block* blk,
                                   const struct switch_interface_id* to_intf);
 
 void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk);
+
+struct stats_zone* switch_stats_zone_alloc(struct stats_domain* domain,
+                                           volatile struct esnet_smartnic_bar2* bar2,
+                                           const char* name);
+void switch_stats_zone_free(struct stats_zone* zone);
 
 #ifdef __cplusplus
 }

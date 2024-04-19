@@ -1,8 +1,10 @@
 #include "switch.h"
 
 #include "array_size.h"
+#include "axi4s_probe_block.h"
 #include "memory-barriers.h"
 #include "smartnic.h"
+#include "stats.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -575,4 +577,124 @@ void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk) {
 
     // Disable split-join support.
     blk->hdr_length = 0;
+}
+
+//--------------------------------------------------------------------------------------------------
+#define SWITCH_STATS_COUNTER(_name) \
+{ \
+    .name = #_name, \
+    .offset = offsetof(struct axi4s_probe_block, _name##_upper), \
+    .size = 2 * sizeof(uint32_t), \
+    .flags = STATS_COUNTER_FLAG_MASK(CLEAR_ON_READ), \
+}
+
+static const struct stats_counter_spec switch_stats_counters[] = {
+    SWITCH_STATS_COUNTER(pkt_count),
+    SWITCH_STATS_COUNTER(byte_count),
+};
+
+struct switch_stats_block_info {
+    const char* name;
+    uintptr_t offset;
+};
+
+#define SWITCH_STATS_BLOCK_INFO(_name) \
+{ \
+    .name = #_name, \
+    .offset = offsetof(struct esnet_smartnic_bar2, _name), \
+}
+
+static const struct switch_stats_block_info switch_stats_block_info[] = {
+    SWITCH_STATS_BLOCK_INFO(probe_from_cmac_0),
+    SWITCH_STATS_BLOCK_INFO(drops_ovfl_from_cmac_0),
+    SWITCH_STATS_BLOCK_INFO(drops_err_from_cmac_0),
+    SWITCH_STATS_BLOCK_INFO(probe_from_cmac_1),
+    SWITCH_STATS_BLOCK_INFO(drops_ovfl_from_cmac_1),
+    SWITCH_STATS_BLOCK_INFO(drops_err_from_cmac_1),
+    SWITCH_STATS_BLOCK_INFO(probe_from_host_0),
+    SWITCH_STATS_BLOCK_INFO(probe_from_host_1),
+    SWITCH_STATS_BLOCK_INFO(probe_core_to_app0),
+    SWITCH_STATS_BLOCK_INFO(probe_core_to_app1),
+    SWITCH_STATS_BLOCK_INFO(probe_app0_to_core),
+    SWITCH_STATS_BLOCK_INFO(probe_app1_to_core),
+    SWITCH_STATS_BLOCK_INFO(probe_to_cmac_0),
+    SWITCH_STATS_BLOCK_INFO(drops_ovfl_to_cmac_0),
+    SWITCH_STATS_BLOCK_INFO(probe_to_cmac_1),
+    SWITCH_STATS_BLOCK_INFO(drops_ovfl_to_cmac_1),
+    SWITCH_STATS_BLOCK_INFO(probe_to_host_0),
+    SWITCH_STATS_BLOCK_INFO(drops_ovfl_to_host_0),
+    SWITCH_STATS_BLOCK_INFO(probe_to_host_1),
+    SWITCH_STATS_BLOCK_INFO(drops_ovfl_to_host_1),
+    SWITCH_STATS_BLOCK_INFO(probe_to_bypass),
+    SWITCH_STATS_BLOCK_INFO(drops_from_igr_sw),
+    SWITCH_STATS_BLOCK_INFO(drops_from_bypass),
+};
+
+//--------------------------------------------------------------------------------------------------
+static void switch_stats_latch_counters(const struct stats_block_spec* bspec) {
+    volatile struct axi4s_probe_block* probe = bspec->base;
+
+    union axi4s_probe_probe_control control = {
+        .latch = AXI4S_PROBE_PROBE_CONTROL_LATCH_LATCH_ON_WR_EVT,
+        .clear = AXI4S_PROBE_PROBE_CONTROL_CLEAR_CLEAR_ON_WR_EVT,
+    };
+    probe->probe_control._v = control._v;
+    barrier();
+}
+
+//--------------------------------------------------------------------------------------------------
+static void switch_stats_release_counters(const struct stats_block_spec* bspec) {
+    volatile struct axi4s_probe_block* probe = bspec->base;
+
+    union axi4s_probe_probe_control control = {
+        .latch = AXI4S_PROBE_PROBE_CONTROL_LATCH_LATCH_ON_CLK,
+        .clear = AXI4S_PROBE_PROBE_CONTROL_CLEAR_NO_CLEAR,
+    };
+    probe->probe_control._v = control._v;
+    barrier();
+}
+
+//--------------------------------------------------------------------------------------------------
+static void switch_stats_attach_counters(const struct stats_block_spec* bspec) {
+    switch_stats_latch_counters(bspec);
+    switch_stats_release_counters(bspec);
+}
+
+//--------------------------------------------------------------------------------------------------
+static uint64_t switch_stats_read_counter(const struct stats_block_spec* bspec,
+                                          const struct stats_counter_spec* cspec) {
+    volatile uint32_t* pair = (typeof(pair))(bspec->base + cspec->offset);
+    return ((uint64_t)pair[0] << 32) | (uint64_t)pair[1];
+}
+
+//--------------------------------------------------------------------------------------------------
+struct stats_zone* switch_stats_zone_alloc(struct stats_domain* domain,
+                                           volatile struct esnet_smartnic_bar2* bar2,
+                                           const char* name) {
+    struct stats_block_spec bspecs[ARRAY_SIZE(switch_stats_block_info)] = {0};
+    for (unsigned int n = 0; n < ARRAY_SIZE(bspecs); ++n) {
+        const struct switch_stats_block_info* binfo = &switch_stats_block_info[n];
+        struct stats_block_spec* bspec = &bspecs[n];
+
+        bspec->name = binfo->name;
+        bspec->base = (volatile void*)bar2 + binfo->offset;
+        bspec->counters = switch_stats_counters;
+        bspec->ncounters = ARRAY_SIZE(switch_stats_counters);
+        bspec->attach_counters = switch_stats_attach_counters;
+        bspec->latch_counters = switch_stats_latch_counters;
+        bspec->release_counters = switch_stats_release_counters;
+        bspec->read_counter = switch_stats_read_counter;
+    }
+
+    struct stats_zone_spec zspec = {
+        .name = name,
+        .blocks = bspecs,
+        .nblocks = ARRAY_SIZE(bspecs),
+    };
+    return stats_zone_alloc(domain, &zspec);
+}
+
+//--------------------------------------------------------------------------------------------------
+void switch_stats_zone_free(struct stats_zone* zone) {
+    stats_zone_free(zone);
 }
