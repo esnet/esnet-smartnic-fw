@@ -127,6 +127,10 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const stri
             .thread = {
                 .interval_ms = 1 * 1000,
             },
+
+            .prometheus = {
+                .registry = NULL,
+            },
         };
         dev->stats.domain = stats_domain_alloc(&spec);
         if (dev->stats.domain == NULL) {

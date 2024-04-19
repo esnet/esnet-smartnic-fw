@@ -11,6 +11,7 @@ sources = files(
 )
 
 ext_incdir = include_directories('include')
+libprom_dep = dependency('prom')
 threads_dep = dependency('threads')
 
 libopennic = shared_library(
@@ -18,6 +19,7 @@ libopennic = shared_library(
   sources,
   dependencies : [
     dependency('regmap'),
+    libprom_dep,
     libsnutil_dep,
     threads_dep,
   ],
@@ -53,6 +55,7 @@ libopennic_dep = declare_dependency(
     libopennic,
   ],
   dependencies: [
+      libprom_dep,
       threads_dep,
   ],
 )

@@ -1,3 +1,5 @@
+#include "array_size.h"
+#include "prom.h"
 #include "stats.h"
 
 #include <errno.h>
@@ -23,6 +25,10 @@ struct stats_counter {
 
     uint64_t value;
     uint64_t last;
+
+    struct {
+        prom_metric_t* metric;
+    } prometheus;
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -31,6 +37,10 @@ struct stats_block {
     struct stats_zone* zone;
 
     struct stats_counter** counters;
+
+    struct {
+        prom_collector_t* collector;
+    } prometheus;
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -99,26 +109,61 @@ static uint64_t __stats_counter_read(struct stats_counter* cnt) {
 //--------------------------------------------------------------------------------------------------
 static void __stats_counter_attach(struct stats_counter* cnt, struct stats_block* blk) {
     cnt->block = blk;
+
+    int rv = prom_collector_add_metric(blk->prometheus.collector, cnt->prometheus.metric);
+    if (rv != 0) {
+        log_panic(rv, "prom_collector_add_metric failed for counter %s", cnt->spec.name);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
 static void __stats_counter_detach(struct stats_counter* cnt) {
+    int rv = prom_collector_remove_metric(cnt->block->prometheus.collector, cnt->prometheus.metric);
+    if (rv != 0) {
+        log_panic(rv, "prom_collector_remove_metric failed for counter %s", cnt->spec.name);
+    }
+    cnt->prometheus.metric = NULL; // Automatic free when metric is removed.
+
     cnt->block = NULL;
 }
 
 //--------------------------------------------------------------------------------------------------
 static void __stats_counter_free(struct stats_counter* cnt) {
+    if (cnt->prometheus.metric != NULL) {
+        int rv = prom_gauge_destroy(cnt->prometheus.metric);
+        if (rv != 0) {
+            log_panic(rv, "prom_gauge_destroy failed for counter %s", cnt->spec.name);
+        }
+    }
+
     free(cnt);
 }
 
 //--------------------------------------------------------------------------------------------------
 static struct stats_counter* __stats_counter_alloc(const struct stats_counter_spec* spec) {
     struct stats_counter* cnt = calloc(1, sizeof(*cnt));
-    if (cnt != NULL) {
-        cnt->spec = *spec;
+    if (cnt == NULL) {
+        return NULL;
+    }
+    cnt->spec = *spec;
+
+    const char* labels[] = {
+        "domain",
+        "zone",
+        "block",
+    };
+    cnt->prometheus.metric = prom_gauge_new(spec->name, spec->desc, ARRAY_SIZE(labels), labels);
+    if (cnt->prometheus.metric == NULL) {
+        log_err(ENOMEM, "prom_gauge_new failed for counter %s", spec->name);
+        goto free_counter;
     }
 
     return cnt;
+
+free_counter:
+    __stats_counter_free(cnt);
+
+    return NULL;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -130,6 +175,12 @@ static void __stats_block_attach(struct stats_block* blk, struct stats_zone* zon
         __stats_counter_attach(*cnt, blk);
     }
     zone->ncounters += spec->ncounters;
+
+    int rv = prom_collector_registry_register_collector(
+        zone->domain->spec.prometheus.registry, blk->prometheus.collector);
+    if (rv != 0) {
+        log_panic(rv, "prom_collector_registry_register_collector failed for block %s", spec->name);
+    }
 
     if (spec->attach_counters != NULL) {
         spec->attach_counters(spec);
@@ -148,6 +199,14 @@ static void __stats_block_detach(struct stats_block* blk) {
         __stats_counter_detach(*cnt);
     }
 
+    int rv = prom_collector_registry_unregister_collector(
+        blk->zone->domain->spec.prometheus.registry, blk->prometheus.collector);
+    if (rv != 0) {
+        log_panic(rv, "prom_collector_registry_unregister_collector failed for block %s",
+                  spec->name);
+    }
+    blk->prometheus.collector = NULL; // Automatic free when collector is unregistered
+
     blk->zone = NULL;
 }
 
@@ -161,6 +220,13 @@ static void __stats_block_free(struct stats_block* blk) {
         }
     }
 
+    if (blk->prometheus.collector != NULL) {
+        int rv = prom_collector_destroy(blk->prometheus.collector);
+        if (rv != 0) {
+            log_panic(rv, "prom_collector_destroy failed for block %s", spec->name);
+        }
+    }
+
     free(blk);
 }
 
@@ -170,6 +236,18 @@ static struct stats_block* __stats_block_alloc(const struct stats_block_spec* sp
     if (blk == NULL) {
         return NULL;
     }
+
+#define COLLECTOR_NAME_FMT "block_%s_0x%" PRIxPTR
+    int len = snprintf(NULL, 0, COLLECTOR_NAME_FMT, spec->name, (uintptr_t)spec->base);
+    char name[len + 1];
+    snprintf(name, len + 1, COLLECTOR_NAME_FMT, spec->name, (uintptr_t)spec->base);
+
+    blk->prometheus.collector = prom_collector_new(name);
+    if (blk->prometheus.collector == NULL) {
+        log_err(ENOMEM, "prom_collector_new failed for %s", name);
+        goto free_block;
+    }
+#undef COLLECTOR_NAME_FMT
 
     /*
      * Copy the block's specification, excluding the counter specification table (since it may have
@@ -220,6 +298,13 @@ static void __stats_block_update_counters(struct stats_block* blk, bool clear) {
         spec->latch_counters(spec);
     }
 
+    // Must match the ordering and number from __stats_counter_alloc.
+    const char* labels[] = {
+        blk->zone->domain->spec.name,
+        blk->zone->spec.name,
+        spec->name,
+    };
+
     for (struct stats_counter** cnt = blk->counters; cnt < &blk->counters[spec->ncounters]; ++cnt) {
         struct stats_counter* c = *cnt;
 
@@ -241,6 +326,8 @@ static void __stats_block_update_counters(struct stats_block* blk, bool clear) {
         } else {
             c->value += diff;
         }
+
+        prom_gauge_set(c->prometheus.metric, c->value, labels);
     }
 
     if (spec->release_counters != NULL) {

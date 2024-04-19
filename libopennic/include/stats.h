@@ -10,6 +10,9 @@
 extern "C" {
 #endif
 
+// The prometheus C client headers are not C++ friendly.
+#include "prom.h"
+
 struct stats_domain;
 struct stats_zone;
 struct stats_block;
@@ -80,6 +83,10 @@ struct stats_domain_spec {
     struct {
         unsigned int interval_ms;
     } thread;
+
+    struct {
+        prom_collector_registry_t* registry;
+    } prometheus;
 };
 
 //--------------------------------------------------------------------------------------------------
