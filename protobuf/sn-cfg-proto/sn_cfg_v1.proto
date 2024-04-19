@@ -170,6 +170,18 @@ message HostConfigResponse {
     HostConfig config = 4;
 }
 
+message HostStatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 host_id = 2; // 0-based index. Set to -1 for all host interfaces.
+}
+
+message HostStatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 host_id = 3;
+    Stats stats = 4;
+}
+
 //--------------------------------------------------------------------------------------------------
 enum PortState {
     PORT_STATE_UNKNOWN = 0; // Field is unset.
@@ -321,6 +333,7 @@ message BatchRequest {
 
         // Host configuration.
         HostConfigRequest host_config = 20;
+        HostStatsRequest host_stats = 21;
 
         // Port configuration.
         PortConfigRequest port_config = 30;
@@ -349,6 +362,7 @@ message BatchResponse {
 
         // Host configuration.
         HostConfigResponse host_config = 20;
+        HostStatsResponse host_stats = 21;
 
         // Port configuration.
         PortConfigResponse port_config = 30;
@@ -380,6 +394,8 @@ service SmartnicConfig {
     // Host configuration.
     rpc GetHostConfig(HostConfigRequest) returns (stream HostConfigResponse);
     rpc SetHostConfig(HostConfigRequest) returns (stream HostConfigResponse);
+    rpc GetHostStats(HostStatsRequest) returns (stream HostStatsResponse);
+    rpc ClearHostStats(HostStatsRequest) returns (stream HostStatsResponse);
 
     // Port configuration.
     rpc GetPortConfig(PortConfigRequest) returns (stream PortConfigResponse);

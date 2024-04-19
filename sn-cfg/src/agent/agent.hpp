@@ -34,6 +34,10 @@ public:
         ServerContext*, const HostConfigRequest*, ServerWriter<HostConfigResponse>*) override;
     Status SetHostConfig(
         ServerContext*, const HostConfigRequest*, ServerWriter<HostConfigResponse>*) override;
+    Status GetHostStats(
+        ServerContext*, const HostStatsRequest*, ServerWriter<HostStatsResponse>*) override;
+    Status ClearHostStats(
+        ServerContext*, const HostStatsRequest*, ServerWriter<HostStatsResponse>*) override;
 
     // Port configuration.
     Status GetPortConfig(
@@ -68,12 +72,20 @@ private:
     void batch_get_device_status(
         const DeviceStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
+    void init_host(Device* dev);
+    void deinit_host(Device* dev);
     void get_host_config(const HostConfigRequest&, function<void(const HostConfigResponse&)>);
     void batch_get_host_config(
         const HostConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void set_host_config(const HostConfigRequest&, function<void(const HostConfigResponse&)>);
     void batch_set_host_config(
         const HostConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_host_stats(const HostStatsRequest&, function<void(const HostStatsResponse&)>);
+    void batch_get_host_stats(
+        const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void clear_host_stats(const HostStatsRequest&, function<void(const HostStatsResponse&)>);
+    void batch_clear_host_stats(
+        const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void get_port_config(const PortConfigRequest&, function<void(const PortConfigResponse&)>);
     void batch_get_port_config(

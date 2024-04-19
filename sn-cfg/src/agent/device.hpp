@@ -26,6 +26,7 @@ struct Device {
 
     struct {
         struct stats_domain* domain;
+        vector<DeviceStats*> hosts;
     } stats;
 };
 
