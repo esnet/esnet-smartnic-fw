@@ -1,4 +1,5 @@
 #include "agent.hpp"
+#include "prometheus.hpp"
 
 #include <cstdlib>
 #include <fstream>
@@ -56,11 +57,12 @@ using namespace std;
 #define HELP_CONFIG_TLS_KEY        "{\"server\":{\"tls\":{\"key\":\"<PATH-TO-PEM-FILE>\"}}}"
 #define HELP_CONFIG_AUTH_TOKENS    "{\"server\":{\"auth\":{\"tokens\":[\"<TOKEN1>\", ...]}}}"
 
-#define ENV_VAR_ADDRESS        "SN_CFG_SERVER_ADDRESS"
-#define ENV_VAR_PORT           "SN_CFG_SERVER_PORT"
-#define ENV_VAR_TLS_CERT_CHAIN "SN_CFG_SERVER_TLS_CERT_CHAIN"
-#define ENV_VAR_TLS_KEY        "SN_CFG_SERVER_TLS_KEY"
-#define ENV_VAR_AUTH_TOKENS    "SN_CFG_SERVER_AUTH_TOKENS"
+#define ENV_VAR_ADDRESS         "SN_CFG_SERVER_ADDRESS"
+#define ENV_VAR_PORT            "SN_CFG_SERVER_PORT"
+#define ENV_VAR_PROMETHEUS_PORT "SN_CFG_SERVER_PROMETHEUS_PORT"
+#define ENV_VAR_TLS_CERT_CHAIN  "SN_CFG_SERVER_TLS_CERT_CHAIN"
+#define ENV_VAR_TLS_KEY         "SN_CFG_SERVER_TLS_KEY"
+#define ENV_VAR_AUTH_TOKENS     "SN_CFG_SERVER_AUTH_TOKENS"
 
 //--------------------------------------------------------------------------------------------------
 struct Arguments {
@@ -70,6 +72,8 @@ struct Arguments {
 
         string address;
         unsigned int port;
+
+        unsigned int prometheus_port;
 
         string tls_cert_chain;
         string tls_key;
@@ -87,7 +91,16 @@ struct Command {
 };
 
 //--------------------------------------------------------------------------------------------------
-SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const string& debug_dir) {
+SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
+                                       const string& debug_dir,
+                                       unsigned int prometheus_port) {
+    int rv = prom_collector_registry_default_init();
+    if (rv != 0) {
+        cerr << "ERROR: Failed to init default prometheus registry." << endl;
+        exit(EXIT_FAILURE);
+    }
+    prometheus.registry = PROM_COLLECTOR_REGISTRY_DEFAULT;
+
     cout << endl << "--- PCI bus IDs:" << endl;
     for (auto bus_id : bus_ids) {
         cout << "------> " << bus_id << endl;
@@ -129,7 +142,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const stri
             },
 
             .prometheus = {
-                .registry = NULL,
+                .registry = prometheus.registry,
             },
         };
         dev->stats.domain = stats_domain_alloc(&spec);
@@ -147,10 +160,20 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const stri
 
         devices.push_back(dev);
     }
+
+    promhttp_set_active_collector_registry(prometheus.registry);
+    prometheus.daemon = promhttp_start_daemon(
+        MHD_USE_SELECT_INTERNALLY, prometheus_port, NULL, NULL);
+    if (prometheus.daemon == NULL) {
+        cerr << "ERROR: Failed to start prometheus HTTP daemon." << endl;
+        exit(EXIT_FAILURE);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
 SmartnicConfigImpl::~SmartnicConfigImpl() {
+    MHD_stop_daemon(prometheus.daemon);
+
     while (!devices.empty()) {
         auto dev = devices.back();
 
@@ -164,6 +187,8 @@ SmartnicConfigImpl::~SmartnicConfigImpl() {
         devices.pop_back();
         delete dev;
     }
+
+    prom_collector_registry_destroy(prometheus.registry);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -330,7 +355,8 @@ static int agent_server_run(const Arguments& args) {
     builder.AddListeningPort(address, credentials);
 
     // Attach the gRPC configuration service.
-    SmartnicConfigImpl service(args.server.bus_ids, args.server.debug_dir);
+    SmartnicConfigImpl service(args.server.bus_ids, args.server.debug_dir,
+                               args.server.prometheus_port);
     builder.RegisterService(&service);
 
     // Create the server and bind it's address.
@@ -375,6 +401,13 @@ static void agent_server_add(CLI::App& app, Arguments::Server& args, vector<Comm
         "variable.")->
         envname(ENV_VAR_PORT)->
         default_val(args.port);
+
+    cmd->add_option(
+        "--prometheus-port", args.prometheus_port,
+        "Port the Prometheus HTTP daemon will listen on. Can also be set via the "
+        ENV_VAR_PROMETHEUS_PORT " environment variable.")->
+        envname(ENV_VAR_PROMETHEUS_PORT)->
+        default_val(args.prometheus_port);
 
     cmd->add_option(
         "--tls-cert-chain", args.tls_cert_chain,
@@ -436,6 +469,8 @@ int main(int argc, char *argv[]) {
 
             .address = "[::]",
             .port = 50100,
+
+            .prometheus_port = 8000,
 
             .tls_cert_chain = "",
             .tls_key = "",

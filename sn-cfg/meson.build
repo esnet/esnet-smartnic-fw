@@ -2,8 +2,11 @@
 # C++ Agent
 cpp = meson.get_compiler('cpp')
 libgrpcpp_reflection_dep = cpp.find_library('grpc++_reflection')
+
 cli11_dep = dependency('cli11')
 jsoncpp_dep = dependency('jsoncpp')
+libprom_dep = dependency('prom')
+libpromhttp_dep = dependency('promhttp')
 regmap_dep = dependency('regmap')
 
 executable(
@@ -23,6 +26,8 @@ executable(
         jsoncpp_dep,
         libgrpcpp_reflection_dep,
         libopennic_dep,
+        libprom_dep,
+        libpromhttp_dep,
         sn_cfg_proto_cpp,
         regmap_dep,
     ],

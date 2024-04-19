@@ -2,6 +2,7 @@
 #define AGENT_HPP
 
 #include "device.hpp"
+#include "prometheus.hpp"
 #include "sn_cfg_v1.grpc.pb.h"
 
 #include <string>
@@ -13,7 +14,8 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 class SmartnicConfigImpl final : public SmartnicConfig::Service {
 public:
-    explicit SmartnicConfigImpl(const vector<string>& bus_ids, const string& debug_dir);
+    explicit SmartnicConfigImpl(const vector<string>& bus_ids, const string& debug_dir,
+                                unsigned int prometheus_port);
     ~SmartnicConfigImpl();
 
     // Batching of multiple RPCs.
@@ -67,6 +69,11 @@ public:
 
 private:
     vector<Device*> devices;
+
+    struct {
+        prom_collector_registry_t* registry;
+        struct MHD_Daemon* daemon;
+    } prometheus;
 
     void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
     void batch_set_defaults(
