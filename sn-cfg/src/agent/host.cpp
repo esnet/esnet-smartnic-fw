@@ -33,7 +33,7 @@ void SmartnicConfigImpl::get_host_config(
         const auto dev = devices[dev_id];
 
         int begin_host_id = 0;
-        int end_host_id = dev.nhosts - 1;
+        int end_host_id = dev->nhosts - 1;
         int host_id = req.host_id(); // 0-based index. -1 means all host interfaces.
         if (host_id > end_host_id) {
             HostConfigResponse resp;
@@ -52,10 +52,10 @@ void SmartnicConfigImpl::get_host_config(
             HostConfigResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            volatile typeof(dev.bar2->qdma_func0)* qdma;
+            volatile typeof(dev->bar2->qdma_func0)* qdma;
             switch (host_id) {
-            case 0: qdma = &dev.bar2->qdma_func0; break;
-            case 1: qdma = &dev.bar2->qdma_func1; break;
+            case 0: qdma = &dev->bar2->qdma_func0; break;
+            case 1: qdma = &dev->bar2->qdma_func1; break;
             default:
                 err = ErrorCode::EC_UNSUPPORTED_HOST_ID;
                 goto write_response;
@@ -149,7 +149,7 @@ void SmartnicConfigImpl::set_host_config(
         const auto dev = devices[dev_id];
 
         int begin_host_id = 0;
-        int end_host_id = dev.nhosts - 1;
+        int end_host_id = dev->nhosts - 1;
         int host_id = req.host_id(); // 0-based index. -1 means all host interfaces.
         if (host_id > end_host_id) {
             HostConfigResponse resp;
@@ -168,10 +168,10 @@ void SmartnicConfigImpl::set_host_config(
             HostConfigResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            volatile typeof(dev.bar2->qdma_func0)* qdma;
+            volatile typeof(dev->bar2->qdma_func0)* qdma;
             switch (host_id) {
-            case 0: qdma = &dev.bar2->qdma_func0; break;
-            case 1: qdma = &dev.bar2->qdma_func1; break;
+            case 0: qdma = &dev->bar2->qdma_func0; break;
+            case 1: qdma = &dev->bar2->qdma_func1; break;
             default:
                 err = ErrorCode::EC_UNSUPPORTED_HOST_ID;
                 goto write_response;

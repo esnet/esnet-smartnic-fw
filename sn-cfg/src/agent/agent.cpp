@@ -105,23 +105,25 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const stri
             exit(EXIT_FAILURE);
         }
 
-        devices.push_back({
+        auto dev = new Device{
             .bus_id = bus_id,
+            .bar2 = bar2,
             .nhosts = 2,
             .nports = 2,
             .napps = 2,
-            .bar2 = bar2,
-        });
+        };
+        devices.push_back(dev);
     }
 }
 
 //--------------------------------------------------------------------------------------------------
 SmartnicConfigImpl::~SmartnicConfigImpl() {
-    for (auto dev : devices) {
-        if (dev.bar2 != NULL) {
-            smartnic_unmap_bar2(dev.bar2);
-            dev.bar2 = NULL;
-        }
+    while (!devices.empty()) {
+        auto dev = devices.back();
+        smartnic_unmap_bar2(dev->bar2);
+
+        devices.pop_back();
+        delete dev;
     }
 }
 

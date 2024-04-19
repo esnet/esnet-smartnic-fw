@@ -50,7 +50,7 @@ public:
         ServerContext*, const SwitchConfigRequest*, ServerWriter<SwitchConfigResponse>*) override;
 
 private:
-    vector<Device> devices;
+    vector<Device*> devices;
 
     void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
     void batch_set_defaults(

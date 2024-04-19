@@ -9,11 +9,11 @@ using namespace std;
 
 //--------------------------------------------------------------------------------------------------
 struct Device {
-    const string bus_id;
+    string bus_id;
+    volatile struct esnet_smartnic_bar2* bar2;
     unsigned int nhosts;
     unsigned int nports;
     unsigned int napps;
-    volatile struct esnet_smartnic_bar2* bar2;
 };
 
 #endif // DEVICE_HPP

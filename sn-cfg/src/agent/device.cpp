@@ -61,12 +61,12 @@ void SmartnicConfigImpl::get_device_info(
         auto info = resp.mutable_info();
 
         auto pci = info->mutable_pci();
-        pci->set_bus_id(dev.bus_id);
-        pci->set_vendor_id(read_hex_pci_id(dev.bus_id, "vendor"));
-        pci->set_device_id(read_hex_pci_id(dev.bus_id, "device"));
+        pci->set_bus_id(dev->bus_id);
+        pci->set_vendor_id(read_hex_pci_id(dev->bus_id, "vendor"));
+        pci->set_device_id(read_hex_pci_id(dev->bus_id, "device"));
 
         auto build = info->mutable_build();
-        volatile auto syscfg = &dev.bar2->syscfg;
+        volatile auto syscfg = &dev->bar2->syscfg;
 
         build->set_number(syscfg->usr_access);
         build->set_status(syscfg->build_status);
@@ -132,15 +132,15 @@ void SmartnicConfigImpl::get_device_status(
 
         auto sysmon = status->add_sysmons();
         sysmon->set_index(0);
-        sysmon->set_temperature(sysmon_get_temp(&dev.bar2->sysmon0));
+        sysmon->set_temperature(sysmon_get_temp(&dev->bar2->sysmon0));
 
         sysmon = status->add_sysmons();
         sysmon->set_index(1);
-        sysmon->set_temperature(sysmon_get_temp(&dev.bar2->sysmon1));
+        sysmon->set_temperature(sysmon_get_temp(&dev->bar2->sysmon1));
 
         sysmon = status->add_sysmons();
         sysmon->set_index(2);
-        sysmon->set_temperature(sysmon_get_temp(&dev.bar2->sysmon2));
+        sysmon->set_temperature(sysmon_get_temp(&dev->bar2->sysmon2));
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);

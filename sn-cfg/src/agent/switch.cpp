@@ -268,9 +268,9 @@ void SmartnicConfigImpl::get_switch_config(
         SwitchConfigResponse resp;
         auto config = resp.mutable_config();
 
-        auto err = get_switch_interface_config(dev, *config, switch_interface_type_PORT);
+        auto err = get_switch_interface_config(*dev, *config, switch_interface_type_PORT);
         if (err == ErrorCode::EC_OK) {
-            err = get_switch_interface_config(dev, *config, switch_interface_type_HOST);
+            err = get_switch_interface_config(*dev, *config, switch_interface_type_HOST);
         }
 
         resp.set_error_code(err);
@@ -334,7 +334,7 @@ void SmartnicConfigImpl::set_switch_config(
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
-        volatile auto blk = &dev.bar2->smartnic_regs;
+        volatile auto blk = &dev->bar2->smartnic_regs;
         auto err = ErrorCode::EC_OK;
         SwitchConfigResponse resp;
 
@@ -350,13 +350,13 @@ void SmartnicConfigImpl::set_switch_config(
             }
 
             struct switch_interface_id from_intf;
-            if (!interface_to_switch_id(dev, src.from_intf(), from_intf)) {
+            if (!interface_to_switch_id(*dev, src.from_intf(), from_intf)) {
                 err = ErrorCode::EC_UNSUPPORTED_IGR_SRC_FROM_INTF;
                 goto write_response;
             }
 
             struct switch_interface_id to_intf;
-            if (!interface_to_switch_id(dev, src.to_intf(), to_intf)) {
+            if (!interface_to_switch_id(*dev, src.to_intf(), to_intf)) {
                 err = ErrorCode::EC_UNSUPPORTED_IGR_SRC_TO_INTF;
                 goto write_response;
             }
@@ -379,13 +379,13 @@ void SmartnicConfigImpl::set_switch_config(
             }
 
             struct switch_interface_id from_intf;
-            if (!interface_to_switch_id(dev, conn.from_intf(), from_intf)) {
+            if (!interface_to_switch_id(*dev, conn.from_intf(), from_intf)) {
                 err = ErrorCode::EC_UNSUPPORTED_IGR_CONN_FROM_INTF;
                 goto write_response;
             }
 
             struct switch_processor_id to_proc;
-            if (!processor_to_switch_id(dev, conn.to_proc(), to_proc)) {
+            if (!processor_to_switch_id(*dev, conn.to_proc(), to_proc)) {
                 err = ErrorCode::EC_UNSUPPORTED_IGR_CONN_TO_PROC;
                 goto write_response;
             }
@@ -413,19 +413,19 @@ void SmartnicConfigImpl::set_switch_config(
             }
 
             struct switch_processor_id on_proc;
-            if (!processor_to_switch_id(dev, conn.on_proc(), on_proc)) {
+            if (!processor_to_switch_id(*dev, conn.on_proc(), on_proc)) {
                 err = ErrorCode::EC_UNSUPPORTED_EGR_CONN_ON_PROC;
                 goto write_response;
             }
 
             struct switch_interface_id from_intf;
-            if (!interface_to_switch_id(dev, conn.from_intf(), from_intf)) {
+            if (!interface_to_switch_id(*dev, conn.from_intf(), from_intf)) {
                 err = ErrorCode::EC_UNSUPPORTED_EGR_CONN_FROM_INTF;
                 goto write_response;
             }
 
             struct switch_interface_id to_intf;
-            if (!interface_to_switch_id(dev, conn.to_intf(), to_intf)) {
+            if (!interface_to_switch_id(*dev, conn.to_intf(), to_intf)) {
                 err = ErrorCode::EC_UNSUPPORTED_EGR_CONN_TO_INTF;
                 goto write_response;
             }

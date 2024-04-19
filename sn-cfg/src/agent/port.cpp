@@ -33,7 +33,7 @@ void SmartnicConfigImpl::get_port_config(
         const auto dev = devices[dev_id];
 
         int begin_port_id = 0;
-        int end_port_id = dev.nports - 1;
+        int end_port_id = dev->nports - 1;
         int port_id = req.port_id(); // 0-based index. -1 means all ports.
         if (port_id > end_port_id) {
             PortConfigResponse resp;
@@ -52,10 +52,10 @@ void SmartnicConfigImpl::get_port_config(
             PortConfigResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            volatile typeof(dev.bar2->cmac0)* cmac;
+            volatile typeof(dev->bar2->cmac0)* cmac;
             switch (port_id) {
-            case 0: cmac = &dev.bar2->cmac0; break;
-            case 1: cmac = &dev.bar2->cmac1; break;
+            case 0: cmac = &dev->bar2->cmac0; break;
+            case 1: cmac = &dev->bar2->cmac1; break;
             default:
                 err = ErrorCode::EC_UNSUPPORTED_PORT_ID;
                 goto write_response;
@@ -140,7 +140,7 @@ void SmartnicConfigImpl::set_port_config(
         const auto dev = devices[dev_id];
 
         int begin_port_id = 0;
-        int end_port_id = dev.nports - 1;
+        int end_port_id = dev->nports - 1;
         int port_id = req.port_id(); // 0-based index. -1 means all ports.
         if (port_id > end_port_id) {
             PortConfigResponse resp;
@@ -159,10 +159,10 @@ void SmartnicConfigImpl::set_port_config(
             PortConfigResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            volatile typeof(dev.bar2->cmac0)* cmac;
+            volatile typeof(dev->bar2->cmac0)* cmac;
             switch (port_id) {
-            case 0: cmac = &dev.bar2->cmac0; break;
-            case 1: cmac = &dev.bar2->cmac1; break;
+            case 0: cmac = &dev->bar2->cmac0; break;
+            case 1: cmac = &dev->bar2->cmac1; break;
             default:
                 err = ErrorCode::EC_UNSUPPORTED_PORT_ID;
                 goto write_response;
@@ -277,7 +277,7 @@ void SmartnicConfigImpl::get_port_status(
         const auto dev = devices[dev_id];
 
         int begin_port_id = 0;
-        int end_port_id = dev.nports - 1;
+        int end_port_id = dev->nports - 1;
         int port_id = req.port_id(); // 0-based index. -1 means all ports.
         if (port_id > end_port_id) {
             PortStatusResponse resp;
@@ -296,10 +296,10 @@ void SmartnicConfigImpl::get_port_status(
             PortStatusResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            volatile typeof(dev.bar2->cmac0)* cmac;
+            volatile typeof(dev->bar2->cmac0)* cmac;
             switch (port_id) {
-            case 0: cmac = &dev.bar2->cmac0; break;
-            case 1: cmac = &dev.bar2->cmac1; break;
+            case 0: cmac = &dev->bar2->cmac0; break;
+            case 1: cmac = &dev->bar2->cmac1; break;
             default:
                 err = ErrorCode::EC_UNSUPPORTED_PORT_ID;
                 goto write_response;

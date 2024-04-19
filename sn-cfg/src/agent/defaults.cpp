@@ -95,7 +95,7 @@ void SmartnicConfigImpl::set_defaults(
 
         switch (req.profile()) {
         case DefaultsProfile::DS_ONE_TO_ONE:
-            err = set_defaults_one_to_one(dev);
+            err = set_defaults_one_to_one(*dev);
             break;
 
         case DefaultsProfile::DS_UNKNOWN:
