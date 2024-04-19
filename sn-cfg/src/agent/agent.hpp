@@ -13,7 +13,7 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 class SmartnicConfigImpl final : public SmartnicConfig::Service {
 public:
-    explicit SmartnicConfigImpl(const vector<string>& bus_ids);
+    explicit SmartnicConfigImpl(const vector<string>& bus_ids, const string& debug_dir);
     ~SmartnicConfigImpl();
 
     // Batching of multiple RPCs.
