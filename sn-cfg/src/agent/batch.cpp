@@ -122,6 +122,22 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kStats:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_stats(req.stats(), rdwr);
+                break;
+
+            case BatchOperation::BOP_CLEAR:
+                batch_clear_stats(req.stats(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         default:
             error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST);
             break;

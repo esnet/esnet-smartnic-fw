@@ -43,6 +43,10 @@ public:
     Status GetPortStatus(
         ServerContext*, const PortStatusRequest*, ServerWriter<PortStatusResponse>*) override;
 
+    // Statistics configuration.
+    Status GetStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
+    Status ClearStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
+
     // Switch configuration.
     Status GetSwitchConfig(
         ServerContext*, const SwitchConfigRequest*, ServerWriter<SwitchConfigResponse>*) override;
@@ -80,6 +84,11 @@ private:
     void get_port_status(const PortStatusRequest&, function<void(const PortStatusResponse&)>);
     void batch_get_port_status(
         const PortStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void get_stats(const StatsRequest&, function<void(const StatsResponse&)>);
+    void batch_get_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void clear_stats(const StatsRequest&, function<void(const StatsResponse&)>);
+    void batch_clear_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void get_switch_config(const SwitchConfigRequest&, function<void(const SwitchConfigResponse&)>);
     void batch_get_switch_config(

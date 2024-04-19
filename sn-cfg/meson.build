@@ -15,6 +15,7 @@ executable(
         'src/agent/device.cpp',
         'src/agent/host.cpp',
         'src/agent/port.cpp',
+        'src/agent/stats.cpp',
         'src/agent/switch.cpp',
     ]),
     dependencies: [
@@ -32,6 +33,7 @@ executable(
 
 install_data(
     'sn-cfg-server-entrypoint.sh',
+    'sn-cfg-check-for-fpga-ready',
     install_mode: ['rwxr-xr-x', 0, 0],
     install_dir: '/usr/local/sbin',
 )
@@ -52,6 +54,7 @@ custom_target(
         'src/client/error.py',
         'src/client/host.py',
         'src/client/port.py',
+        'src/client/stats.py',
         'src/client/switch.py',
         'src/client/utils.py',
     ],

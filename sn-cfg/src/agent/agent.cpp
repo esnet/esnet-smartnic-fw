@@ -18,6 +18,7 @@
 #include <json/json.h>
 
 #include "smartnic.h"
+#include "stats.h"
 
 using namespace google::protobuf;
 using namespace grpc;
@@ -111,7 +112,26 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const stri
             .nhosts = 2,
             .nports = 2,
             .napps = 2,
+            .stats = {
+                .domain = NULL,
+            },
         };
+
+        struct stats_domain_spec spec = {
+            .name = dev->bus_id.c_str(),
+            .thread = {
+                .interval_ms = 1 * 1000,
+            },
+        };
+        dev->stats.domain = stats_domain_alloc(&spec);
+        if (dev->stats.domain == NULL) {
+            cerr << "ERROR: Failed to allocate statistics domain for device " << bus_id << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        stats_domain_clear_counters(dev->stats.domain);
+        stats_domain_start(dev->stats.domain);
+
         devices.push_back(dev);
     }
 }
@@ -120,6 +140,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids, const stri
 SmartnicConfigImpl::~SmartnicConfigImpl() {
     while (!devices.empty()) {
         auto dev = devices.back();
+        stats_domain_free(dev->stats.domain);
         smartnic_unmap_bar2(dev->bar2);
 
         devices.pop_back();
