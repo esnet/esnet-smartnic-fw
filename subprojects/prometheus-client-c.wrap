@@ -1,0 +1,12 @@
+[wrap-file]
+directory = prometheus-client-c-0.1.3
+
+source_url = https://github.com/digitalocean/prometheus-client-c/archive/refs/tags/v0.1.3.tar.gz
+source_filename = v0.1.3.tar.gz
+source_hash = 3a82e302a5bdbbd5f699cf21bee97217c0386b5076d878cab724d5f672ef5092
+
+patch_directory = prometheus-client-c.overlay
+
+[provide]
+prom = libprom_dep
+promhttp = libpromhttp_dep
