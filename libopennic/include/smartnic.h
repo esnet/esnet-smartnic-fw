@@ -12,6 +12,8 @@ extern "C"
 
 #include "smartnic-block-compat.h"
 
+volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_fd(int fd);
+volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_path(const char *path, bool create);
 volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_pciaddr(const char *addr);
 void smartnic_unmap_bar2(volatile struct esnet_smartnic_bar2 * virt_addr);
 
