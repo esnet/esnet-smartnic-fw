@@ -6,6 +6,7 @@ source_filename = v0.1.3.tar.gz
 source_hash = 3a82e302a5bdbbd5f699cf21bee97217c0386b5076d878cab724d5f672ef5092
 
 patch_directory = prometheus-client-c.overlay
+diff_files = prometheus-client-c.overlay/patches/map-delete-fix-v0.1.3.patch, prometheus-client-c.overlay/patches/collector-unregister-v0.1.3.patch, prometheus-client-c.overlay/patches/metric-remove-v0.1.3.patch
 
 [provide]
 prom = libprom_dep
