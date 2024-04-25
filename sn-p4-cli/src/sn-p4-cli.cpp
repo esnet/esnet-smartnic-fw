@@ -397,16 +397,14 @@ public:
 	std::vector<std::string> matches;
 	std::copy(tokens.begin(), div, std::back_inserter(matches));
 	std::vector<std::string> params;
-
-	// Check if this table requires a priority, if so, steal the last parameter and
-	// treat it as the required priority.
-	std::optional<uint32_t> priority;
-	if (table.priority_required()) {
-	  // Assume that the last token is the priority
-	  priority = stoi(tokens.back(), nullptr, 0);
-	  tokens.pop_back();
-	}
 	std::copy(div+1, tokens.end(), std::back_inserter(params));
+
+	// Steal the last parameter and use it as the priority if we have been provided extra params
+	std::optional<uint32_t> priority;
+	if (params.size() > (unsigned)action.parameter_specs().size()) {
+	  priority = stoi(params.back(), nullptr, 0);
+	  params.pop_back();
+	}
 
 	InsertRule(table_name, matches, action_name, params, priority, false);
       } else if (op == "table_clear") {
