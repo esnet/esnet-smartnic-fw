@@ -186,10 +186,10 @@ public:
 	std::cout << "Priority value is required for this table but not provided." << std::endl;
 	return false;
       }
-    } else {
+    } else if (replace) {
       // Priority not allowed
       if (priority.has_value()) {
-	std::cout << "Priority value provided but not allowed for this table." << std::endl;
+	std::cout << "Priority value provided but not allowed for replace operations." << std::endl;
 	return false;
       }
     }
@@ -234,8 +234,7 @@ public:
       param->set_value(param_str);
     }
 
-    // Only provide the priority if it is required for this table
-    if (table.priority_required() && !replace) {
+    if (priority.has_value()) {
       ma_rule.set_priority(priority.value());
     }
 
