@@ -236,20 +236,20 @@ static const char * switch_map_port_id_to_name(enum switch_map_port_id port)
   }
 }
 
-static bool switch_map_port_id_to_igr_sw_tid (enum switch_map_port_id port, union smartnic_322mhz_igr_sw_tid * tid)
+static bool switch_map_port_id_to_igr_sw_tid (enum switch_map_port_id port, union smartnic_igr_sw_tid * tid)
 {
   switch (port) {
   case SW_MAP_PORT_CMAC0:
-    tid->_v = SMARTNIC_322MHZ_IGR_SW_TID_VALUE_CMAC_0;
+    tid->_v = SMARTNIC_IGR_SW_TID_VALUE_CMAC_0;
     return true;
   case SW_MAP_PORT_CMAC1:
-    tid->_v = SMARTNIC_322MHZ_IGR_SW_TID_VALUE_CMAC_1;
+    tid->_v = SMARTNIC_IGR_SW_TID_VALUE_CMAC_1;
     return true;
   case SW_MAP_PORT_HOST0:
-    tid->_v = SMARTNIC_322MHZ_IGR_SW_TID_VALUE_HOST_0;
+    tid->_v = SMARTNIC_IGR_SW_TID_VALUE_HOST_0;
     return true;
   case SW_MAP_PORT_HOST1:
-    tid->_v = SMARTNIC_322MHZ_IGR_SW_TID_VALUE_HOST_1;
+    tid->_v = SMARTNIC_IGR_SW_TID_VALUE_HOST_1;
     return true;
   default:
     // Invalid port for this table
@@ -257,32 +257,32 @@ static bool switch_map_port_id_to_igr_sw_tid (enum switch_map_port_id port, unio
   }
 }
 
-static const char * igr_sw_tid_to_name(union smartnic_322mhz_igr_sw_tid tid)
+static const char * igr_sw_tid_to_name(union smartnic_igr_sw_tid tid)
 {
   switch (tid.value) {
-  case SMARTNIC_322MHZ_IGR_SW_TID_VALUE_CMAC_0: return "CMAC0";
-  case SMARTNIC_322MHZ_IGR_SW_TID_VALUE_CMAC_1: return "CMAC1";
-  case SMARTNIC_322MHZ_IGR_SW_TID_VALUE_HOST_0: return "HOST0";
-  case SMARTNIC_322MHZ_IGR_SW_TID_VALUE_HOST_1: return "HOST1";
+  case SMARTNIC_IGR_SW_TID_VALUE_CMAC_0: return "CMAC0";
+  case SMARTNIC_IGR_SW_TID_VALUE_CMAC_1: return "CMAC1";
+  case SMARTNIC_IGR_SW_TID_VALUE_HOST_0: return "HOST0";
+  case SMARTNIC_IGR_SW_TID_VALUE_HOST_1: return "HOST1";
   default:
     return "????";
   }
 }
 
-static bool switch_map_port_id_to_igr_sw_tdest (enum switch_map_port_id port, union smartnic_322mhz_igr_sw_tdest * tdest)
+static bool switch_map_port_id_to_igr_sw_tdest (enum switch_map_port_id port, union smartnic_igr_sw_tdest * tdest)
 {
   switch (port) {
   case SW_MAP_PORT_APP0:
-    tdest->_v = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_0;
+    tdest->_v = SMARTNIC_IGR_SW_TDEST_VALUE_APP_0;
     return true;
   case SW_MAP_PORT_APP1:
-    tdest->_v = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_1;
+    tdest->_v = SMARTNIC_IGR_SW_TDEST_VALUE_APP_1;
     return true;
   case SW_MAP_PORT_BYPASS:
-    tdest->_v = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_BYPASS;
+    tdest->_v = SMARTNIC_IGR_SW_TDEST_VALUE_APP_BYPASS;
     return true;
   case SW_MAP_PORT_DROP:
-    tdest->_v = SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_DROP;
+    tdest->_v = SMARTNIC_IGR_SW_TDEST_VALUE_DROP;
     return true;
   default:
     // Invalid port for this table
@@ -290,32 +290,32 @@ static bool switch_map_port_id_to_igr_sw_tdest (enum switch_map_port_id port, un
   }
 }
 
-static const char * igr_sw_tdest_to_name(union smartnic_322mhz_igr_sw_tdest tdest)
+static const char * igr_sw_tdest_to_name(union smartnic_igr_sw_tdest tdest)
 {
   switch (tdest.value) {
-  case SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_0: return "APP0";
-  case SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_1: return "APP1";
-  case SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_APP_BYPASS: return "BYPASS";
-  case SMARTNIC_322MHZ_IGR_SW_TDEST_VALUE_DROP: return "DROP";
+  case SMARTNIC_IGR_SW_TDEST_VALUE_APP_0: return "APP0";
+  case SMARTNIC_IGR_SW_TDEST_VALUE_APP_1: return "APP1";
+  case SMARTNIC_IGR_SW_TDEST_VALUE_APP_BYPASS: return "BYPASS";
+  case SMARTNIC_IGR_SW_TDEST_VALUE_DROP: return "DROP";
   default:
     return "????";
   }
 }
 
-static bool switch_map_port_id_to_bypass_tdest (enum switch_map_port_id port, union smartnic_322mhz_bypass_tdest * tdest)
+static bool switch_map_port_id_to_bypass_tdest (enum switch_map_port_id port, union smartnic_bypass_tdest * tdest)
 {
   switch (port) {
   case SW_MAP_PORT_CMAC0:
-    tdest->_v = SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_CMAC_0;
+    tdest->_v = SMARTNIC_BYPASS_TDEST_VALUE_CMAC_0;
     return true;
   case SW_MAP_PORT_CMAC1:
-    tdest->_v = SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_CMAC_1;
+    tdest->_v = SMARTNIC_BYPASS_TDEST_VALUE_CMAC_1;
     return true;
   case SW_MAP_PORT_HOST0:
-    tdest->_v = SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_HOST_0;
+    tdest->_v = SMARTNIC_BYPASS_TDEST_VALUE_HOST_0;
     return true;
   case SW_MAP_PORT_HOST1:
-    tdest->_v = SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_HOST_1;
+    tdest->_v = SMARTNIC_BYPASS_TDEST_VALUE_HOST_1;
     return true;
   default:
     // Invalid port for this table
@@ -323,32 +323,32 @@ static bool switch_map_port_id_to_bypass_tdest (enum switch_map_port_id port, un
   }
 }
 
-static const char * bypass_tdest_to_name(union smartnic_322mhz_bypass_tdest tdest)
+static const char * bypass_tdest_to_name(union smartnic_bypass_tdest tdest)
 {
   switch (tdest.value) {
-  case SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_CMAC_0: return "CMAC0";
-  case SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_CMAC_1: return "CMAC1";
-  case SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_HOST_0: return "HOST0";
-  case SMARTNIC_322MHZ_BYPASS_TDEST_VALUE_HOST_1: return "HOST1";
+  case SMARTNIC_BYPASS_TDEST_VALUE_CMAC_0: return "CMAC0";
+  case SMARTNIC_BYPASS_TDEST_VALUE_CMAC_1: return "CMAC1";
+  case SMARTNIC_BYPASS_TDEST_VALUE_HOST_0: return "HOST0";
+  case SMARTNIC_BYPASS_TDEST_VALUE_HOST_1: return "HOST1";
   default:
     return "????";
   }
 }
 
-static bool switch_map_port_id_to_app_0_tdest_remap (enum switch_map_port_id port, union smartnic_322mhz_app_0_tdest_remap * tdest)
+static bool switch_map_port_id_to_app_0_tdest_remap (enum switch_map_port_id port, union smartnic_app_0_tdest_remap * tdest)
 {
   switch (port) {
   case SW_MAP_PORT_CMAC0:
-    tdest->_v = SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_CMAC_0;
+    tdest->_v = SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_0;
     return true;
   case SW_MAP_PORT_CMAC1:
-    tdest->_v = SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_CMAC_1;
+    tdest->_v = SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_1;
     return true;
   case SW_MAP_PORT_HOST0:
-    tdest->_v = SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_HOST_0;
+    tdest->_v = SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_0;
     return true;
   case SW_MAP_PORT_HOST1:
-    tdest->_v = SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_HOST_1;
+    tdest->_v = SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_1;
     return true;
   default:
     // Invalid port for this table
@@ -356,32 +356,32 @@ static bool switch_map_port_id_to_app_0_tdest_remap (enum switch_map_port_id por
   }
 }
 
-static const char * app_0_tdest_to_name(union smartnic_322mhz_app_0_tdest_remap tdest)
+static const char * app_0_tdest_to_name(union smartnic_app_0_tdest_remap tdest)
 {
   switch (tdest.value) {
-  case SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_CMAC_0: return "CMAC0";
-  case SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_CMAC_1: return "CMAC1";
-  case SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_HOST_0: return "HOST0";
-  case SMARTNIC_322MHZ_APP_0_TDEST_REMAP_VALUE_HOST_1: return "HOST1";
+  case SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_0: return "CMAC0";
+  case SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_1: return "CMAC1";
+  case SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_0: return "HOST0";
+  case SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_1: return "HOST1";
   default:
     return "????";
   }
 }
 
-static bool switch_map_port_id_to_app_1_tdest_remap (enum switch_map_port_id port, union smartnic_322mhz_app_1_tdest_remap * tdest)
+static bool switch_map_port_id_to_app_1_tdest_remap (enum switch_map_port_id port, union smartnic_app_1_tdest_remap * tdest)
 {
   switch (port) {
   case SW_MAP_PORT_CMAC0:
-    tdest->_v = SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_CMAC_0;
+    tdest->_v = SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_0;
     return true;
   case SW_MAP_PORT_CMAC1:
-    tdest->_v = SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_CMAC_1;
+    tdest->_v = SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_1;
     return true;
   case SW_MAP_PORT_HOST0:
-    tdest->_v = SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_HOST_0;
+    tdest->_v = SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_0;
     return true;
   case SW_MAP_PORT_HOST1:
-    tdest->_v = SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_HOST_1;
+    tdest->_v = SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_1;
     return true;
   default:
     // Invalid port for this table
@@ -389,13 +389,13 @@ static bool switch_map_port_id_to_app_1_tdest_remap (enum switch_map_port_id por
   }
 }
 
-static const char * app_1_tdest_to_name(union smartnic_322mhz_app_1_tdest_remap tdest)
+static const char * app_1_tdest_to_name(union smartnic_app_1_tdest_remap tdest)
 {
   switch (tdest.value) {
-  case SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_CMAC_0: return "CMAC0";
-  case SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_CMAC_1: return "CMAC1";
-  case SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_HOST_0: return "HOST0";
-  case SMARTNIC_322MHZ_APP_1_TDEST_REMAP_VALUE_HOST_1: return "HOST1";
+  case SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_0: return "CMAC0";
+  case SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_1: return "CMAC1";
+  case SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_0: return "HOST0";
+  case SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_1: return "HOST1";
   default:
     return "????";
   }
@@ -406,8 +406,8 @@ static void print_switch_status(volatile struct esnet_smartnic_bar2 * bar2)
   // Ingress Switch Input Port Renaming
   printf ("Ingress Switch Input Port Remap\n");
   for (enum switch_map_slot_id slot = SW_MAP_SLOT_MIN; slot < SW_MAP_SLOT_NUM_ENTRIES; slot++) {
-    union smartnic_322mhz_igr_sw_tid tid;
-    tid._v = bar2->smartnic_322mhz_regs.igr_sw_tid[slot]._v;
+    union smartnic_igr_sw_tid tid;
+    tid._v = bar2->smartnic_regs.igr_sw_tid[slot]._v;
 
     printf ("\t[%u] %s\t%s\n", slot, switch_map_slot_id_to_name(slot), igr_sw_tid_to_name(tid));
   }
@@ -417,8 +417,8 @@ static void print_switch_status(volatile struct esnet_smartnic_bar2 * bar2)
   printf ("Ingress Switch Logical Port Connection\n");
   printf ("\tslot Logical\tApp Port\n");
   for (enum switch_map_slot_id slot = SW_MAP_SLOT_MIN; slot < SW_MAP_SLOT_NUM_ENTRIES; slot++) {
-    union smartnic_322mhz_igr_sw_tdest tdest;
-    tdest._v = bar2->smartnic_322mhz_regs.igr_sw_tdest[slot]._v;
+    union smartnic_igr_sw_tdest tdest;
+    tdest._v = bar2->smartnic_regs.igr_sw_tdest[slot]._v;
 
     printf ("\t[%u]  %s\t%s\n", slot, switch_map_slot_id_to_name(slot), igr_sw_tdest_to_name(tdest));
   }
@@ -428,8 +428,8 @@ static void print_switch_status(volatile struct esnet_smartnic_bar2 * bar2)
   printf ("Bypass Port Connection\n");
   printf ("\tslot IN\tOUT\n");
   for (enum switch_map_slot_id slot = SW_MAP_SLOT_MIN; slot < SW_MAP_SLOT_NUM_ENTRIES; slot++) {
-    union smartnic_322mhz_bypass_tdest tdest;
-    tdest._v = bar2->smartnic_322mhz_regs.bypass_tdest[slot]._v;
+    union smartnic_bypass_tdest tdest;
+    tdest._v = bar2->smartnic_regs.bypass_tdest[slot]._v;
 
     printf ("\t[%u]  %s\t%s\n", slot, switch_map_slot_id_to_name(slot), bypass_tdest_to_name(tdest));
   }
@@ -439,8 +439,8 @@ static void print_switch_status(volatile struct esnet_smartnic_bar2 * bar2)
   printf ("Egress Switch APP_0 Port Redirect\n");
   printf ("\tslot Logical\tPhysical\n");
   for (enum switch_map_slot_id slot = SW_MAP_SLOT_MIN; slot < SW_MAP_SLOT_NUM_ENTRIES; slot++) {
-    union smartnic_322mhz_app_0_tdest_remap tdest;
-    tdest._v = bar2->smartnic_322mhz_regs.app_0_tdest_remap[slot]._v;
+    union smartnic_app_0_tdest_remap tdest;
+    tdest._v = bar2->smartnic_regs.app_0_tdest_remap[slot]._v;
 
     printf ("\t[%u]  %s\t%s\n", slot, switch_map_slot_id_to_name(slot), app_0_tdest_to_name(tdest));
   }
@@ -450,8 +450,8 @@ static void print_switch_status(volatile struct esnet_smartnic_bar2 * bar2)
   printf ("Egress Switch APP_1 Port Redirect\n");
   printf ("\tslot Logical\tPhysical\n");
   for (enum switch_map_slot_id slot = SW_MAP_SLOT_MIN; slot < SW_MAP_SLOT_NUM_ENTRIES; slot++) {
-    union smartnic_322mhz_app_1_tdest_remap tdest;
-    tdest._v = bar2->smartnic_322mhz_regs.app_1_tdest_remap[slot]._v;
+    union smartnic_app_1_tdest_remap tdest;
+    tdest._v = bar2->smartnic_regs.app_1_tdest_remap[slot]._v;
 
     printf ("\t[%u]  %s\t%s\n", slot, switch_map_slot_id_to_name(slot), app_1_tdest_to_name(tdest));
   }
@@ -461,7 +461,7 @@ static void print_switch_status(volatile struct esnet_smartnic_bar2 * bar2)
   printf ("Egress Switch Port FIFO Flow Control Thresholds\n");
   printf ("\tslot Port\tThreshold\n");
   for (enum switch_map_slot_id slot = SW_MAP_SLOT_MIN; slot < SW_MAP_SLOT_NUM_ENTRIES; slot++) {
-    printf ("\t[%u]  %s\t%10u\n", slot, switch_map_slot_id_to_name(slot), bar2->smartnic_322mhz_regs.egr_fc_thresh[slot]);
+    printf ("\t[%u]  %s\t%10u\n", slot, switch_map_slot_id_to_name(slot), bar2->smartnic_regs.egr_fc_thresh[slot]);
   }
   printf("\n");
 }
@@ -522,9 +522,9 @@ void cmd_sw(struct argp_state *state)
       struct switch_map *map = &arguments.map[i];
       printf ("\t[%u]  %s -> %s", i, switch_map_slot_id_to_name(map->a), switch_map_port_id_to_name(map->z));
 
-      union smartnic_322mhz_igr_sw_tid tid;
+      union smartnic_igr_sw_tid tid;
       if (switch_map_port_id_to_igr_sw_tid(map->z, &tid)) {
-	bar2->smartnic_322mhz_regs.igr_sw_tid[map->a]._v = tid._v;
+	bar2->smartnic_regs.igr_sw_tid[map->a]._v = tid._v;
 	printf("  OK\n");
       } else {
 	printf("  FAIL: Invalid target port name for this table\n");
@@ -536,9 +536,9 @@ void cmd_sw(struct argp_state *state)
       struct switch_map *map = &arguments.map[i];
       printf ("\t[%u]  %s -> %s", i, switch_map_slot_id_to_name(map->a), switch_map_port_id_to_name(map->z));
 
-      union smartnic_322mhz_igr_sw_tdest tdest;
+      union smartnic_igr_sw_tdest tdest;
       if (switch_map_port_id_to_igr_sw_tdest(map->z, &tdest)) {
-	bar2->smartnic_322mhz_regs.igr_sw_tdest[map->a]._v = tdest._v;
+	bar2->smartnic_regs.igr_sw_tdest[map->a]._v = tdest._v;
 	printf("  OK\n");
       } else {
 	printf("  FAIL: Invalid target port name for this table\n");
@@ -550,9 +550,9 @@ void cmd_sw(struct argp_state *state)
       struct switch_map *map = &arguments.map[i];
       printf ("\t[%u]  %s -> %s", i, switch_map_slot_id_to_name(map->a), switch_map_port_id_to_name(map->z));
 
-      union smartnic_322mhz_bypass_tdest tdest;
+      union smartnic_bypass_tdest tdest;
       if (switch_map_port_id_to_bypass_tdest(map->z, &tdest)) {
-	bar2->smartnic_322mhz_regs.bypass_tdest[map->a]._v = tdest._v;
+	bar2->smartnic_regs.bypass_tdest[map->a]._v = tdest._v;
 	printf("  OK\n");
       } else {
 	printf("  FAIL: Invalid target port name for this table\n");
@@ -564,9 +564,9 @@ void cmd_sw(struct argp_state *state)
       struct switch_map *map = &arguments.map[i];
       printf ("\t[%u]  %s -> %s", i, switch_map_slot_id_to_name(map->a), switch_map_port_id_to_name(map->z));
 
-      union smartnic_322mhz_app_0_tdest_remap tdest;
+      union smartnic_app_0_tdest_remap tdest;
       if (switch_map_port_id_to_app_0_tdest_remap(map->z, &tdest)) {
-	bar2->smartnic_322mhz_regs.app_0_tdest_remap[map->a]._v = tdest._v;
+	bar2->smartnic_regs.app_0_tdest_remap[map->a]._v = tdest._v;
 	printf("  OK\n");
       } else {
 	printf("  FAIL: Invalid target port name for this table\n");
@@ -578,9 +578,9 @@ void cmd_sw(struct argp_state *state)
       struct switch_map *map = &arguments.map[i];
       printf ("\t[%u]  %s -> %s", i, switch_map_slot_id_to_name(map->a), switch_map_port_id_to_name(map->z));
 
-      union smartnic_322mhz_app_1_tdest_remap tdest;
+      union smartnic_app_1_tdest_remap tdest;
       if (switch_map_port_id_to_app_1_tdest_remap(map->z, &tdest)) {
-	bar2->smartnic_322mhz_regs.app_1_tdest_remap[map->a]._v = tdest._v;
+	bar2->smartnic_regs.app_1_tdest_remap[map->a]._v = tdest._v;
 	printf("  OK\n");
       } else {
 	printf("  FAIL: Invalid target port name for this table\n");

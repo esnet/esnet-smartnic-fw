@@ -32,7 +32,7 @@ static ErrorCode set_defaults_one_to_one(const Device& dev) {
     usleep(1 * 1000 * 1000); // Wait 1s for the pipelines to drain.
 
     // Default the switch.
-    switch_set_defaults_one_to_one(&dev.bar2->smartnic_322mhz_regs);
+    switch_set_defaults_one_to_one(&dev.bar2->smartnic_regs);
 
     // Default the host interfaces.
     for (unsigned int index = 0; index < dev.nhosts; ++index) {
