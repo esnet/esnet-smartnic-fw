@@ -32,6 +32,7 @@ install_headers(
     'include/switch.h',
     'include/sysmon.h',
     'include/smartnic.h',
+    'include/smartnic-block-compat.h',
   ],
   subdir : 'esnet-smartnic'
 )

@@ -122,7 +122,7 @@ static bool processor_from_switch_id(SwitchProcessorId& id,
 static ErrorCode get_switch_ingress_config(const Device& dev,
                                            SwitchConfig& config,
                                            const struct switch_interface_id& intf) {
-    volatile auto blk = &dev.bar2->smartnic_322mhz_regs;
+    volatile auto blk = &dev.bar2->smartnic_regs;
 
     struct switch_interface_id to_intf;
     if (!switch_get_ingress_source(blk, &intf, &to_intf)) {
@@ -160,7 +160,7 @@ static ErrorCode get_switch_egress_config(const Device& dev,
                                           SwitchConfig& config,
                                           const struct switch_interface_id& intf,
                                           const enum switch_processor_type type) {
-    volatile auto blk = &dev.bar2->smartnic_322mhz_regs;
+    volatile auto blk = &dev.bar2->smartnic_regs;
     struct switch_processor_id proc = {.type = type, .index = 0};
     unsigned int max_index = 0;
 
@@ -334,7 +334,7 @@ void SmartnicConfigImpl::set_switch_config(
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
-        volatile auto blk = &dev.bar2->smartnic_322mhz_regs;
+        volatile auto blk = &dev.bar2->smartnic_regs;
         auto err = ErrorCode::EC_OK;
         SwitchConfigResponse resp;
 

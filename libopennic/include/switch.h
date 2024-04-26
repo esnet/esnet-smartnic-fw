@@ -1,7 +1,7 @@
 #ifndef INCLUDE_SWITCH_H
 #define INCLUDE_SWITCH_H
 
-#include "smartnic_322mhz_block.h"
+#include "smartnic.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -34,30 +34,30 @@ struct switch_processor_id {
 };
 
 //--------------------------------------------------------------------------------------------------
-bool switch_get_ingress_source(volatile struct smartnic_322mhz_block* blk,
+bool switch_get_ingress_source(volatile struct smartnic_block* blk,
                                const struct switch_interface_id* from_intf,
                                struct switch_interface_id* to_intf);
-bool switch_set_ingress_source(volatile struct smartnic_322mhz_block* blk,
+bool switch_set_ingress_source(volatile struct smartnic_block* blk,
                                const struct switch_interface_id* from_intf,
                                const struct switch_interface_id* to_intf);
 
-bool switch_get_ingress_connection(volatile struct smartnic_322mhz_block* blk,
+bool switch_get_ingress_connection(volatile struct smartnic_block* blk,
                                    const struct switch_interface_id* from_intf,
                                    struct switch_processor_id* to_proc);
-bool switch_set_ingress_connection(volatile struct smartnic_322mhz_block* blk,
+bool switch_set_ingress_connection(volatile struct smartnic_block* blk,
                                    const struct switch_interface_id* from_intf,
                                    const struct switch_processor_id* to_proc);
 
-bool switch_get_egress_connection(volatile struct smartnic_322mhz_block* blk,
+bool switch_get_egress_connection(volatile struct smartnic_block* blk,
                                   const struct switch_processor_id* on_proc,
                                   const struct switch_interface_id* from_intf,
                                   struct switch_interface_id* to_intf);
-bool switch_set_egress_connection(volatile struct smartnic_322mhz_block* blk,
+bool switch_set_egress_connection(volatile struct smartnic_block* blk,
                                   const struct switch_processor_id* on_proc,
                                   const struct switch_interface_id* from_intf,
                                   const struct switch_interface_id* to_intf);
 
-void switch_set_defaults_one_to_one(volatile struct smartnic_322mhz_block* blk);
+void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk);
 
 #ifdef __cplusplus
 }

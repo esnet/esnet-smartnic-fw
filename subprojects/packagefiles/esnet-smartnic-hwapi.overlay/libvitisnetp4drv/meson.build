@@ -15,28 +15,39 @@ regmap_dep = dependency('regmap')
 # Find Vitis drivers. There are two layouts:
 # - legacy: Include and lib directories for the ingress pipeline are peers with
 #           this file. This will generate a single vitisnetp4 driver wrapper.
-# - new:    sdnet_* directories for different pipelines are peers with this
-#           file. The include and lib directories are beneath each sdnet_*. This
+# - new:    <prefix>* directories for different pipelines are peers with this
+#           file. The include and lib directories are beneath each <prefix>*. This
 #           will generate a vitisnetp4 driver wrapper per pipeline. Currently,
 #           only a combination of 2 pipelines is supported: ingress and egress.
 #           The ordering follows the definition of the PipelineId enum from the
 #           protobuf sn-p4-proto/sn_p4_v1.proto file. When an unknown pipeline
 #           name is encountered, a build-time error will be forced to ensure that
 #           the driver software is updated appropriately to support it.
+EXPECTED_IP_PREFIXES = [
+    'vitisnetp4_',
+    'sdnet_',
+]
 EXPECTED_IP_NAMES = [
-    'sdnet_igr', # enum PipelineId INGRESS
-    'sdnet_egr', # enum PipelineId EGRESS
+    'igr', # enum PipelineId INGRESS
+    'egr', # enum PipelineId EGRESS
 ]
 MAX_IP_NAMES = EXPECTED_IP_NAMES.length()
 
-found_ip_names = run_command(
-    'bash', '-c',
-    'find ' + this_dir +
-    ' -mindepth 1 -maxdepth 1 ' +
-    ' -name \'sdnet_*\' -printf \'%P\\n\'' +
-    ' | sort -V',
-    check: true).stdout().splitlines()
-n_ip_names = found_ip_names.length()
+n_ip_names = 0
+foreach ip_prefix: EXPECTED_IP_PREFIXES
+    found_ip_names = run_command(
+        'bash', '-c',
+        'find ' + this_dir +
+        ' -mindepth 1 -maxdepth 1 ' +
+        ' -name \'@0@*\' -printf \'%P\\n\''.format(ip_prefix) +
+        ' | sort -V',
+        check: true).stdout().splitlines()
+
+    n_ip_names = found_ip_names.length()
+    if n_ip_names > 0
+        break
+    endif
+endforeach
 
 ip_dir_prefixes = {}
 ip_names = []
@@ -52,11 +63,16 @@ elif n_ip_names > MAX_IP_NAMES
     error('Too many vitisnetp4 drivers. Expected no more than @0@, found @1@.'.
           format(MAX_IP_NAMES, n_ip_names))
 else
+    expected_ip_names = []
+    foreach ip_name: EXPECTED_IP_NAMES
+        expected_ip_names += [ip_prefix + ip_name]
+    endforeach
+
     # Fail the build if an unsupported IP name is found.
     foreach ip_name: found_ip_names
-        if ip_name not in EXPECTED_IP_NAMES
+        if ip_name not in expected_ip_names
             error('Unknown vitisnetp4 IP name "@0@". Expected names are: @1@.'.
-                  format(ip_name, EXPECTED_IP_NAMES))
+                  format(ip_name, expected_ip_names))
         endif
     endforeach
 
@@ -68,7 +84,7 @@ else
     # PipelineId enum from the protobuf sn-p4-proto/sn_p4_v1.proto file (refer
     # to the comment for EXPECTED_IP_NAMES). Empty strings indicate that an sdnet
     # is not implemented, resulting in a NULL entry in the driver wrapper table.
-    foreach ip_name: EXPECTED_IP_NAMES
+    foreach ip_name: expected_ip_names
         if ip_name in found_ip_names
             ip_names += [ip_name]
             ip_dir_prefixes += {ip_name: ip_name + '/'}
