@@ -26,6 +26,7 @@ RUN <<EOT
       fakeroot \
       less \
       libdistro-info-perl \
+      libmicrohttpd-dev \
       libpython3-dev \
       lsof \
       net-tools \

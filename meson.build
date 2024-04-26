@@ -9,6 +9,7 @@ project(
 
 subproject('gtest')
 subproject('cli11')
+subproject('prometheus-client-c')
 
 subproject('esnet-smartnic-hwapi', default_options: ['default_library=static'])
 subdir('libsnutil')

@@ -1,0 +1,23 @@
+#!/usr/bin/env -S regio-esnet-smartnic script
+
+import sys
+
+#---------------------------------------------------------------------------------------------------
+def stdout(msg):
+    sys.stdout.write(msg)
+
+#---------------------------------------------------------------------------------------------------
+def main():
+    stdout('Checking for FPGA readiness ... ')
+
+    for dna in dev0.bar2.syscfg.dna:
+        if dna.value == 0xffffffff:
+            stdout('FPGA not ready.\n')
+            sys.exit(1)
+
+    stdout('FPGA ready.\n')
+    sys.exit(0)
+
+#---------------------------------------------------------------------------------------------------
+if __name__ == '__main__':
+    main()

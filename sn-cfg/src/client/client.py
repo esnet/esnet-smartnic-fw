@@ -17,6 +17,7 @@ from . import defaults
 from . import device
 from . import host
 from . import port
+from . import stats
 from . import switch
 
 SUB_COMMAND_MODULES = (
@@ -25,6 +26,7 @@ SUB_COMMAND_MODULES = (
     device,
     host,
     port,
+    stats,
     switch,
 )
 
@@ -195,6 +197,11 @@ def batch_callback(ctx, results):
 
 @click_main.group
 @click.pass_context
+def clear(ctx):
+    connect_client(ctx.obj)
+
+@click_main.group
+@click.pass_context
 def configure(ctx):
     connect_client(ctx.obj)
 
@@ -209,6 +216,7 @@ def main():
     cmds = Commands()
     cmds.main = click_main
     cmds.batch = batch
+    cmds.clear = clear
     cmds.configure = configure
     cmds.show = show
 

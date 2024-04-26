@@ -58,6 +58,29 @@ enum ErrorCode {
 }
 
 //--------------------------------------------------------------------------------------------------
+message StatsCounter {
+    string domain = 1;
+    string zone = 2;
+    string block = 3;
+    string name = 4;
+    uint64 value = 5;
+}
+
+message Stats {
+    repeated StatsCounter counters = 1;
+}
+
+message StatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+}
+
+message StatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    Stats stats = 3;
+}
+
+//--------------------------------------------------------------------------------------------------
 enum DefaultsProfile {
     DS_UNKNOWN = 0;
     DS_ONE_TO_ONE = 1;
@@ -147,6 +170,18 @@ message HostConfigResponse {
     HostConfig config = 4;
 }
 
+message HostStatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 host_id = 2; // 0-based index. Set to -1 for all host interfaces.
+}
+
+message HostStatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 host_id = 3;
+    Stats stats = 4;
+}
+
 //--------------------------------------------------------------------------------------------------
 enum PortState {
     PORT_STATE_UNKNOWN = 0; // Field is unset.
@@ -209,6 +244,18 @@ message PortStatusResponse {
     uint32 dev_id = 2;
     uint32 port_id = 3;
     PortStatus status = 4;
+}
+
+message PortStatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 port_id = 2; // 0-based index. Set to -1 for all ports.
+}
+
+message PortStatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 port_id = 3;
+    Stats stats = 4;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -278,11 +325,22 @@ message SwitchConfigResponse {
     SwitchConfig config = 3;
 }
 
+message SwitchStatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+}
+
+message SwitchStatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    Stats stats = 3;
+}
+
 //--------------------------------------------------------------------------------------------------
 enum BatchOperation {
     BOP_UNKNOWN = 0; // Field is unset.
     BOP_GET = 1;
     BOP_SET = 2;
+    BOP_CLEAR = 3;
 }
 
 message BatchRequest {
@@ -297,16 +355,22 @@ message BatchRequest {
 
         // Host configuration.
         HostConfigRequest host_config = 20;
+        HostStatsRequest host_stats = 21;
 
         // Port configuration.
         PortConfigRequest port_config = 30;
         PortStatusRequest port_status = 31;
+        PortStatsRequest port_stats = 32;
 
         // Switch configuration.
         SwitchConfigRequest switch_config = 40;
+        SwitchStatsRequest switch_stats = 41;
 
         // Preset defaults configuration.
         DefaultsRequest defaults = 50;
+
+        // Statistics configuration.
+        StatsRequest stats = 60;
     };
 }
 
@@ -322,16 +386,22 @@ message BatchResponse {
 
         // Host configuration.
         HostConfigResponse host_config = 20;
+        HostStatsResponse host_stats = 21;
 
         // Port configuration.
         PortConfigResponse port_config = 30;
         PortStatusResponse port_status = 31;
+        PortStatsResponse port_stats = 32;
 
         // Switch configuration.
         SwitchConfigResponse switch_config = 40;
+        SwitchStatsResponse switch_stats = 41;
 
         // Preset defaults configuration.
         DefaultsResponse defaults = 50;
+
+        // Statistics configuration.
+        StatsResponse stats = 60;
     };
 }
 
@@ -350,13 +420,23 @@ service SmartnicConfig {
     // Host configuration.
     rpc GetHostConfig(HostConfigRequest) returns (stream HostConfigResponse);
     rpc SetHostConfig(HostConfigRequest) returns (stream HostConfigResponse);
+    rpc GetHostStats(HostStatsRequest) returns (stream HostStatsResponse);
+    rpc ClearHostStats(HostStatsRequest) returns (stream HostStatsResponse);
 
     // Port configuration.
     rpc GetPortConfig(PortConfigRequest) returns (stream PortConfigResponse);
     rpc SetPortConfig(PortConfigRequest) returns (stream PortConfigResponse);
     rpc GetPortStatus(PortStatusRequest) returns (stream PortStatusResponse);
+    rpc GetPortStats(PortStatsRequest) returns (stream PortStatsResponse);
+    rpc ClearPortStats(PortStatsRequest) returns (stream PortStatsResponse);
+
+    // Statistics configuration.
+    rpc GetStats(StatsRequest) returns (stream StatsResponse);
+    rpc ClearStats(StatsRequest) returns (stream StatsResponse);
 
     // Switch configuration.
     rpc GetSwitchConfig(SwitchConfigRequest) returns (stream SwitchConfigResponse);
     rpc SetSwitchConfig(SwitchConfigRequest) returns (stream SwitchConfigResponse);
+    rpc GetSwitchStats(SwitchStatsRequest) returns (stream SwitchStatsResponse);
+    rpc ClearSwitchStats(SwitchStatsRequest) returns (stream SwitchStatsResponse);
 }

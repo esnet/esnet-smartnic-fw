@@ -558,6 +558,7 @@ services:
     depends_on:
       smartnic-hw:
         condition: service_healthy
+        restart: true
     restart: unless-stopped
     init: true
     user: root

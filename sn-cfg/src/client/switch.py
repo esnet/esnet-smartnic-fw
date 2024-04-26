@@ -16,6 +16,7 @@ from sn_cfg_proto import (
     SwitchConfigRequest,
     SwitchInterfaceType,
     SwitchProcessorType,
+    SwitchStatsRequest,
 )
 
 from .device import device_id_option
@@ -200,6 +201,78 @@ def batch_switch_config(op, **kargs):
     return batch_generate_switch_config_req(op, **kargs), batch_process_switch_config_resp
 
 #---------------------------------------------------------------------------------------------------
+def switch_stats_req(dev_id, **stats_kargs):
+    req_kargs = {'dev_id': dev_id}
+    return SwitchStatsRequest(**req_kargs)
+
+#---------------------------------------------------------------------------------------------------
+def rpc_switch_stats(op, **kargs):
+    req = switch_stats_req(**kargs)
+    try:
+        for resp in op(req):
+            if resp.error_code != ErrorCode.EC_OK:
+                raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+            yield resp
+    except grpc.RpcError as e:
+        raise click.ClickException(str(e))
+
+def rpc_clear_switch_stats(stub, **kargs):
+    for resp in rpc_switch_stats(stub.ClearSwitchStats, **kargs):
+        yield resp.dev_id
+
+def rpc_get_switch_stats(stub, **kargs):
+    for resp in rpc_switch_stats(stub.GetSwitchStats, **kargs):
+        yield resp.dev_id, resp.stats
+
+#---------------------------------------------------------------------------------------------------
+def clear_switch_stats(client, **kargs):
+    for dev_id in rpc_clear_switch_stats(client.stub, **kargs):
+        click.echo(f'Cleared statistics for device ID {dev_id}.')
+
+#---------------------------------------------------------------------------------------------------
+def _show_switch_stats(dev_id, stats):
+    rows = []
+    rows.append(HEADER_SEP)
+    rows.append(f'Device ID: {dev_id}')
+    rows.append(HEADER_SEP)
+
+    for cnt in stats.counters:
+        if cnt.value != 0:
+            rows.append(f'{cnt.block}_{cnt.name}: {cnt.value}')
+    click.echo('\n'.join(rows))
+
+def show_switch_stats(client, **kargs):
+    for dev_id, stats in rpc_get_switch_stats(client.stub, **kargs):
+        _show_switch_stats(dev_id, stats)
+
+#---------------------------------------------------------------------------------------------------
+def batch_generate_switch_stats_req(op, **kargs):
+    yield BatchRequest(op=op, switch_stats=switch_stats_req(**kargs))
+
+def batch_process_switch_stats_resp(resp):
+    if not resp.HasField('switch_stats'):
+        return False
+
+    resp = resp.switch_stats
+    if resp.error_code != ErrorCode.EC_OK:
+        raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+
+    if resp.HasField('stats'):
+        _show_switch_stats(resp.dev_id, resp.stats)
+    else:
+        click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
+    return True
+
+def batch_switch_stats(op, **kargs):
+    return batch_generate_switch_stats_req(op, **kargs), batch_process_switch_stats_resp
+
+#---------------------------------------------------------------------------------------------------
+def clear_switch_options(fn):
+    options = (
+        device_id_option,
+    )
+    return apply_options(options, fn)
+
 def configure_switch_options(fn):
     options = (
         device_id_option,
@@ -259,6 +332,14 @@ def show_switch_options(fn):
 def add_batch_commands(cmd):
     # Click doesn't support nested groups when using command chaining, so the command hierarchy
     # needs to be flattened.
+    @cmd.command(name='clear-switch-stats')
+    @clear_switch_options
+    def clear_switch_stats(**kargs):
+        '''
+        Clear the statistics of the SmartNIC packet switch.
+        '''
+        return batch_switch_stats(BatchOperation.BOP_CLEAR, **kargs)
+
     @cmd.command(name='configure-switch')
     @configure_switch_options
     def configure_switch(**kargs):
@@ -274,6 +355,36 @@ def add_batch_commands(cmd):
         Display the configuration of the SmartNIC packet switch.
         '''
         return batch_switch_config(BatchOperation.BOP_GET, **kargs)
+
+    @cmd.command(name='show-switch-stats')
+    @show_switch_options
+    def show_switch_stats(**kargs):
+        '''
+        Display the statistics of the SmartNIC packet switch.
+        '''
+        return batch_switch_stats(BatchOperation.BOP_GET, **kargs)
+
+#---------------------------------------------------------------------------------------------------
+def add_clear_commands(cmd):
+    @cmd.group(invoke_without_command=True)
+    @click.pass_context
+    def switch(ctx):
+        '''
+        Clear for the SmartNIC packet switch.
+        '''
+        if ctx.invoked_subcommand is None:
+            client = ctx.obj
+            kargs = {'dev_id': -1}
+            clear_switch_stats(client, **kargs)
+
+    @switch.command
+    @clear_switch_options
+    @click.pass_context
+    def stats(ctx, **kargs):
+        '''
+        Clear the statistics of the SmartNIC packet switch.
+        '''
+        clear_switch_stats(ctx.obj, **kargs)
 
 #---------------------------------------------------------------------------------------------------
 def add_configure_commands(cmd):
@@ -300,7 +411,7 @@ def add_show_commands(cmd):
             show_switch_config(client, **kargs)
 
     @switch.command
-    @device_id_option
+    @show_switch_options
     @click.pass_context
     def config(ctx, **kargs):
         '''
@@ -308,8 +419,18 @@ def add_show_commands(cmd):
         '''
         show_switch_config(ctx.obj, **kargs)
 
+    @switch.command
+    @device_id_option
+    @click.pass_context
+    def stats(ctx, **kargs):
+        '''
+        Display the statistics of the SmartNIC packet switch.
+        '''
+        show_switch_stats(ctx.obj, **kargs)
+
 #---------------------------------------------------------------------------------------------------
 def add_sub_commands(cmds):
     add_batch_commands(cmds.batch)
+    add_clear_commands(cmds.clear)
     add_configure_commands(cmds.configure)
     add_show_commands(cmds.show)

@@ -2,18 +2,34 @@
 #define DEVICE_HPP
 
 #include <string>
+#include <vector>
 
 #include "esnet_smartnic_toplevel.h"
+#include "stats.h"
 
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
+struct DeviceStats {
+    string name;
+    struct stats_zone* zone;
+};
+
+//--------------------------------------------------------------------------------------------------
 struct Device {
-    const string bus_id;
+    string bus_id;
+    volatile struct esnet_smartnic_bar2* bar2;
+
     unsigned int nhosts;
     unsigned int nports;
     unsigned int napps;
-    volatile struct esnet_smartnic_bar2* bar2;
+
+    struct {
+        struct stats_domain* domain;
+        vector<DeviceStats*> hosts;
+        vector<DeviceStats*> ports;
+        DeviceStats* sw;
+    } stats;
 };
 
 #endif // DEVICE_HPP

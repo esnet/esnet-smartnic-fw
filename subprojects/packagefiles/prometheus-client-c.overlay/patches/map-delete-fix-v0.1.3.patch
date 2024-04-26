@@ -1,0 +1,12 @@
+diff -Naur a/prom/src/prom_map.c b/prom/src/prom_map.c
+--- a/prom/src/prom_map.c	2020-12-08 02:38:13.000000000 -0500
++++ b/prom/src/prom_map.c	2024-04-22 12:57:49.609147924 -0400
+@@ -369,7 +369,7 @@
+     prom_map_node_t *current_map_node = (prom_map_node_t *)current_node->item;
+     prom_linked_list_compare_t result = prom_linked_list_compare(list, current_map_node, temp_map_node);
+     if (result == PROM_EQUAL) {
+-      r = prom_linked_list_remove(list, current_node);
++      r = prom_linked_list_remove(list, current_map_node);
+       if (r) return r;
+ 
+       r = prom_linked_list_remove(keys, (char *)current_map_node->key);

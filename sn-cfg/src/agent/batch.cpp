@@ -78,6 +78,22 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kHostStats:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_host_stats(req.host_stats(), rdwr);
+                break;
+
+            case BatchOperation::BOP_CLEAR:
+                batch_clear_host_stats(req.host_stats(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         case BatchRequest::ItemCase::kPortConfig:
             switch (op) {
             case BatchOperation::BOP_GET:
@@ -106,6 +122,22 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kPortStats:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_port_stats(req.port_stats(), rdwr);
+                break;
+
+            case BatchOperation::BOP_CLEAR:
+                batch_clear_port_stats(req.port_stats(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         case BatchRequest::ItemCase::kSwitchConfig:
             switch (op) {
             case BatchOperation::BOP_GET:
@@ -114,6 +146,38 @@ Status SmartnicConfigImpl::Batch(
 
             case BatchOperation::BOP_SET:
                 batch_set_switch_config(req.switch_config(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kSwitchStats:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_switch_stats(req.switch_stats(), rdwr);
+                break;
+
+            case BatchOperation::BOP_CLEAR:
+                batch_clear_switch_stats(req.switch_stats(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kStats:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_stats(req.stats(), rdwr);
+                break;
+
+            case BatchOperation::BOP_CLEAR:
+                batch_clear_stats(req.stats(), rdwr);
                 break;
 
             default:

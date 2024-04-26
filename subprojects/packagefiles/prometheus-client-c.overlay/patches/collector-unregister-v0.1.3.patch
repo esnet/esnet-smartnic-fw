@@ -1,0 +1,57 @@
+diff -Naur a/prom/include/prom_collector_registry.h b/prom/include/prom_collector_registry.h
+--- a/prom/include/prom_collector_registry.h	2020-12-08 02:38:13.000000000 -0500
++++ b/prom/include/prom_collector_registry.h	2024-04-22 10:43:38.805767673 -0400
+@@ -96,6 +96,14 @@
+ int prom_collector_registry_register_collector(prom_collector_registry_t *self, prom_collector_t *collector);
+ 
+ /**
++ * @brief Unregister a collector from the given registry. Returns a non-zero integer value on failure.
++ * @param self The target prom_collector_registry_t*
++ * @param collector The prom_collector_t* to unregister onto the prom_collector_registry_t* as self
++ * @return A non-zero integer value upon failure
++ */
++int prom_collector_registry_unregister_collector(prom_collector_registry_t *self, prom_collector_t *collector);
++
++/**
+  * @brief Returns a string in the default metric exposition format. The string MUST be freed to avoid unnecessary heap
+  * memory growth.
+  *
+diff -Naur a/prom/src/prom_collector_registry.c b/prom/src/prom_collector_registry.c
+--- a/prom/src/prom_collector_registry.c	2020-12-08 02:38:13.000000000 -0500
++++ b/prom/src/prom_collector_registry.c	2024-04-22 11:00:27.568322084 -0400
+@@ -190,6 +190,35 @@
+   return 0;
+ }
+ 
++int prom_collector_registry_unregister_collector(prom_collector_registry_t *self, prom_collector_t *collector) {
++  PROM_ASSERT(self != NULL);
++  if (self == NULL) return 1;
++
++  int r = 0;
++
++  r = pthread_rwlock_wrlock(self->lock);
++  if (r) {
++    PROM_LOG(PROM_PTHREAD_RWLOCK_LOCK_ERROR);
++    return 1;
++  }
++  r = prom_map_delete(self->collectors, collector->name);
++  if (r) {
++    int rr = pthread_rwlock_unlock(self->lock);
++    if (rr) {
++      PROM_LOG(PROM_PTHREAD_RWLOCK_UNLOCK_ERROR);
++      return rr;
++    } else {
++      return r;
++    }
++  }
++  r = pthread_rwlock_unlock(self->lock);
++  if (r) {
++    PROM_LOG(PROM_PTHREAD_RWLOCK_UNLOCK_ERROR);
++    return 1;
++  }
++  return 0;
++}
++
+ int prom_collector_registry_validate_metric_name(prom_collector_registry_t *self, const char *metric_name) {
+   regex_t r;
+   int ret = 0;
