@@ -1,6 +1,7 @@
 sources = files(
   [
     'src/cmac.c',
+    'src/cms.c',
     'src/qdma.c',
     'src/sff-8024.c',
     'src/sff-8089.c',
@@ -36,6 +37,7 @@ libopennic = shared_library(
 install_headers(
   [
     'include/cmac.h',
+    'include/cms.h',
     'include/qdma.h',
     'include/sff-8024.h',
     'include/sff-8089.h',
