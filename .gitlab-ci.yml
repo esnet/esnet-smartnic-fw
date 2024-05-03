@@ -10,6 +10,9 @@ include:
     ref: 'main'
     file: 'harbor-cve.yml'
 
+workflow:
+  name: '$SN_HW_APP_NAME - $SN_HW_GROUP/$SN_HW_REPO ($SN_HW_BRANCH) $SN_HW_BOARD'
+
 stages:
   - pull_sn_hw
   - build
