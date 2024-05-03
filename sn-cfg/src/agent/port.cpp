@@ -394,16 +394,18 @@ struct GetPortStatsContext {
 };
 
 extern "C" {
-    static int __get_port_stats_counters(const struct stats_for_each_spec* spec,
-                                         uint64_t value, void* arg) {
-        GetPortStatsContext* ctx = static_cast<GetPortStatsContext*>(arg);
+    static int __get_port_stats_counters(const struct stats_for_each_spec* spec) {
+        if (spec->metric->type != stats_metric_type_COUNTER) {
+            return 0; // Skip non-counter metrics.
+        }
 
+        GetPortStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
         auto cnt = ctx->stats->add_counters();
         cnt->set_domain(spec->domain->name);
         cnt->set_zone(spec->zone->name);
         cnt->set_block(spec->block->name);
-        cnt->set_name(spec->counter->name);
-        cnt->set_value(value);
+        cnt->set_name(spec->metric->name);
+        cnt->set_value(spec->value.u64);
 
         return 0;
     }
@@ -455,7 +457,7 @@ void SmartnicConfigImpl::get_port_stats(
                 .stats = resp.mutable_stats(),
             };
 
-            stats_zone_for_each_counter(stats->zone, __get_port_stats_counters, &ctx);
+            stats_zone_for_each_metric(stats->zone, __get_port_stats_counters, &ctx);
 
             resp.set_error_code(ErrorCode::EC_OK);
             resp.set_dev_id(dev_id);
@@ -531,7 +533,7 @@ void SmartnicConfigImpl::clear_port_stats(
 
         for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
             auto stats = dev->stats.ports[port_id];
-            stats_zone_clear_counters(stats->zone);
+            stats_zone_clear_metrics(stats->zone);
 
             PortStatsResponse resp;
             resp.set_error_code(ErrorCode::EC_OK);

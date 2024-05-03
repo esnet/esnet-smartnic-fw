@@ -6,6 +6,7 @@
 #include "qdma_function_block.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include "unused.h"
 
 //--------------------------------------------------------------------------------------------------
 bool qdma_get_queues(volatile struct qdma_function_block* qdma,
@@ -49,12 +50,14 @@ bool qdma_set_queues(volatile struct qdma_function_block* qdma,
 //--------------------------------------------------------------------------------------------------
 #define CMAC_ADAPTER_STATS_COUNTER(_name) \
 { \
-    .name = #_name, \
-    .offset = offsetof(struct cmac_adapter_block, _name##_lo), \
-    .size = 2 * sizeof(uint32_t), \
+    __STATS_METRIC_SPEC(#_name, NULL, COUNTER, 0, 0), \
+    .io = { \
+        .offset = offsetof(struct cmac_adapter_block, _name##_lo), \
+        .size = 2 * sizeof(uint32_t), \
+    }, \
 }
 
-static const struct stats_counter_spec cmac_adapter_stats_counters[] = {
+static const struct stats_metric_spec cmac_adapter_stats_metrics[] = {
     CMAC_ADAPTER_STATS_COUNTER(tx_packets),
     CMAC_ADAPTER_STATS_COUNTER(tx_bytes),
     CMAC_ADAPTER_STATS_COUNTER(tx_drop_packets),
@@ -68,9 +71,10 @@ static const struct stats_counter_spec cmac_adapter_stats_counters[] = {
 };
 
 //--------------------------------------------------------------------------------------------------
-static uint64_t cmac_adapter_stats_read_counter(const struct stats_block_spec* bspec,
-                                                const struct stats_counter_spec* cspec) {
-    volatile uint32_t* pair = (typeof(pair))(bspec->base + cspec->offset);
+static uint64_t cmac_adapter_stats_read_metric(const struct stats_block_spec* bspec,
+                                               const struct stats_metric_spec* mspec,
+                                               void* UNUSED(data)) {
+    volatile uint32_t* pair = (typeof(pair))(bspec->io.base + mspec->io.offset);
     return ((uint64_t)pair[1] << 32) | (uint64_t)pair[0];
 }
 
@@ -82,10 +86,12 @@ struct stats_zone* qdma_stats_zone_alloc(struct stats_domain* domain,
         {
             // NOTE: Although the register block is named "cmac", it's actually used for host qdma.
             .name = "cmac_adapter",
-            .base = adapter,
-            .counters = cmac_adapter_stats_counters,
-            .ncounters = ARRAY_SIZE(cmac_adapter_stats_counters),
-            .read_counter = cmac_adapter_stats_read_counter,
+            .metrics = cmac_adapter_stats_metrics,
+            .nmetrics = ARRAY_SIZE(cmac_adapter_stats_metrics),
+            .io = {
+                .base = adapter,
+            },
+            .read_metric = cmac_adapter_stats_read_metric,
         },
     };
     struct stats_zone_spec zspec = {

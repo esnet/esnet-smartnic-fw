@@ -15,16 +15,18 @@ struct GetStatsContext {
 };
 
 extern "C" {
-    static int __get_stats_counters(const struct stats_for_each_spec* spec,
-                                    uint64_t value, void* arg) {
-        GetStatsContext* ctx = static_cast<GetStatsContext*>(arg);
+    static int __get_stats_counters(const struct stats_for_each_spec* spec) {
+        if (spec->metric->type != stats_metric_type_COUNTER) {
+            return 0; // Skip non-counter metrics.
+        }
 
+        GetStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
         auto cnt = ctx->stats->add_counters();
         cnt->set_domain(spec->domain->name);
         cnt->set_zone(spec->zone->name);
         cnt->set_block(spec->block->name);
-        cnt->set_name(spec->counter->name);
-        cnt->set_value(value);
+        cnt->set_name(spec->metric->name);
+        cnt->set_value(spec->value.u64);
 
         return 0;
     }
@@ -57,7 +59,7 @@ void SmartnicConfigImpl::get_stats(
             .stats = resp.mutable_stats(),
         };
 
-        stats_domain_for_each_counter(dev->stats.domain, __get_stats_counters, &ctx);
+        stats_domain_for_each_metric(dev->stats.domain, __get_stats_counters, &ctx);
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);
@@ -112,7 +114,7 @@ void SmartnicConfigImpl::clear_stats(
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
-        stats_domain_clear_counters(dev->stats.domain);
+        stats_domain_clear_metrics(dev->stats.domain);
 
         StatsResponse resp;
         resp.set_error_code(ErrorCode::EC_OK);

@@ -7,6 +7,7 @@
 #include "stats.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include "unused.h"
 
 //--------------------------------------------------------------------------------------------------
 static bool switch_interface_id_from_igr_sw_tid(struct switch_interface_id* intf,
@@ -579,13 +580,14 @@ void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk) {
 //--------------------------------------------------------------------------------------------------
 #define SWITCH_STATS_COUNTER(_name) \
 { \
-    .name = #_name, \
-    .offset = offsetof(struct axi4s_probe_block, _name##_upper), \
-    .size = 2 * sizeof(uint32_t), \
-    .flags = STATS_COUNTER_FLAG_MASK(CLEAR_ON_READ), \
+    __STATS_METRIC_SPEC(#_name, NULL, COUNTER, STATS_METRIC_FLAG_MASK(CLEAR_ON_READ), 0), \
+    .io = { \
+        .offset = offsetof(struct axi4s_probe_block, _name##_upper), \
+        .size = 2 * sizeof(uint32_t), \
+    }, \
 }
 
-static const struct stats_counter_spec switch_stats_counters[] = {
+static const struct stats_metric_spec switch_stats_metrics[] = {
     SWITCH_STATS_COUNTER(pkt_count),
     SWITCH_STATS_COUNTER(byte_count),
 };
@@ -628,8 +630,8 @@ static const struct switch_stats_block_info switch_stats_block_info[] = {
 };
 
 //--------------------------------------------------------------------------------------------------
-static void switch_stats_latch_counters(const struct stats_block_spec* bspec) {
-    volatile struct axi4s_probe_block* probe = bspec->base;
+static void switch_stats_latch_metrics(const struct stats_block_spec* bspec, void* UNUSED(data)) {
+    volatile struct axi4s_probe_block* probe = bspec->io.base;
 
     union axi4s_probe_probe_control control = {
         .latch = AXI4S_PROBE_PROBE_CONTROL_LATCH_LATCH_ON_WR_EVT,
@@ -640,8 +642,8 @@ static void switch_stats_latch_counters(const struct stats_block_spec* bspec) {
 }
 
 //--------------------------------------------------------------------------------------------------
-static void switch_stats_release_counters(const struct stats_block_spec* bspec) {
-    volatile struct axi4s_probe_block* probe = bspec->base;
+static void switch_stats_release_metrics(const struct stats_block_spec* bspec, void* UNUSED(data)) {
+    volatile struct axi4s_probe_block* probe = bspec->io.base;
 
     union axi4s_probe_probe_control control = {
         .latch = AXI4S_PROBE_PROBE_CONTROL_LATCH_LATCH_ON_CLK,
@@ -652,15 +654,16 @@ static void switch_stats_release_counters(const struct stats_block_spec* bspec) 
 }
 
 //--------------------------------------------------------------------------------------------------
-static void switch_stats_attach_counters(const struct stats_block_spec* bspec) {
-    switch_stats_latch_counters(bspec);
-    switch_stats_release_counters(bspec);
+static void switch_stats_attach_metrics(const struct stats_block_spec* bspec) {
+    switch_stats_latch_metrics(bspec, NULL);
+    switch_stats_release_metrics(bspec, NULL);
 }
 
 //--------------------------------------------------------------------------------------------------
-static uint64_t switch_stats_read_counter(const struct stats_block_spec* bspec,
-                                          const struct stats_counter_spec* cspec) {
-    volatile uint32_t* pair = (typeof(pair))(bspec->base + cspec->offset);
+static uint64_t switch_stats_read_metric(const struct stats_block_spec* bspec,
+                                         const struct stats_metric_spec* mspec,
+                                         void* UNUSED(data)) {
+    volatile uint32_t* pair = (typeof(pair))(bspec->io.base + mspec->io.offset);
     return ((uint64_t)pair[0] << 32) | (uint64_t)pair[1];
 }
 
@@ -674,13 +677,13 @@ struct stats_zone* switch_stats_zone_alloc(struct stats_domain* domain,
         struct stats_block_spec* bspec = &bspecs[n];
 
         bspec->name = binfo->name;
-        bspec->base = (volatile void*)bar2 + binfo->offset;
-        bspec->counters = switch_stats_counters;
-        bspec->ncounters = ARRAY_SIZE(switch_stats_counters);
-        bspec->attach_counters = switch_stats_attach_counters;
-        bspec->latch_counters = switch_stats_latch_counters;
-        bspec->release_counters = switch_stats_release_counters;
-        bspec->read_counter = switch_stats_read_counter;
+        bspec->metrics = switch_stats_metrics;
+        bspec->nmetrics = ARRAY_SIZE(switch_stats_metrics);
+        bspec->io.base = (volatile void*)bar2 + binfo->offset;
+        bspec->attach_metrics = switch_stats_attach_metrics;
+        bspec->latch_metrics = switch_stats_latch_metrics;
+        bspec->release_metrics = switch_stats_release_metrics;
+        bspec->read_metric = switch_stats_read_metric;
     }
 
     struct stats_zone_spec zspec = {

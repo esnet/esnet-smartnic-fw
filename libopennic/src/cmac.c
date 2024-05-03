@@ -4,6 +4,7 @@
 #include "array_size.h"
 #include "stats.h"
 #include <string.h>
+#include "unused.h"
 
 bool cmac_reset(volatile struct cmac_block * cmac)
 {
@@ -147,10 +148,10 @@ bool cmac_rx_status_is_link_up(volatile struct cmac_block * cmac) {
 }
 
 #define CMAC_STATS_COUNTER(_name) \
-    STATS_COUNTER_SPEC(struct cmac_block, stat_##_name, #_name, NULL, \
-                       STATS_COUNTER_FLAG_MASK(CLEAR_ON_READ), NULL)
+    STATS_METRIC_SPEC_IO(#_name, NULL, COUNTER, STATS_METRIC_FLAG_MASK(CLEAR_ON_READ), 0, \
+                         struct cmac_block, stat_##_name, 0, 0, false, STATS_IO_DATA_NULL)
 
-static const struct stats_counter_spec cmac_stats_counters[] = {
+static const struct stats_metric_spec cmac_stats_metrics[] = {
   CMAC_STATS_COUNTER(rx_bip_err_0),
   CMAC_STATS_COUNTER(rx_bip_err_1),
   CMAC_STATS_COUNTER(rx_bip_err_2),
@@ -265,8 +266,8 @@ static const struct stats_counter_spec cmac_stats_counters[] = {
 #endif
 };
 
-static void cmac_stats_latch_counters(const struct stats_block_spec * bspec) {
-    volatile struct cmac_block * cmac = bspec->base;
+static void cmac_stats_latch_metrics(const struct stats_block_spec * bspec, void* UNUSED(data)) {
+    volatile struct cmac_block * cmac = bspec->io.base;
 
     cmac->tick = 1;
     barrier();
@@ -278,10 +279,12 @@ struct stats_zone* cmac_stats_zone_alloc(struct stats_domain * domain,
   struct stats_block_spec bspecs[] = {
       {
           .name = "cmac",
-          .base = cmac,
-          .counters = cmac_stats_counters,
-          .ncounters = ARRAY_SIZE(cmac_stats_counters),
-          .latch_counters = cmac_stats_latch_counters,
+          .metrics = cmac_stats_metrics,
+          .nmetrics = ARRAY_SIZE(cmac_stats_metrics),
+          .io = {
+              .base = cmac,
+          },
+          .latch_metrics = cmac_stats_latch_metrics,
       },
   };
   struct stats_zone_spec zspec = {

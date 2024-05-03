@@ -499,16 +499,18 @@ struct GetSwitchStatsContext {
 };
 
 extern "C" {
-    static int __get_switch_stats_counters(const struct stats_for_each_spec* spec,
-                                           uint64_t value, void* arg) {
-        GetSwitchStatsContext* ctx = static_cast<GetSwitchStatsContext*>(arg);
+    static int __get_switch_stats_counters(const struct stats_for_each_spec* spec) {
+        if (spec->metric->type != stats_metric_type_COUNTER) {
+            return 0; // Skip non-counter metrics.
+        }
 
+        GetSwitchStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
         auto cnt = ctx->stats->add_counters();
         cnt->set_domain(spec->domain->name);
         cnt->set_zone(spec->zone->name);
         cnt->set_block(spec->block->name);
-        cnt->set_name(spec->counter->name);
-        cnt->set_value(value);
+        cnt->set_name(spec->metric->name);
+        cnt->set_value(spec->value.u64);
 
         return 0;
     }
@@ -541,7 +543,7 @@ void SmartnicConfigImpl::get_switch_stats(
             .stats = resp.mutable_stats(),
         };
 
-        stats_zone_for_each_counter(dev->stats.sw->zone, __get_switch_stats_counters, &ctx);
+        stats_zone_for_each_metric(dev->stats.sw->zone, __get_switch_stats_counters, &ctx);
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);
@@ -596,7 +598,7 @@ void SmartnicConfigImpl::clear_switch_stats(
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
-        stats_zone_clear_counters(dev->stats.sw->zone);
+        stats_zone_clear_metrics(dev->stats.sw->zone);
 
         SwitchStatsResponse resp;
         resp.set_error_code(ErrorCode::EC_OK);

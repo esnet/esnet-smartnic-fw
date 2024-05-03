@@ -16,58 +16,114 @@ extern "C" {
 struct stats_domain;
 struct stats_zone;
 struct stats_block;
-struct stats_counter;
+struct stats_metric;
 
 //--------------------------------------------------------------------------------------------------
-enum stats_counter_flag {
-    stats_counter_flag_CLEAR_ON_READ,
+struct stats_metric_value {
+    uint64_t u64;
+    double f64;
 };
 
-#define STATS_COUNTER_FLAG_MASK(_name) (1 << stats_counter_flag_##_name)
-#define STATS_COUNTER_FLAG_TEST(_flags, _name) (((_flags) & STATS_COUNTER_FLAG_MASK(_name)) != 0)
+enum stats_metric_type {
+    stats_metric_type_COUNTER,
+    stats_metric_type_GAUGE,
+    stats_metric_type_FLAG,
+};
 
-struct stats_counter_spec {
+enum stats_metric_flag {
+    stats_metric_flag_CLEAR_ON_READ,
+};
+
+#define STATS_METRIC_FLAG_MASK(_name) (1 << stats_metric_flag_##_name)
+#define STATS_METRIC_FLAG_TEST(_flags, _name) (((_flags) & STATS_METRIC_FLAG_MASK(_name)) != 0)
+
+union stats_io_data {
+    void* ptr;
+    uint64_t u64;
+};
+#define STATS_IO_DATA_NULL {.ptr = NULL}
+
+struct stats_metric_spec {
     const char* name;
     const char* desc;
-    uintptr_t offset;
-    size_t size;
+
+    enum stats_metric_type type;
     unsigned int flags;
-    void* data;
+    uint64_t init_value;
+
+    struct {
+        uintptr_t offset;
+        size_t size;
+        size_t width;
+        size_t shift;
+        bool invert;
+        union stats_io_data data;
+    } io;
 };
 
-#define STATS_COUNTER_SPEC(_type, _field, _name, _desc, _flags, _data) \
-{ \
+#define __STATS_METRIC_SPEC(_name, _desc, _type, _flags, _init_value) \
     .name = _name, \
     .desc = _desc, \
-    .offset = offsetof(_type, _field), \
-    .size = sizeof(((_type*)NULL)->_field), \
+    .type = stats_metric_type_##_type, \
     .flags = _flags, \
-    .data = _data, \
+    .init_value = _init_value
+
+#define STATS_METRIC_SPEC(_name, _desc, _type, _flags, _init_value) \
+{ \
+    __STATS_METRIC_SPEC(_name, _desc, _type, _flags, _init_value) \
+}
+
+#define STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value, \
+                             _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
+{ \
+    __STATS_METRIC_SPEC(_name, _desc, _type, _flags, _init_value), \
+    .io = { \
+        .offset = offsetof(_io_type, _io_field), \
+        .size = sizeof(((_io_type*)NULL)->_io_field), \
+        .width = _io_width, \
+        .shift = _io_shift, \
+        .invert = _io_invert, \
+        .data = _io_data, \
+    }, \
 }
 
 //--------------------------------------------------------------------------------------------------
 struct stats_block_spec {
     const char* name;
-    volatile void* base;
 
-    const struct stats_counter_spec* counters; /* Used to pass counter specifications during block
-                                                * allocation. Not referenced afterwards. */
-    size_t ncounters;
+    size_t nmetrics;
+    const struct stats_metric_spec* metrics; /* Used to pass metric specifications during block
+                                              * allocation. Not referenced afterwards. */
+    struct {
+        volatile void* base;
+        union stats_io_data data;
+    } io;
+
+    struct {
+        size_t data_size;
+    } latch;
 
     /*
-     * attach_counters: Called for the driver to take ownership of all counters in the block.
-     * detach_counters: Called for the driver to release ownership of all counters in the block.
-     * latch_counters: Called prior to reading the current value of all counters in the block.
-     * release_counters: Called after reading all counters in the block.
-     * read_counter: Called to read the current value of a single counter in the block.
+     * attach_metrics: Called for the driver to take ownership of all metrics in the block.
+     * detach_metrics: Called for the driver to release ownership of all metrics in the block.
+     * latch_metrics: Called prior to reading the current value of all metrics in the block. Is
+     *                passed a stack buffer of latch.data_size for internal use during an update
+     *                operation. The buffer is zeroed prior to use, is only valid until the
+     *                release_metrics method is invoked and is also passed to the read_metric and
+     *                convert_metric methods.
+     * release_metrics: Called after reading all metrics in the block.
+     * read_metric: Called to read the current value of a single metric in the block.
+     * convert_metric: Called to convert a raw register value to a floating point representation.
      */
-    void* data;
-    void (*attach_counters)(const struct stats_block_spec* bspec);
-    void (*detach_counters)(const struct stats_block_spec* bspec);
-    void (*latch_counters)(const struct stats_block_spec* bspec);
-    void (*release_counters)(const struct stats_block_spec* bspec);
-    uint64_t (*read_counter)(const struct stats_block_spec* bspec,
-                             const struct stats_counter_spec* cspec);
+    void (*attach_metrics)(const struct stats_block_spec* bspec);
+    void (*detach_metrics)(const struct stats_block_spec* bspec);
+    void (*latch_metrics)(const struct stats_block_spec* bspec, void* data);
+    void (*release_metrics)(const struct stats_block_spec* bspec, void* data);
+    uint64_t (*read_metric)(const struct stats_block_spec* bspec,
+                            const struct stats_metric_spec* mspec, void* data);
+    double (*convert_metric)(const struct stats_block_spec* bspec,
+                             const struct stats_metric_spec* mspec,
+                             uint64_t value, void* data);
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -94,33 +150,37 @@ struct stats_for_each_spec {
     const struct stats_domain_spec* domain;
     const struct stats_zone_spec* zone;
     const struct stats_block_spec* block;
-    const struct stats_counter_spec* counter;
+    const struct stats_metric_spec* metric;
+    struct stats_metric_value value;
+    void* arg;
 };
 
 //--------------------------------------------------------------------------------------------------
 struct stats_zone* stats_zone_alloc(struct stats_domain* domain,
                                     const struct stats_zone_spec* spec);
 void stats_zone_free(struct stats_zone* zone);
-size_t stats_zone_number_of_counters(struct stats_zone* zone);
-size_t stats_zone_get_counters(struct stats_zone* zone, uint64_t* values, size_t nvalues);
-void stats_zone_update_counters(struct stats_zone* zone);
-void stats_zone_clear_counters(struct stats_zone* zone);
-int stats_zone_for_each_counter(struct stats_zone* zone,
-                                int (*callback)(const struct stats_for_each_spec* spec,
-                                                uint64_t value, void* arg), void* arg);
+size_t stats_zone_number_of_metrics(struct stats_zone* zone);
+size_t stats_zone_get_metrics(struct stats_zone* zone,
+                              struct stats_metric_value* values, size_t nvalues);
+void stats_zone_update_metrics(struct stats_zone* zone);
+void stats_zone_clear_metrics(struct stats_zone* zone);
+int stats_zone_for_each_metric(struct stats_zone* zone,
+                               int (*callback)(const struct stats_for_each_spec* spec),
+                               void* arg);
 
 //--------------------------------------------------------------------------------------------------
 struct stats_domain* stats_domain_alloc(const struct stats_domain_spec* spec);
 void stats_domain_free(struct stats_domain* domain);
 void stats_domain_start(struct stats_domain* domain);
 void stats_domain_stop(struct stats_domain* domain);
-size_t stats_domain_number_of_counters(struct stats_domain* domain);
-size_t stats_domain_get_counters(struct stats_domain* domain, uint64_t* values, size_t nvalues);
-void stats_domain_update_counters(struct stats_domain* domain);
-void stats_domain_clear_counters(struct stats_domain* domain);
-int stats_domain_for_each_counter(struct stats_domain* domain,
-                                  int (*callback)(const struct stats_for_each_spec* spec,
-                                                  uint64_t value, void* arg), void* arg);
+size_t stats_domain_number_of_metrics(struct stats_domain* domain);
+size_t stats_domain_get_metrics(struct stats_domain* domain,
+                                struct stats_metric_value* values, size_t nvalues);
+void stats_domain_update_metrics(struct stats_domain* domain);
+void stats_domain_clear_metrics(struct stats_domain* domain);
+int stats_domain_for_each_metric(struct stats_domain* domain,
+                                 int (*callback)(const struct stats_for_each_spec* spec),
+                                 void* arg);
 
 #ifdef __cplusplus
 }

@@ -155,7 +155,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         init_port(dev);
         init_switch(dev);
 
-        stats_domain_clear_counters(dev->stats.domain);
+        stats_domain_clear_metrics(dev->stats.domain);
         stats_domain_start(dev->stats.domain);
 
         devices.push_back(dev);
