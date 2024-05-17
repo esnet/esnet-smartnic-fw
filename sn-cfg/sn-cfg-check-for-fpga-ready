@@ -11,7 +11,7 @@ def main():
     stdout('Checking for FPGA readiness ... ')
 
     for dna in dev0.bar2.syscfg.dna:
-        if dna.value == 0xffffffff:
+        if dna._r == 0xffffffff:
             stdout('FPGA not ready.\n')
             sys.exit(1)
 

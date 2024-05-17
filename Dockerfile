@@ -110,7 +110,7 @@ RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
       sn_p4
 
     # Install bash completions.
-    regio-esnet-smartnic -t zero completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
+    regio-esnet-smartnic -t zero -p none completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
     sn-cfg completions bash >/usr/share/bash-completion/completions/sn-cfg
 EOF
 
