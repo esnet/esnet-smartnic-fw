@@ -491,6 +491,7 @@ services:
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
       - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
+      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_CLI_SERVER=smartnic-p4
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
@@ -530,6 +531,7 @@ services:
     restart: unless-stopped
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
+      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_AGENT_SLOTADDR=$FPGA_PCIE_DEV.0
     volumes:
@@ -566,6 +568,7 @@ services:
     ports:
       - "${SN_CFG_SERVER_PORT-50100}:50100"
     environment:
+      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CFG_SERVER_HOST=${SN_HOST}
       - SN_CFG_SERVER_AUTH_TOKENS=${SN_CFG_AUTH_TOKEN}
       - SN_CFG_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
@@ -603,6 +606,7 @@ services:
     environment:
       - REGIO_SELECT=$FPGA_PCIE_DEV.0
       - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
+      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_CLI_SERVER=smartnic-p4
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
