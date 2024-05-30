@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "cms.h"
 #include "esnet_smartnic_toplevel.h"
 #include "stats.h"
 
@@ -25,6 +26,7 @@ struct DeviceStats {
 struct Device {
     string bus_id;
     volatile struct esnet_smartnic_bar2* bar2;
+    struct cms cms;
 
     unsigned int nhosts;
     unsigned int nports;

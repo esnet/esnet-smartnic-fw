@@ -48,16 +48,37 @@ def _show_device_info(dev_id, info):
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
+    pci = info.pci
     rows.append('PCI:')
-    rows.append(f'    Bus ID:    {info.pci.bus_id}')
-    rows.append(f'    Vendor ID: 0x{info.pci.vendor_id:04x}')
-    rows.append(f'    Device ID: 0x{info.pci.device_id:04x}')
+    rows.append(f'    Bus ID:    {pci.bus_id}')
+    rows.append(f'    Vendor ID: 0x{pci.vendor_id:04x}')
+    rows.append(f'    Device ID: 0x{pci.device_id:04x}')
 
+    build = info.build
     rows.append('Build:')
-    rows.append(f'    Number: 0x{info.build.number:08x}')
-    rows.append(f'    Status: 0x{info.build.status:08x}')
-    for i, d in enumerate(info.build.dna):
+    rows.append(f'    Number: 0x{build.number:08x}')
+    rows.append(f'    Status: 0x{build.status:08x}')
+    for i, d in enumerate(build.dna):
         rows.append(f'    DNA[{i}]: 0x{d:08x}')
+
+    card = info.card
+    rows.append('Card:')
+    rows.append(f'    Name:                  {card.name}')
+    rows.append(f'    Profile:               {card.profile}')
+    rows.append(f'    Serial Number:         {card.serial_number}')
+    rows.append(f'    Revision:              {card.revision}')
+    rows.append(f'    SC Version:            {card.sc_version}')
+    rows.append(f'    Config Mode:           {card.config_mode}')
+    rows.append(f'    Fan Present:           {card.sc_version}')
+    rows.append(f'    Total Power Available: {card.total_power_avail}W')
+
+    rows.append(f'    Cage Types:')
+    for i, cage_type in enumerate(card.cage_types):
+        rows.append(f'        {i}: {cage_type}')
+
+    rows.append(f'    MAC Addresses:')
+    for i, addr in enumerate(card.mac_addrs):
+        rows.append(f'        {i}: {addr}')
 
     click.echo('\n'.join(rows))
 

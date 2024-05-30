@@ -9,6 +9,7 @@
 #include <grpc/grpc.h>
 #include "sn_cfg_v1.grpc.pb.h"
 
+#include "cms.h"
 #include "esnet_smartnic_toplevel.h"
 #include "syscfg_block.h"
 #include "sysmon.h"
@@ -92,6 +93,13 @@ void SmartnicConfigImpl::init_device(Device* dev) {
 
         dev->stats.sysmons.push_back(stats);
     }
+
+    dev->cms.blk = &dev->bar2->cms;
+    cms_init(&dev->cms);
+    if (!cms_reset(&dev->cms)) {
+        cerr << "ERROR: Failed to reset CMS for device " << dev->bus_id << "."  << endl;
+        exit(EXIT_FAILURE);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -103,6 +111,60 @@ void SmartnicConfigImpl::deinit_device(Device* dev) {
         dev->stats.sysmons.pop_back();
         delete stats;
     }
+
+    cms_destroy(&dev->cms);
+}
+
+//--------------------------------------------------------------------------------------------------
+static void card_info_add_mac_addr(DeviceCardInfo* card, const struct ether_addr* addr) {
+    const uint8_t* octets = addr->ether_addr_octet;
+    char str[17 + 1];
+    snprintf(str, sizeof(str), "%02X:%02X:%02X:%02X:%02X:%02X",
+             octets[0], octets[1], octets[2], octets[3], octets[4], octets[5]);
+    card->add_mac_addrs(str);
+}
+
+//--------------------------------------------------------------------------------------------------
+static ErrorCode add_card_info(Device* dev, DeviceInfo* info) {
+    auto ci = cms_card_info_read(&dev->cms);
+    if (ci == NULL) {
+        return ErrorCode::EC_CARD_INFO_READ_FAILED;
+    }
+
+    auto card = info->mutable_card();
+    card->set_name(ci->name);
+    card->set_profile(cms_profile_to_str(ci->profile));
+    card->set_serial_number(ci->serial_number);
+    card->set_revision(ci->revision);
+    card->set_sc_version(ci->sc_version);
+
+    card->set_fan_present(ci->fan_present);
+    card->set_total_power_avail(ci->total_power_avail);
+    card->set_config_mode(cms_card_info_config_mode_to_str(ci->config_mode));
+
+    for (unsigned int n = 0; n < CMS_CARD_INFO_MAX_CAGES; ++n) {
+        if (CMS_CARD_INFO_CAGE_IS_VALID(ci, n)) {
+            card->add_cage_types(cms_card_info_cage_type_to_str(ci->cage.types[n]));
+        }
+    }
+
+    if (ci->mac.block.count > 0) {
+        struct ether_addr addr = ci->mac.block.base;
+        for (unsigned int n = 0; n < ci->mac.block.count; ++n) {
+            card_info_add_mac_addr(card, &addr);
+            addr.ether_addr_octet[5] += 1; // TODO: handle range check and wrapping?
+        }
+    } else {
+        for (unsigned int n = 0; n < CMS_CARD_INFO_MAX_LEGACY_MACS; ++n) {
+            if (CMS_CARD_INFO_LEGACY_MAC_IS_VALID(ci, n)) {
+                card_info_add_mac_addr(card, &ci->mac.legacy.addrs[n]);
+            }
+        }
+    }
+
+    cms_card_info_free(ci);
+
+    return ErrorCode::EC_OK;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -127,6 +189,7 @@ void SmartnicConfigImpl::get_device_info(
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
+        auto err = ErrorCode::EC_OK;
         DeviceInfoResponse resp;
         auto info = resp.mutable_info();
 
@@ -144,7 +207,9 @@ void SmartnicConfigImpl::get_device_info(
             build->add_dna(syscfg->dna[d]);
         }
 
-        resp.set_error_code(ErrorCode::EC_OK);
+        err = add_card_info(dev, info);
+
+        resp.set_error_code(err);
         resp.set_dev_id(dev_id);
 
         write_resp(resp);

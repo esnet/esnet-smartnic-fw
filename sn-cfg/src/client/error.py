@@ -16,6 +16,7 @@ ERROR_MAP = {
 
     # Device configuration error codes.
     ErrorCode.EC_INVALID_DEVICE_ID: 'invalid-device-id',
+    ErrorCode.EC_CARD_INFO_READ_FAILED: 'card-info-read-failed',
 
     # Host configuration error codes.
     ErrorCode.EC_INVALID_HOST_ID: 'invalid-host-id',

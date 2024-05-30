@@ -122,6 +122,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         auto dev = new Device{
             .bus_id = bus_id,
             .bar2 = bar2,
+            .cms = {},
 
             .nhosts = 2,
             .nports = 2,
