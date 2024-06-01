@@ -4,6 +4,7 @@ install_headers(
   [
     'include/array_size.h',
     'include/memory-barriers.h',
+    'include/stringize.h',
     'include/unused.h',
   ],
   subdir : 'esnet-smartnic'
