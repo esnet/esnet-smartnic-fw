@@ -94,6 +94,62 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kModuleGpio:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_module_gpio(req.module_gpio(), rdwr);
+                break;
+
+            case BatchOperation::BOP_SET:
+                batch_set_module_gpio(req.module_gpio(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kModuleInfo:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_module_info(req.module_info(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kModuleMem:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_module_mem(req.module_mem(), rdwr);
+                break;
+
+            case BatchOperation::BOP_SET:
+                batch_set_module_mem(req.module_mem(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kModuleStatus:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_module_status(req.module_status(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         case BatchRequest::ItemCase::kPortConfig:
             switch (op) {
             case BatchOperation::BOP_GET:

@@ -16,6 +16,7 @@ from . import completions
 from . import defaults
 from . import device
 from . import host
+from . import module
 from . import port
 from . import stats
 from . import switch
@@ -25,6 +26,7 @@ SUB_COMMAND_MODULES = (
     defaults,
     device,
     host,
+    module,
     port,
     stats,
     switch,

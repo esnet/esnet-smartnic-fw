@@ -41,6 +41,20 @@ public:
     Status ClearHostStats(
         ServerContext*, const HostStatsRequest*, ServerWriter<HostStatsResponse>*) override;
 
+    // Module configuration.
+    Status GetModuleGpio(
+        ServerContext*, const ModuleGpioRequest*, ServerWriter<ModuleGpioResponse>*) override;
+    Status SetModuleGpio(
+        ServerContext*, const ModuleGpioRequest*, ServerWriter<ModuleGpioResponse>*) override;
+    Status GetModuleInfo(
+        ServerContext*, const ModuleInfoRequest*, ServerWriter<ModuleInfoResponse>*) override;
+    Status GetModuleMem(
+        ServerContext*, const ModuleMemRequest*, ServerWriter<ModuleMemResponse>*) override;
+    Status SetModuleMem(
+        ServerContext*, const ModuleMemRequest*, ServerWriter<ModuleMemResponse>*) override;
+    Status GetModuleStatus(
+        ServerContext*, const ModuleStatusRequest*, ServerWriter<ModuleStatusResponse>*) override;
+
     // Port configuration.
     Status GetPortConfig(
         ServerContext*, const PortConfigRequest*, ServerWriter<PortConfigResponse>*) override;
@@ -103,6 +117,25 @@ private:
         const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_clear_host_stats(
         const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void get_module_gpio(const ModuleGpioRequest&, function<void(const ModuleGpioResponse&)>);
+    void batch_get_module_gpio(
+        const ModuleGpioRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void set_module_gpio(const ModuleGpioRequest&, function<void(const ModuleGpioResponse&)>);
+    void batch_set_module_gpio(
+        const ModuleGpioRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_module_info(const ModuleInfoRequest&, function<void(const ModuleInfoResponse&)>);
+    void batch_get_module_info(
+        const ModuleInfoRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_module_mem(const ModuleMemRequest&, function<void(const ModuleMemResponse&)>);
+    void batch_get_module_mem(
+        const ModuleMemRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void set_module_mem(const ModuleMemRequest&, function<void(const ModuleMemResponse&)>);
+    void batch_set_module_mem(
+        const ModuleMemRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_module_status(const ModuleStatusRequest&, function<void(const ModuleStatusResponse&)>);
+    void batch_get_module_status(
+        const ModuleStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void init_port(Device* dev);
     void deinit_port(Device* dev);
