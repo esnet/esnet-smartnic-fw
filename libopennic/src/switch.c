@@ -574,9 +574,6 @@ void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk) {
     for (tid = 0; tid < ARRAY_SIZE(blk->egr_fc_thresh); ++tid) {
         blk->egr_fc_thresh[tid] = egr_fc_thresh_defaults[tid];
     }
-
-    // Disable split-join support.
-    blk->hdr_length = 0;
 }
 
 //--------------------------------------------------------------------------------------------------
