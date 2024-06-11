@@ -22,9 +22,15 @@ using grpc::StatusCode;
 
 using namespace std;
 
+#define SNP4_DEBUG_LOG(_log) \
+if (debug) { \
+  _log; \
+}
+
 class SmartnicP4Impl final : public SmartnicP4::Service {
 public:
-  explicit SmartnicP4Impl(const std::string& pci_address) :
+  explicit SmartnicP4Impl(const std::string& pci_address, bool debug) :
+    debug(debug),
     bar2(),
     snp4_handle{},
     pipeline{} {
@@ -75,84 +81,84 @@ public:
 
   /* This rpc will be phased out. Use ClearAllPipelineTables instead. */
   Status ClearAllTables(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, ClearResponse* /* clear_response */) override {
-    std::cerr << "--- ClearAllTables" << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "--- ClearAllTables" << std::endl);
 
     auto id = PipelineId::INGRESS;
     if (snp4_handle[id] == NULL) {
-      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
     }
 
     if (!snp4_reset_all_tables(snp4_handle[id])) {
-      std::cerr << "FAIL" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "FAIL" << std::endl << std::endl);
       return Status(StatusCode::UNKNOWN, "Failed to reset all tables");
     } else {
-      std::cerr << "OK" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "OK" << std::endl << std::endl);
       return Status::OK;
     }
   }
 
   Status ClearAllPipelineTables(ServerContext* /* context */, const ClearAllPipelineTablesRequest* request, ClearResponse* /* response */) override {
-    std::cerr << "--- ClearAllPipelineTables" << std::endl;
-    std::cerr << request->DebugString() << std::endl;
-    std::cerr << "---" << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "--- ClearAllPipelineTables" << std::endl;
+                   std::cerr << request->DebugString() << std::endl;
+                   std::cerr << "---" << std::endl);
 
     // Enums under proto3 use the "open" behaviour, which allows passing unknown values
     // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
     auto id = request->pipeline_id();
     if (id > PipelineId_MAX) {
-      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Invalid pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
     }
 
     if (snp4_handle[id] == NULL) {
-      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
     }
 
     if (!snp4_reset_all_tables(snp4_handle[id])) {
-      std::cerr << "FAIL" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "FAIL" << std::endl << std::endl);
       return Status(StatusCode::UNKNOWN, "Failed to reset all tables");
     } else {
-      std::cerr << "OK" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "OK" << std::endl << std::endl);
       return Status::OK;
     }
   }
 
   Status ClearOneTable(ServerContext* /* context */, const ClearOneTableRequest* clear_one_table, ClearResponse* /* clear_response */) override {
-    std::cerr << "--- ClearOneTable" << std::endl;
-    std::cerr << clear_one_table->DebugString() << std::endl;
-    std::cerr << "---" << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "--- ClearOneTable" << std::endl;
+                   std::cerr << clear_one_table->DebugString() << std::endl;
+                   std::cerr << "---" << std::endl);
 
     // Enums under proto3 use the "open" behaviour, which allows passing unknown values
     // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
     auto id = clear_one_table->pipeline_id();
     if (id > PipelineId_MAX) {
-      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Invalid pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
     }
 
     if (snp4_handle[id] == NULL) {
-      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
     }
 
     if (!snp4_reset_one_table(snp4_handle[id], const_cast<char *>(clear_one_table->table_name().c_str()))) {
-      std::cerr << "FAIL" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "FAIL" << std::endl << std::endl);
       return Status(StatusCode::UNKNOWN, "Failed to reset table");
     } else {
-      std::cerr << "OK" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "OK" << std::endl << std::endl);
       return Status::OK;
     }
   }
 
   /* This rpc will be phased out. Use GetPipelineIdInfo instead. */
   Status GetPipelineInfo(ServerContext* /* context */, const ::google::protobuf::Empty* /* empty */, PipelineInfo* PipelineInfoResponse) override {
-    std::cerr << "--- GetPipelineInfo" << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "--- GetPipelineInfo" << std::endl);
 
     auto id = PipelineId::INGRESS;
     if (snp4_handle[id] == NULL) {
-      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
     }
 
@@ -232,25 +238,25 @@ public:
       pi_table->set_priority_bits(t->priority_bits);
 
     }
-    std::cerr << "OK" << std::endl << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "OK" << std::endl << std::endl);
     return Status::OK;
   }
 
   Status GetPipelineIdInfo(ServerContext* /* context */, const PipelineIdInfoRequest* request, PipelineInfo* response) override {
-    std::cerr << "--- GetPipelineIdInfo" << std::endl;
-    std::cerr << request->DebugString() << std::endl;
-    std::cerr << "---" << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "--- GetPipelineIdInfo" << std::endl;
+                   std::cerr << request->DebugString() << std::endl;
+                   std::cerr << "---" << std::endl);
 
     // Enums under proto3 use the "open" behaviour, which allows passing unknown values
     // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
     auto id = request->pipeline_id();
     if (id > PipelineId_MAX) {
-      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Invalid pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
     }
 
     if (snp4_handle[id] == NULL) {
-      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
     }
 
@@ -330,25 +336,25 @@ public:
       pi_table->set_priority_bits(t->priority_bits);
 
     }
-    std::cerr << "OK" << std::endl << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "OK" << std::endl << std::endl);
     return Status::OK;
   }
 
   Status InsertRule(ServerContext* /* context */, const MatchActionRule* ma, RuleOperationResponse* /* response */) override {
-    std::cerr << "--- InsertRule" << std::endl;
-    std::cerr << ma->DebugString() << std::endl;
-    std::cerr << "---" << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "--- InsertRule" << std::endl;
+                   std::cerr << ma->DebugString() << std::endl;
+                   std::cerr << "---" << std::endl);
 
     // Enums under proto3 use the "open" behaviour, which allows passing unknown values
     // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
     auto id = ma->pipeline_id();
     if (id > PipelineId_MAX) {
-      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Invalid pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
     }
 
     if (snp4_handle[id] == NULL) {
-      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
     }
 
@@ -362,9 +368,9 @@ public:
     for (const Match& match : ma->matches()) {
       struct sn_match * m = &rule.matches[rule.num_matches];
 
-      std::cerr << "Load match [" << rule.num_matches << "] " << match.ShortDebugString() << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Load match [" << rule.num_matches << "] " << match.ShortDebugString() << std::endl);
       if (!load_one_match(match, m)) {
-	std::cerr << "FAIL (match)" << std::endl << std::endl;
+        SNP4_DEBUG_LOG(std::cerr << "FAIL (match)" << std::endl << std::endl);
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse match");
       }
 
@@ -379,9 +385,9 @@ public:
     for (const Param& param : ma->params()) {
       struct sn_param * p = &rule.params[rule.num_params];
 
-      std::cerr << "Load param [" << rule.num_params << "] " << param.ShortDebugString() << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Load param [" << rule.num_params << "] " << param.ShortDebugString() << std::endl);
       if (!load_one_param(param, p)) {
-	std::cerr << "FAIL (param)" << std::endl << std::endl;
+        SNP4_DEBUG_LOG(std::cerr << "FAIL (param)" << std::endl << std::endl);
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse param");
       }
 
@@ -394,7 +400,7 @@ public:
     // Pack the rule's matches and params
     struct sn_pack pack;
     if (snp4_rule_pack(pipeline[id], &rule, &pack) != SNP4_STATUS_OK) {
-      std::cerr << "FAIL (pack)" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "FAIL (pack)" << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to pack rule into key/mask and params");
     }
 
@@ -409,29 +415,29 @@ public:
 			       pack.params_len,
 			       rule.priority,
 			       ma->replace())) {
-      std::cerr << "FAIL (insert)" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "FAIL (insert)" << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to insert rule into hardware table");
     }
 
-    std::cerr << "OK" << std::endl << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "OK" << std::endl << std::endl);
     return Status::OK;
   }
 
   Status DeleteRule(ServerContext* /* context */, const MatchOnlyRule* mo, RuleOperationResponse* /* response */) override {
-    std::cerr << "--- DeleteRule" << std::endl;
-    std::cerr << mo->DebugString() << std::endl;
-    std::cerr << "---" << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "--- DeleteRule" << std::endl;
+                   std::cerr << mo->DebugString() << std::endl;
+                   std::cerr << "---" << std::endl);
 
     // Enums under proto3 use the "open" behaviour, which allows passing unknown values
     // through in the message. Refer to https://protobuf.dev/programming-guides/enum/.
     auto id = mo->pipeline_id();
     if (id > PipelineId_MAX) {
-      std::cerr << "Invalid pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Invalid pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Invalid pipeline id");
     }
 
     if (snp4_handle[id] == NULL) {
-      std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Unimplemented pipeline id " << id << std::endl << std::endl);
       return Status(StatusCode::UNIMPLEMENTED, "Unimplemented pipeline id");
     }
 
@@ -441,7 +447,7 @@ public:
     // Find the requested table
     auto table_info = snp4_info_get_table_by_name(pipeline[id], table_name);
     if (table_info == NULL) {
-      std::cerr << "FAIL (get_table_by_name)" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "FAIL (get_table_by_name)" << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Table not found");
     }
 
@@ -452,9 +458,9 @@ public:
     for (const Match& match : mo->matches()) {
       struct sn_match * m = &matches[num_matches];
 
-      std::cerr << "Load match [" << num_matches << "] " << match.ShortDebugString() << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "Load match [" << num_matches << "] " << match.ShortDebugString() << std::endl);
       if (!load_one_match(match, m)) {
-	std::cerr << "FAIL (match)" << std::endl << std::endl;
+        SNP4_DEBUG_LOG(std::cerr << "FAIL (match)" << std::endl << std::endl);
 	return Status(StatusCode::INVALID_ARGUMENT, "Failed to parse match fields");
       }
       num_matches++;
@@ -469,7 +475,7 @@ public:
 				num_matches,
 				&pack);
     if (rc != SNP4_STATUS_OK) {
-      std::cerr << "FAIL (pack)" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "FAIL (pack)" << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to pack match fields into key/mask");
     }
 
@@ -479,15 +485,16 @@ public:
 			     pack.key_len,
 			     pack.mask,
 			     pack.mask_len)) {
-      std::cerr << "FAIL (delete)" << std::endl << std::endl;
+      SNP4_DEBUG_LOG(std::cerr << "FAIL (delete)" << std::endl << std::endl);
       return Status(StatusCode::INVALID_ARGUMENT, "Failed to delete rule from hardware table");
     }
 
-    std::cerr << "OK" << std::endl << std::endl;
+    SNP4_DEBUG_LOG(std::cerr << "OK" << std::endl << std::endl);
     return Status::OK;
   }
 
 private:
+  bool debug;
   volatile struct esnet_smartnic_bar2 * volatile bar2;
   void * snp4_handle[PipelineId_ARRAYSIZE];
   struct snp4_info_pipeline * pipeline[PipelineId_ARRAYSIZE];
@@ -553,14 +560,14 @@ private:
   }
 };
 
-void RunServer(const std::string& pci_address) {
+void RunServer(const std::string& pci_address, bool debug) {
 
   // Verify that the version of the library that we linked with matches the version of the
   // header files that we compiled against.
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   std::string server_address("0.0.0.0:50051");
-  SmartnicP4Impl service(pci_address);
+  SmartnicP4Impl service(pci_address, debug);
 
   ServerBuilder builder;
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -577,13 +584,14 @@ int main(int argc, char *argv[])
 {
   // Convert args into a vector of strings
   std::vector<std::string> args(argv + 1, argv + argc);
+  bool debug = getenv("SN_P4_SERVER_DEBUG") != NULL;
 
   if (args.size() < 1) {
     std::cerr << "Missing PCIe address parameter" << std::endl;
     exit(EXIT_FAILURE);
   }
 
-  RunServer(args[0]);
+  RunServer(args[0], debug);
 
   return 0;
 }
