@@ -14,6 +14,7 @@ from sn_cfg_proto import (
     HostConfigRequest,
     HostDmaConfig,
     HostStatsRequest,
+    StatsFilters,
 )
 
 from .device import device_id_option
@@ -101,6 +102,14 @@ def batch_host_config(op, **kargs):
 #---------------------------------------------------------------------------------------------------
 def host_stats_req(dev_id, host_id, **stats_kargs):
     req_kargs = {'dev_id': dev_id, 'host_id': host_id}
+    if stats_kargs:
+        filters_kargs = {}
+        if not stats_kargs.get('zeroes'):
+            filters_kargs['non_zero'] = True
+
+        if filters_kargs:
+            req_kargs['filters'] = StatsFilters(**filters_kargs)
+
     return HostStatsRequest(**req_kargs)
 
 #---------------------------------------------------------------------------------------------------
@@ -128,43 +137,50 @@ def clear_host_stats(client, **kargs):
         click.echo(f'Cleared statistics for host ID {host_id} on device ID {dev_id}.')
 
 #---------------------------------------------------------------------------------------------------
-def _show_host_stats(dev_id, host_id, stats):
+def _show_host_stats(dev_id, host_id, stats, kargs):
     rows = []
     rows.append(HEADER_SEP)
     rows.append(f'Host ID: {host_id} on device ID {dev_id}')
     rows.append(HEADER_SEP)
 
+    metrics = {}
     for metric in stats.metrics:
-        value = metric.value.u64
-        if value != 0:
-            rows.append(f'{metric.name}: {value}')
+        metrics[metric.name] = metric.value.u64
+
+    if metrics:
+        name_len = max(len(name) for name in metrics)
+        for name in sorted(metrics):
+            rows.append(f'{name:>{name_len}}: {metrics[name]}')
 
     click.echo('\n'.join(rows))
 
 def show_host_stats(client, **kargs):
     for dev_id, host_id, stats in rpc_get_host_stats(client.stub, **kargs):
-        _show_host_stats(dev_id, host_id, stats)
+        _show_host_stats(dev_id, host_id, stats, kargs)
 
 #---------------------------------------------------------------------------------------------------
 def batch_generate_host_stats_req(op, **kargs):
     yield BatchRequest(op=op, host_stats=host_stats_req(**kargs))
 
-def batch_process_host_stats_resp(resp):
-    if not resp.HasField('host_stats'):
-        return False
+def batch_process_host_stats_resp(kargs):
+    def process(resp):
+        if not resp.HasField('host_stats'):
+            return False
 
-    resp = resp.host_stats
-    if resp.error_code != ErrorCode.EC_OK:
-        raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+        resp = resp.host_stats
+        if resp.error_code != ErrorCode.EC_OK:
+            raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('stats'):
-        _show_host_stats(resp.dev_id, resp.host_id, resp.stats)
-    else:
-        click.echo(f'Cleared statistics for host ID {resp.host_id} on device ID {resp.dev_id}.')
-    return True
+        if resp.HasField('stats'):
+            _show_host_stats(resp.dev_id, resp.host_id, resp.stats, kargs)
+        else:
+            click.echo(f'Cleared statistics for host ID {resp.host_id} on device ID {resp.dev_id}.')
+        return True
+
+    return process
 
 def batch_host_stats(op, **kargs):
-    return batch_generate_host_stats_req(op, **kargs), batch_process_host_stats_resp
+    return batch_generate_host_stats_req(op, **kargs), batch_process_host_stats_resp(kargs)
 
 #---------------------------------------------------------------------------------------------------
 host_id_option = click.option(
@@ -176,7 +192,7 @@ host_id_option = click.option(
     ''',
 )
 
-def clear_host_options(fn):
+def clear_host_stats_options(fn):
     options = (
         device_id_option,
         host_id_option,
@@ -209,12 +225,24 @@ def show_host_options(fn):
     )
     return apply_options(options, fn)
 
+def show_host_stats_options(fn):
+    options = (
+        device_id_option,
+        host_id_option,
+        click.option(
+            '--zeroes',
+            is_flag=True,
+            help='Include zero valued counters in the display.',
+        ),
+    )
+    return apply_options(options, fn)
+
 #---------------------------------------------------------------------------------------------------
 def add_batch_commands(cmd):
     # Click doesn't support nested groups when using command chaining, so the command hierarchy
     # needs to be flattened.
     @cmd.command(name='clear-host-stats')
-    @clear_host_options
+    @clear_host_stats_options
     def clear_host_stats(**kargs):
         '''
         Clear the statistics of SmartNIC host interfaces.
@@ -238,7 +266,7 @@ def add_batch_commands(cmd):
         return batch_host_config(BatchOperation.BOP_GET, **kargs)
 
     @cmd.command(name='show-host-stats')
-    @show_host_options
+    @show_host_stats_options
     def show_host_stats(**kargs):
         '''
         Display the statistics of SmartNIC host interfaces.
@@ -259,7 +287,7 @@ def add_clear_commands(cmd):
             clear_host_stats(client, **kargs)
 
     @host.command
-    @clear_host_options
+    @clear_host_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
         '''
@@ -301,7 +329,7 @@ def add_show_commands(cmd):
         show_host_config(ctx.obj, **kargs)
 
     @host.command
-    @show_host_options
+    @show_host_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
         '''

@@ -11,6 +11,7 @@ using namespace std;
 struct GetStatsContext {
     Stats* stats;
     bitset<StatsMetricType_MAX + 1> metric_types;
+    bool non_zero;
 };
 
 extern "C" {

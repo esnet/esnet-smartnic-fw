@@ -14,6 +14,11 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 extern "C" {
     int get_stats_for_each_metric(const struct stats_for_each_spec* spec) {
+        GetStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
+        if (ctx->non_zero && spec->value.u64 == 0) {
+            return 0;
+        }
+
         StatsMetricType type;
         switch (spec->metric->type) {
         case stats_metric_type_COUNTER:
@@ -29,7 +34,6 @@ extern "C" {
             break;
         }
 
-        GetStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
         if (!ctx->metric_types.test(type)) {
             return 0;
         }
@@ -75,6 +79,8 @@ void SmartnicConfigImpl::get_or_clear_stats(
     GetStatsContext ctx;
     if (!do_clear) {
         auto filters = req.filters();
+        ctx.non_zero = filters.non_zero();
+
         auto ntypes = filters.metric_types_size();
         if (ntypes > 0) {
             for (auto n = 0; n < ntypes; ++n) {

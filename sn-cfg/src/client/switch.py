@@ -12,6 +12,7 @@ from sn_cfg_proto import (
     BatchOperation,
     BatchRequest,
     ErrorCode,
+    StatsFilters,
     SwitchConfig,
     SwitchConfigRequest,
     SwitchInterfaceType,
@@ -203,6 +204,14 @@ def batch_switch_config(op, **kargs):
 #---------------------------------------------------------------------------------------------------
 def switch_stats_req(dev_id, **stats_kargs):
     req_kargs = {'dev_id': dev_id}
+    if stats_kargs:
+        filters_kargs = {}
+        if not stats_kargs.get('zeroes'):
+            filters_kargs['non_zero'] = True
+
+        if filters_kargs:
+            req_kargs['filters'] = StatsFilters(**filters_kargs)
+
     return SwitchStatsRequest(**req_kargs)
 
 #---------------------------------------------------------------------------------------------------
@@ -230,46 +239,53 @@ def clear_switch_stats(client, **kargs):
         click.echo(f'Cleared statistics for device ID {dev_id}.')
 
 #---------------------------------------------------------------------------------------------------
-def _show_switch_stats(dev_id, stats):
+def _show_switch_stats(dev_id, stats, kargs):
     rows = []
     rows.append(HEADER_SEP)
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
+    metrics = {}
     for metric in stats.metrics:
-        value = metric.value.u64
-        if value != 0:
-            rows.append(f'{metric.scope.block}_{metric.name}: {value}')
+        metrics[f'{metric.scope.block}_{metric.name}'] = metric.value.u64
+
+    if metrics:
+        name_len = max(len(name) for name in metrics)
+        for name in sorted(metrics):
+            rows.append(f'{name:>{name_len}}: {metrics[name]}')
 
     click.echo('\n'.join(rows))
 
 def show_switch_stats(client, **kargs):
     for dev_id, stats in rpc_get_switch_stats(client.stub, **kargs):
-        _show_switch_stats(dev_id, stats)
+        _show_switch_stats(dev_id, stats, kargs)
 
 #---------------------------------------------------------------------------------------------------
 def batch_generate_switch_stats_req(op, **kargs):
     yield BatchRequest(op=op, switch_stats=switch_stats_req(**kargs))
 
-def batch_process_switch_stats_resp(resp):
-    if not resp.HasField('switch_stats'):
-        return False
+def batch_process_switch_stats_resp(kargs):
+    def process(resp):
+        if not resp.HasField('switch_stats'):
+            return False
 
-    resp = resp.switch_stats
-    if resp.error_code != ErrorCode.EC_OK:
-        raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+        resp = resp.switch_stats
+        if resp.error_code != ErrorCode.EC_OK:
+            raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('stats'):
-        _show_switch_stats(resp.dev_id, resp.stats)
-    else:
-        click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
-    return True
+        if resp.HasField('stats'):
+            _show_switch_stats(resp.dev_id, resp.stats, kargs)
+        else:
+            click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
+        return True
+
+    return process
 
 def batch_switch_stats(op, **kargs):
-    return batch_generate_switch_stats_req(op, **kargs), batch_process_switch_stats_resp
+    return batch_generate_switch_stats_req(op, **kargs), batch_process_switch_stats_resp(kargs)
 
 #---------------------------------------------------------------------------------------------------
-def clear_switch_options(fn):
+def clear_switch_stats_options(fn):
     options = (
         device_id_option,
     )
@@ -330,12 +346,23 @@ def show_switch_options(fn):
     )
     return apply_options(options, fn)
 
+def show_switch_stats_options(fn):
+    options = (
+        device_id_option,
+        click.option(
+            '--zeroes',
+            is_flag=True,
+            help='Include zero valued counters in the display.',
+        ),
+    )
+    return apply_options(options, fn)
+
 #---------------------------------------------------------------------------------------------------
 def add_batch_commands(cmd):
     # Click doesn't support nested groups when using command chaining, so the command hierarchy
     # needs to be flattened.
     @cmd.command(name='clear-switch-stats')
-    @clear_switch_options
+    @clear_switch_stats_options
     def clear_switch_stats(**kargs):
         '''
         Clear the statistics of the SmartNIC packet switch.
@@ -359,7 +386,7 @@ def add_batch_commands(cmd):
         return batch_switch_config(BatchOperation.BOP_GET, **kargs)
 
     @cmd.command(name='show-switch-stats')
-    @show_switch_options
+    @show_switch_stats_options
     def show_switch_stats(**kargs):
         '''
         Display the statistics of the SmartNIC packet switch.
@@ -380,7 +407,7 @@ def add_clear_commands(cmd):
             clear_switch_stats(client, **kargs)
 
     @switch.command
-    @clear_switch_options
+    @clear_switch_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
         '''
@@ -422,7 +449,7 @@ def add_show_commands(cmd):
         show_switch_config(ctx.obj, **kargs)
 
     @switch.command
-    @device_id_option
+    @show_switch_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
         '''

@@ -18,6 +18,7 @@ from sn_cfg_proto import (
     PortState,
     PortStatsRequest,
     PortStatusRequest,
+    StatsFilters,
 )
 
 from .device import device_id_option
@@ -127,6 +128,14 @@ def batch_port_config(op, **kargs):
 #---------------------------------------------------------------------------------------------------
 def port_stats_req(dev_id, port_id, **stats_kargs):
     req_kargs = {'dev_id': dev_id, 'port_id': port_id}
+    if stats_kargs:
+        filters_kargs = {}
+        if not stats_kargs.get('zeroes'):
+            filters_kargs['non_zero'] = True
+
+        if filters_kargs:
+            req_kargs['filters'] = StatsFilters(**filters_kargs)
+
     return PortStatsRequest(**req_kargs)
 
 #---------------------------------------------------------------------------------------------------
@@ -154,43 +163,50 @@ def clear_port_stats(client, **kargs):
         click.echo(f'Cleared statistics for port ID {port_id} on device ID {dev_id}.')
 
 #---------------------------------------------------------------------------------------------------
-def _show_port_stats(dev_id, port_id, stats):
+def _show_port_stats(dev_id, port_id, stats, kargs):
     rows = []
     rows.append(HEADER_SEP)
     rows.append(f'Port ID: {port_id} on device ID {dev_id}')
     rows.append(HEADER_SEP)
 
+    metrics = {}
     for metric in stats.metrics:
-        value = metric.value.u64
-        if value != 0:
-            rows.append(f'{metric.name}: {value}')
+        metrics[metric.name] = metric.value.u64
+
+    if metrics:
+        name_len = max(len(name) for name in metrics)
+        for name in sorted(metrics):
+            rows.append(f'{name:>{name_len}}: {metrics[name]}')
 
     click.echo('\n'.join(rows))
 
 def show_port_stats(client, **kargs):
     for dev_id, port_id, stats in rpc_get_port_stats(client.stub, **kargs):
-        _show_port_stats(dev_id, port_id, stats)
+        _show_port_stats(dev_id, port_id, stats, kargs)
 
 #---------------------------------------------------------------------------------------------------
 def batch_generate_port_stats_req(op, **kargs):
     yield BatchRequest(op=op, port_stats=port_stats_req(**kargs))
 
-def batch_process_port_stats_resp(resp):
-    if not resp.HasField('port_stats'):
-        return False
+def batch_process_port_stats_resp(kargs):
+    def process(resp):
+        if not resp.HasField('port_stats'):
+            return False
 
-    resp = resp.port_stats
-    if resp.error_code != ErrorCode.EC_OK:
-        raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+        resp = resp.port_stats
+        if resp.error_code != ErrorCode.EC_OK:
+            raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('stats'):
-        _show_port_stats(resp.dev_id, resp.port_id, resp.stats)
-    else:
-        click.echo(f'Cleared statistics for port ID {resp.port_id} on device ID {resp.dev_id}.')
-    return True
+        if resp.HasField('stats'):
+            _show_port_stats(resp.dev_id, resp.port_id, resp.stats, kargs)
+        else:
+            click.echo(f'Cleared statistics for port ID {resp.port_id} on device ID {resp.dev_id}.')
+        return True
+
+    return process
 
 def batch_port_stats(op, **kargs):
-    return batch_generate_port_stats_req(op, **kargs), batch_process_port_stats_resp
+    return batch_generate_port_stats_req(op, **kargs), batch_process_port_stats_resp(kargs)
 
 #---------------------------------------------------------------------------------------------------
 def port_status_req(dev_id, port_id, **status_kargs):
@@ -256,7 +272,7 @@ port_id_option = click.option(
     ''',
 )
 
-def clear_port_options(fn):
+def clear_port_stats_options(fn):
     options = (
         device_id_option,
         port_id_option,
@@ -292,12 +308,24 @@ def show_port_options(fn):
     )
     return apply_options(options, fn)
 
+def show_port_stats_options(fn):
+    options = (
+        device_id_option,
+        port_id_option,
+        click.option(
+            '--zeroes',
+            is_flag=True,
+            help='Include zero valued counters in the display.',
+        ),
+    )
+    return apply_options(options, fn)
+
 #---------------------------------------------------------------------------------------------------
 def add_batch_commands(cmd):
     # Click doesn't support nested groups when using command chaining, so the command hierarchy
     # needs to be flattened.
     @cmd.command(name='clear-port-stats')
-    @clear_port_options
+    @clear_port_stats_options
     def clear_port_stats(**kargs):
         '''
         Clear the statistics of SmartNIC ports.
@@ -321,7 +349,7 @@ def add_batch_commands(cmd):
         return batch_port_config(BatchOperation.BOP_GET, **kargs)
 
     @cmd.command(name='show-port-stats')
-    @show_port_options
+    @show_port_stats_options
     def show_port_stats(**kargs):
         '''
         Display the statistics of SmartNIC ports.
@@ -350,7 +378,7 @@ def add_clear_commands(cmd):
             clear_port_stats(client, **kargs)
 
     @port.command
-    @clear_port_options
+    @clear_port_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
         '''
@@ -381,7 +409,7 @@ def add_show_commands(cmd):
             client = ctx.obj
             kargs = {'dev_id': -1, 'port_id': -1}
             show_port_config(client, **kargs)
-            show_port_status(ctx.obj, **kargs)
+            show_port_status(client, **kargs)
 
     @port.command
     @show_port_options
@@ -393,7 +421,7 @@ def add_show_commands(cmd):
         show_port_config(ctx.obj, **kargs)
 
     @port.command
-    @show_port_options
+    @show_port_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
         '''

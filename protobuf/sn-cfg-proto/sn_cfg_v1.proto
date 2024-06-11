@@ -101,6 +101,7 @@ message Stats {
 message StatsFilters {
     repeated StatsMetricType metric_types = 1; // Restrict metrics to the given type(s).
                                                // Leave unset for all types.
+    bool non_zero = 2; // Restrict metrics to those whose value is not zero.
 }
 
 message StatsRequest {

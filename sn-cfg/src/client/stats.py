@@ -30,19 +30,21 @@ METRIC_TYPE_MAP = {
 METRIC_TYPE_RMAP = dict((name, enum) for enum, name in METRIC_TYPE_MAP.items())
 
 #---------------------------------------------------------------------------------------------------
-def stats_req(dev_id, **kargs):
+def stats_req(dev_id, **stats_kargs):
     req_kargs = {'dev_id': dev_id}
-
-    if kargs:
+    if stats_kargs:
         filters_kargs = {}
 
         key = 'metric_types'
-        names = kargs.get(key)
+        names = stats_kargs.get(key)
         if names:
             enums = []
             for name in names:
                 enums.append(METRIC_TYPE_RMAP[name])
             filters_kargs[key] = enums
+
+        if not stats_kargs.get('zeroes'):
+            filters_kargs['non_zero'] = True
 
         if filters_kargs:
             req_kargs['filters'] = StatsFilters(**filters_kargs)
@@ -74,12 +76,13 @@ def clear_stats(client, **kargs):
         click.echo(f'Cleared statistics for device ID {dev_id}.')
 
 #---------------------------------------------------------------------------------------------------
-def _show_stats(dev_id, stats):
+def _show_stats(dev_id, stats, kargs):
     rows = []
     rows.append(HEADER_SEP)
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
+    metrics = {}
     for metric in stats.metrics:
         if metric.type == StatsMetricType.STATS_METRIC_TYPE_FLAG:
             value = 'yes' if metric.value.u64 != 0 else 'no'
@@ -87,36 +90,42 @@ def _show_stats(dev_id, stats):
             value = metric.value.f64
         else:
             value = metric.value.u64
+        metrics[f'{metric.scope.zone}_{metric.scope.block}_{metric.name}'] = value
 
-        if value != 0:
-            rows.append(f'{metric.scope.zone}_{metric.scope.block}_{metric.name}: {value}')
+    if metrics:
+        name_len = max(len(name) for name in metrics)
+        for name in sorted(metrics):
+            rows.append(f'{name:>{name_len}}: {metrics[name]}')
 
     click.echo('\n'.join(rows))
 
 def show_stats(client, **kargs):
     for dev_id, stats in rpc_get_stats(client.stub, **kargs):
-        _show_stats(dev_id, stats)
+        _show_stats(dev_id, stats, kargs)
 
 #---------------------------------------------------------------------------------------------------
 def batch_generate_stats_req(op, **kargs):
     yield BatchRequest(op=op, stats=stats_req(**kargs))
 
-def batch_process_stats_resp(resp):
-    if not resp.HasField('stats'):
-        return False
+def batch_process_stats_resp(kargs):
+    def process(resp):
+        if not resp.HasField('stats'):
+            return False
 
-    resp = resp.stats
-    if resp.error_code != ErrorCode.EC_OK:
-        raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+        resp = resp.stats
+        if resp.error_code != ErrorCode.EC_OK:
+            raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('stats'):
-        _show_stats(resp.dev_id, resp.stats)
-    else:
-        click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
-    return True
+        if resp.HasField('stats'):
+            _show_stats(resp.dev_id, resp.stats, kargs)
+        else:
+            click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
+        return True
+
+    return process
 
 def batch_stats(op, **kargs):
-    return batch_generate_stats_req(op, **kargs), batch_process_stats_resp
+    return batch_generate_stats_req(op, **kargs), batch_process_stats_resp(kargs)
 
 #---------------------------------------------------------------------------------------------------
 def clear_stats_options(fn):
@@ -134,6 +143,11 @@ def show_stats_options(fn):
             type=click.Choice(sorted(name for name in METRIC_TYPE_RMAP)),
             multiple=True,
             help='Filter to restrict statistic metrics to the given type(s).',
+        ),
+        click.option(
+            '--zeroes',
+            is_flag=True,
+            help='Include zero valued statistic metrics in the display.',
         ),
     )
     return apply_options(options, fn)

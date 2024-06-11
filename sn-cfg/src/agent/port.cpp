@@ -414,6 +414,8 @@ void SmartnicConfigImpl::get_or_clear_port_stats(
     GetStatsContext ctx;
     if (!do_clear) {
         auto filters = req.filters();
+        ctx.non_zero = filters.non_zero();
+
         auto ntypes = filters.metric_types_size();
         if (ntypes > 0) {
             for (auto n = 0; n < ntypes; ++n) {
