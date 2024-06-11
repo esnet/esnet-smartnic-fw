@@ -28,7 +28,7 @@ libsnp4 = shared_library(
   ],
   c_args : [
     #'-DSDNETIO_DEBUG',
-    '-DSDNETCONFIG_DEBUG',
+    #'-DSDNETCONFIG_DEBUG',
   ],
   install : true,
   soversion : 1,
