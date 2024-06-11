@@ -61,6 +61,7 @@ static XilVitisNetP4ReturnType device_read(XilVitisNetP4EnvIf *EnvIfPtr, XilViti
     return XIL_VITIS_NET_P4_SUCCESS;
 }
 
+#ifdef SDNETCONFIG_DEBUG
 static XilVitisNetP4ReturnType log_info(XilVitisNetP4EnvIf *UNUSED(EnvIfPtr), const char *MessagePtr)
 {
   fprintf(stdout, "%s\n", MessagePtr);
@@ -74,6 +75,7 @@ static XilVitisNetP4ReturnType log_error(XilVitisNetP4EnvIf *UNUSED(EnvIfPtr), c
 
   return XIL_VITIS_NET_P4_SUCCESS;
 }
+#endif
 
 size_t snp4_sdnet_count(void)
 {
@@ -107,8 +109,10 @@ void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr)
   snp4_user->env.WordWrite32 = (XilVitisNetP4WordWrite32Fp) &device_write;
   snp4_user->env.WordRead32  = (XilVitisNetP4WordRead32Fp)  &device_read;
   snp4_user->env.UserCtx     = (XilVitisNetP4UserCtxType)   snp4_user;
+#ifdef SDNETCONFIG_DEBUG
   snp4_user->env.LogError    = (XilVitisNetP4LogFp)         &log_error;
   snp4_user->env.LogInfo     = (XilVitisNetP4LogFp)         &log_info;
+#endif
 
   // Initialize the vitisnetp4 target
   if (snp4_user->intf->target.init(&snp4_user->target, &snp4_user->env, snp4_user->intf->target.config) != XIL_VITIS_NET_P4_SUCCESS) {

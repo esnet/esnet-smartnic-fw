@@ -534,6 +534,7 @@ services:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_P4_AGENT_SLOTADDR=$FPGA_PCIE_DEV.0
+      #- SN_P4_SERVER_DEBUG=1 # enable debug logging by the server
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
