@@ -12,6 +12,7 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 enum DeviceStatsDomain {
     COUNTERS,
+    MONITORS,
     NDOMAINS
 };
 
@@ -34,6 +35,7 @@ struct Device {
         vector<DeviceStats*> hosts;
         vector<DeviceStats*> ports;
         DeviceStats* sw;
+        vector<DeviceStats*> sysmons;
     } stats;
 };
 

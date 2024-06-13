@@ -145,6 +145,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
                 seconds = 1;
                 break;
 
+            case DeviceStatsDomain::MONITORS:
             default:
                 seconds = 10;
                 break;
@@ -159,6 +160,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
             }
         }
 
+        init_device(dev);
         init_host(dev);
         init_port(dev);
         init_switch(dev);
@@ -187,6 +189,7 @@ SmartnicConfigImpl::~SmartnicConfigImpl() {
     while (!devices.empty()) {
         auto dev = devices.back();
 
+        deinit_device(dev);
         deinit_host(dev);
         deinit_port(dev);
         deinit_switch(dev);

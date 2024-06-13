@@ -36,6 +36,76 @@ static uint16_t read_hex_pci_id(const string& bus_id, const string& file) {
 }
 
 //--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::init_device(Device* dev) {
+    sysmon_master_reset(&dev->bar2->sysmon0);
+
+    struct sysmon_info {
+        volatile struct sysmon_block* blk;
+        uint64_t select_mask;
+    } sysmons[] = {
+        {
+            .blk = &dev->bar2->sysmon0, // master
+            .select_mask =
+                SYSMON_CHANNEL_MASK(TEMP) |
+                SYSMON_CHANNEL_MASK(VCCINT) |
+                SYSMON_CHANNEL_MASK(VCCAUX) |
+                SYSMON_CHANNEL_MASK(VCCBRAM) |
+                SYSMON_CHANNEL_MASK(VP_VN),
+        },
+        {
+            .blk = &dev->bar2->sysmon1, // slave0
+            .select_mask =
+                SYSMON_CHANNEL_MASK(TEMP) |
+                SYSMON_CHANNEL_MASK(VCCINT) |
+                SYSMON_CHANNEL_MASK(VCCAUX) |
+                SYSMON_CHANNEL_MASK(VCCBRAM) |
+                SYSMON_CHANNEL_MASK(VUSER0),
+        },
+        {
+            .blk = &dev->bar2->sysmon2, // slave1
+            .select_mask =
+                SYSMON_CHANNEL_MASK(TEMP) |
+                SYSMON_CHANNEL_MASK(VCCINT) |
+                SYSMON_CHANNEL_MASK(VCCAUX) |
+                SYSMON_CHANNEL_MASK(VCCBRAM) |
+                SYSMON_CHANNEL_MASK(VUSER0),
+        },
+    };
+
+    unsigned int n = 0;
+    for (auto info : sysmons) {
+        ostringstream name;
+        name << "sysmon" << n;
+        n += 1;
+
+        sysmon_sequencer_enable(info.blk, info.select_mask, 0);
+
+        auto stats = new DeviceStats;
+        stats->name = name.str();
+        stats->zone = sysmon_stats_zone_alloc(
+            dev->stats.domains[DeviceStatsDomain::MONITORS], info.blk, stats->name.c_str());
+        if (stats->zone == NULL) {
+            cerr << "ERROR: Failed to alloc sysmon " << n << " stats zone for device "
+                 << dev->bus_id << "."  << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        dev->stats.sysmons.push_back(stats);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::deinit_device(Device* dev) {
+    while (!dev->stats.sysmons.empty()) {
+        auto stats = dev->stats.sysmons.back();
+        sysmon_stats_zone_free(stats->zone);
+
+        dev->stats.sysmons.pop_back();
+        delete stats;
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::get_device_info(
     const DeviceInfoRequest& req,
     function<void(const DeviceInfoResponse&)> write_resp) {
@@ -106,6 +176,39 @@ Status SmartnicConfigImpl::GetDeviceInfo(
 }
 
 //--------------------------------------------------------------------------------------------------
+struct GetDeviceStatsContext {
+    DeviceStatus* status;
+};
+
+extern "C" {
+    static int __get_device_stats(const struct stats_for_each_spec* spec) {
+        GetDeviceStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
+        switch (spec->metric->type) {
+        case stats_metric_type_FLAG: {
+            auto alarm = ctx->status->add_alarms();
+            alarm->set_source(spec->zone->name);
+            alarm->set_name(spec->metric->name);
+            alarm->set_active(spec->value.u64 != 0);
+            break;
+        }
+
+        case stats_metric_type_GAUGE: {
+            auto mon = ctx->status->add_monitors();
+            mon->set_source(spec->zone->name);
+            mon->set_name(spec->metric->name);
+            mon->set_value(spec->value.f64);
+            break;
+        }
+
+        default:
+            break;
+        }
+
+        return 0;
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::get_device_status(
     const DeviceStatusRequest& req,
     function<void(const DeviceStatusResponse&)> write_resp) {
@@ -128,19 +231,13 @@ void SmartnicConfigImpl::get_device_status(
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
         DeviceStatusResponse resp;
-        auto status = resp.mutable_status();
+        GetDeviceStatsContext ctx = {
+            .status = resp.mutable_status(),
+        };
 
-        auto sysmon = status->add_sysmons();
-        sysmon->set_index(0);
-        sysmon->set_temperature(sysmon_get_temp(&dev->bar2->sysmon0));
-
-        sysmon = status->add_sysmons();
-        sysmon->set_index(1);
-        sysmon->set_temperature(sysmon_get_temp(&dev->bar2->sysmon1));
-
-        sysmon = status->add_sysmons();
-        sysmon->set_index(2);
-        sysmon->set_temperature(sysmon_get_temp(&dev->bar2->sysmon2));
+        for (auto sysmon : dev->stats.sysmons) {
+            stats_zone_for_each_metric(sysmon->zone, __get_device_stats, &ctx);
+        }
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);

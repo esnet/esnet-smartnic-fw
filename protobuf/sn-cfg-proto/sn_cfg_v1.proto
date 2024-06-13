@@ -165,8 +165,26 @@ message DeviceSystemMonitor {
     float temperature = 2; // Value from sysmon0.temperature.
 }
 
+message DeviceStatusAlarm {
+    string source = 1;
+    string name = 2;
+    bool active = 3;
+}
+
+message DeviceStatusMonitor {
+    string source = 1;
+    string name = 2;
+    double value = 3;
+}
+
 message DeviceStatus {
-    repeated DeviceSystemMonitor sysmons = 1; // One per valid system monitor.
+    // This field is no longer populated. Use the monitors field with:
+    // - source == "sysmon<index>" ("sysmon0", "sysmon1", ...)
+    // - name == "temp"
+    repeated DeviceSystemMonitor sysmons = 1 [deprecated = true];
+
+    repeated DeviceStatusMonitor monitors = 2;
+    repeated DeviceStatusAlarm alarms = 3;
 }
 
 message DeviceStatusRequest {

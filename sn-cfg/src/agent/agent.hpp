@@ -79,6 +79,8 @@ private:
     void batch_set_defaults(
         const DefaultsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
+    void init_device(Device* dev);
+    void deinit_device(Device* dev);
     void get_device_info(const DeviceInfoRequest&, function<void(const DeviceInfoResponse&)>);
     void batch_get_device_info(
         const DeviceInfoRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
