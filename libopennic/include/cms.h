@@ -5,6 +5,7 @@
 #include <net/ethernet.h>
 #include <pthread.h>
 #include "sff-8636.h"
+#include "stats.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include "stringize.h"
@@ -112,6 +113,10 @@ struct cms_card_info {
 
 struct cms_card_info* cms_card_info_read(struct cms* cms);
 void cms_card_info_free(struct cms_card_info* info);
+
+struct stats_zone* cms_card_stats_zone_alloc(struct stats_domain* domain,
+                                             struct cms* cms, const char* name);
+void cms_card_stats_zone_free(struct stats_zone* zone);
 
 //--------------------------------------------------------------------------------------------------
 struct cms_module_id {

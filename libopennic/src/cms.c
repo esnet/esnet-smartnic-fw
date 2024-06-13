@@ -5,12 +5,14 @@
 #include <errno.h>
 #include "memory-barriers.h"
 #include <netinet/ether.h>
+#include "stats.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "unused.h"
 
 //--------------------------------------------------------------------------------------------------
 #define log_err(_rv, _format, _args...) \
@@ -1023,4 +1025,202 @@ bool cms_module_gpio_write(struct cms* cms, uint8_t cage, const struct cms_modul
     cms_unlock(cms);
 
     return mailbox != NULL;
+}
+
+//--------------------------------------------------------------------------------------------------
+union cms_card_metric_flags {
+    struct {
+        uint64_t is_adc   : 1; // [0]
+        uint64_t in_milli : 1; // [1]
+    };
+    uint64_t _v;
+} __attribute__((packed));
+
+struct cms_card_metric {
+    struct stats_metric_spec spec;
+    union cms_card_metric_flags flags;
+    uint64_t profile_mask;
+};
+
+#define _CMS_CARD_METRIC_ADC(_name, _in_milli, _profile_mask) \
+{ \
+    .spec = STATS_METRIC_SPEC_IO( \
+        #_name, NULL, GAUGE, 0, 0, \
+        struct cms_block, _name##_reg, 0, 0, false, STATS_IO_DATA_NULL \
+     ), \
+    .flags = { \
+        .is_adc = 1, \
+        .in_milli = (_in_milli) ? 1 : 0, \
+    }, \
+    .profile_mask = _profile_mask, \
+}
+
+#define CMS_CARD_METRIC_ADC(_name, _in_milli, _profile_mask) \
+    _CMS_CARD_METRIC_ADC(_name##_max, _in_milli, _profile_mask), \
+    _CMS_CARD_METRIC_ADC(_name##_avg, _in_milli, _profile_mask), \
+    _CMS_CARD_METRIC_ADC(_name##_ins, _in_milli, _profile_mask)
+
+#define CMS_CARD_METRIC_BIT(_name, _pos, _invert, _profile_mask) \
+{ \
+    .spec = STATS_METRIC_SPEC_IO( \
+        #_name, NULL, FLAG, 0, 0, \
+        struct cms_block, _name##_ins_reg, 1, _pos, _invert, STATS_IO_DATA_NULL \
+     ), \
+    .profile_mask = _profile_mask, \
+}
+
+// TODO: add units as extra label for each metric?
+static const struct cms_card_metric cms_card_metrics[] = {
+#define PM(_name) CMS_PROFILE_MASK(_name)
+    // 10-bit ADC formatted metrics
+    //                  name            in_milli      profile_mask
+    CMS_CARD_METRIC_ADC(_1v2_vccio,         true,     0                 ),
+    CMS_CARD_METRIC_ADC(_2v5_vpp23,         true,     0                 ),
+    CMS_CARD_METRIC_ADC(_3v3_aux,           true,     PM(U280)          ),
+    CMS_CARD_METRIC_ADC(_3v3_pex,           true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(_3v3pex_i_in,       true,                PM(U55)),
+    CMS_CARD_METRIC_ADC(_12v_aux,           true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(_12v_aux1,          true,     0                 ),
+    CMS_CARD_METRIC_ADC(_12v_aux_i_in,      true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(_12v_pex,           true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(_12v_sw,            true,     PM(U280)          ),
+    CMS_CARD_METRIC_ADC(_12vpex_i_in,       true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(aux_3v3_i,          true,     PM(U280)          ),
+    CMS_CARD_METRIC_ADC(cage_temp0,         false,    PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(cage_temp1,         false,    PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(cage_temp2,         false,    0                 ),
+    CMS_CARD_METRIC_ADC(cage_temp3,         false,    0                 ),
+    CMS_CARD_METRIC_ADC(ddr4_vpp_btm,       true,     PM(U280)          ),
+    CMS_CARD_METRIC_ADC(ddr4_vpp_top,       true,     PM(U280)          ),
+    CMS_CARD_METRIC_ADC(dimm_temp0,         false,    PM(U280)          ),
+    CMS_CARD_METRIC_ADC(dimm_temp1,         false,    PM(U280)          ),
+    CMS_CARD_METRIC_ADC(dimm_temp2,         false,    0                 ),
+    CMS_CARD_METRIC_ADC(dimm_temp3,         false,    0                 ),
+    CMS_CARD_METRIC_ADC(fan_speed,          false,    PM(U280)          ),
+    CMS_CARD_METRIC_ADC(fan_temp,           false,    PM(U280)          ),
+    CMS_CARD_METRIC_ADC(fpga_temp,          false,    PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(gtavcc,             true,     0                 ),
+    CMS_CARD_METRIC_ADC(gtvcc_aux,          true,     0                 ),
+    CMS_CARD_METRIC_ADC(hbm_1v2,            true,                PM(U55)),
+    CMS_CARD_METRIC_ADC(hbm_1v2_i,          true,                PM(U55)),
+    CMS_CARD_METRIC_ADC(hbm_temp1,          false,    PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(hbm_temp2,          false,    PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(mgt0v9avcc,         true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(cmc_mgtavcc,        true,     0                 ),
+    CMS_CARD_METRIC_ADC(cmc_mgtavcc_i,      true,     0                 ),
+    CMS_CARD_METRIC_ADC(mgtavtt,            true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(cmc_mgtavtt_i,      true,     0                 ),
+    CMS_CARD_METRIC_ADC(pex_3v3_power,      true,                PM(U55)),
+    CMS_CARD_METRIC_ADC(pex_12v_power,      true,                PM(U55)),
+    CMS_CARD_METRIC_ADC(se98_temp0,         false,    PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(se98_temp1,         false,    PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(se98_temp2,         false,    0                 ),
+    CMS_CARD_METRIC_ADC(sys_5v5,            true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(v12_in_aux0_i,      true,     0                 ),
+    CMS_CARD_METRIC_ADC(v12_in_aux1_i,      true,     0                 ),
+    CMS_CARD_METRIC_ADC(v12_in_i,           true,     0                 ),
+    CMS_CARD_METRIC_ADC(vcc0v85,            true,     PM(U280)          ),
+    CMS_CARD_METRIC_ADC(vcc1v2_btm,         true,     PM(U280)          ),
+    CMS_CARD_METRIC_ADC(vcc1v2_i,           true,     0                 ),
+    CMS_CARD_METRIC_ADC(vcc1v2_top,         true,     PM(U280)          ),
+    CMS_CARD_METRIC_ADC(cmc_vcc1v5,         true,     0                 ),
+    CMS_CARD_METRIC_ADC(vcc1v8,             true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(vcc3v3,             true,                PM(U55)),
+    CMS_CARD_METRIC_ADC(vcc_5v0,            true,     0                 ),
+    CMS_CARD_METRIC_ADC(vccaux,             true,     0                 ),
+    CMS_CARD_METRIC_ADC(vccaux_pmc,         true,     0                 ),
+    CMS_CARD_METRIC_ADC(vccint,             true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(vccint_i,           true,     PM(U280) | PM(U55)),
+    CMS_CARD_METRIC_ADC(vccint_io,          true,                PM(U55)),
+    CMS_CARD_METRIC_ADC(vccint_io_i,        true,                PM(U55)),
+    CMS_CARD_METRIC_ADC(vccint_power,       true,     0                 ),
+    CMS_CARD_METRIC_ADC(vccint_temp,        false,               PM(U55)),
+    CMS_CARD_METRIC_ADC(vccint_vcu_0v9,     true,     0                 ),
+    CMS_CARD_METRIC_ADC(vccram,             true,     0                 ),
+    CMS_CARD_METRIC_ADC(vccsoc,             true,     0                 ),
+    CMS_CARD_METRIC_ADC(vpp2v5,             true,                PM(U55)),
+
+    // Flag metrics
+    //                  name         pos    invert    profile_mask
+    CMS_CARD_METRIC_BIT(power_good,    0,    true,    PM(U280) | PM(U55)),
+#undef PM
+};
+
+//--------------------------------------------------------------------------------------------------
+static void cms_card_stats_attach_metrics(const struct stats_block_spec* bspec) {
+    volatile struct cms_block* cms = bspec->io.base;
+
+    union cms_control_reg control = {._v = cms->control_reg._v};
+    control.hbm_temp_monitor_enable = 1; // Enable temperature monitoring on high-bandwidth memory.
+    cms->control_reg._v = control._v;
+    barrier();
+}
+
+//--------------------------------------------------------------------------------------------------
+static double cms_card_stats_convert_metric(const struct stats_block_spec* UNUSED(bspec),
+                                            const struct stats_metric_spec* mspec,
+                                            uint64_t value,
+                                            void* UNUSED(data)) {
+    union cms_card_metric_flags flags = {._v = mspec->io.data.u64};
+
+    if (flags.is_adc && flags.in_milli) {
+        return (double)value / 1000.0;
+    }
+
+    return (double)value;
+}
+
+//--------------------------------------------------------------------------------------------------
+struct stats_zone* cms_card_stats_zone_alloc(struct stats_domain* domain,
+                                             struct cms* cms,
+                                             const char* name) {
+    if (!cms_reg_map_is_ready(cms->blk)) {
+        log_err(EBUSY, "regmap ready timeout");
+        return NULL;
+    }
+
+    enum cms_profile profile = cms_profile_get(cms->blk);
+    uint64_t profile_mask = _CMS_PROFILE_MASK(profile);
+
+    unsigned int nmetrics = 0;
+    const struct cms_card_metric* cm;
+    for (cm = cms_card_metrics; cm < &cms_card_metrics[ARRAY_SIZE(cms_card_metrics)]; ++cm) {
+        if ((cm->profile_mask & profile_mask) != 0) {
+            nmetrics += 1;
+        }
+    }
+
+    struct stats_metric_spec mspecs[nmetrics];
+    struct stats_metric_spec* mspec = mspecs;
+    for (cm = cms_card_metrics; cm < &cms_card_metrics[ARRAY_SIZE(cms_card_metrics)]; ++cm) {
+        if ((cm->profile_mask & profile_mask) != 0) {
+            *mspec = cm->spec;
+            mspec->io.data.u64 = cm->flags._v;
+            mspec += 1;
+        }
+    }
+
+    struct stats_block_spec bspecs[] = {
+      {
+          .name = "cms-card",
+          .metrics = mspecs,
+          .nmetrics = nmetrics,
+          .io = {
+              .base = cms->blk,
+          },
+          .attach_metrics = cms_card_stats_attach_metrics,
+          .convert_metric = cms_card_stats_convert_metric,
+      },
+    };
+    struct stats_zone_spec zspec = {
+        .name = name,
+        .blocks = bspecs,
+        .nblocks = ARRAY_SIZE(bspecs),
+    };
+    return stats_zone_alloc(domain, &zspec);
+}
+
+//--------------------------------------------------------------------------------------------------
+void cms_card_stats_zone_free(struct stats_zone* zone) {
+    stats_zone_free(zone);
 }
