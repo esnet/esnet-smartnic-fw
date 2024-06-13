@@ -1202,7 +1202,7 @@ struct stats_zone* cms_card_stats_zone_alloc(struct stats_domain* domain,
 
     struct stats_block_spec bspecs[] = {
       {
-          .name = "cms-card",
+          .name = "cms",
           .metrics = mspecs,
           .nmetrics = nmetrics,
           .io = {

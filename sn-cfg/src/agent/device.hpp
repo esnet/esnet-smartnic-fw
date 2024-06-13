@@ -34,6 +34,7 @@ struct Device {
 
     struct {
         struct stats_domain* domains[DeviceStatsDomain::NDOMAINS];
+        DeviceStats* card;
         vector<DeviceStats*> hosts;
         vector<DeviceStats*> ports;
         DeviceStats* sw;

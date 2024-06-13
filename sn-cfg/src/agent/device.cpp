@@ -100,6 +100,16 @@ void SmartnicConfigImpl::init_device(Device* dev) {
         cerr << "ERROR: Failed to reset CMS for device " << dev->bus_id << "."  << endl;
         exit(EXIT_FAILURE);
     }
+
+    auto stats = new DeviceStats;
+    stats->name = "card";
+    stats->zone = cms_card_stats_zone_alloc(
+        dev->stats.domains[DeviceStatsDomain::MONITORS], &dev->cms, stats->name.c_str());
+    if (stats->zone == NULL) {
+        cerr << "ERROR: Failed to alloc CMS stats zone for device " << dev->bus_id << "."  << endl;
+        exit(EXIT_FAILURE);
+    }
+    dev->stats.card = stats;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -111,6 +121,12 @@ void SmartnicConfigImpl::deinit_device(Device* dev) {
         dev->stats.sysmons.pop_back();
         delete stats;
     }
+
+    auto stats = dev->stats.card;
+    dev->stats.card = NULL;
+
+    cms_card_stats_zone_free(stats->zone);
+    delete stats;
 
     cms_destroy(&dev->cms);
 }
@@ -303,6 +319,7 @@ void SmartnicConfigImpl::get_device_status(
         for (auto sysmon : dev->stats.sysmons) {
             stats_zone_for_each_metric(sysmon->zone, __get_device_stats, &ctx);
         }
+        stats_zone_for_each_metric(dev->stats.card->zone, __get_device_stats, &ctx);
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);
