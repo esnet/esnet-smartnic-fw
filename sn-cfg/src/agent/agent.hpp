@@ -95,10 +95,10 @@ private:
     void set_host_config(const HostConfigRequest&, function<void(const HostConfigResponse&)>);
     void batch_set_host_config(
         const HostConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
-    void get_host_stats(const HostStatsRequest&, function<void(const HostStatsResponse&)>);
+    void get_or_clear_host_stats(
+        const HostStatsRequest&, bool, function<void(const HostStatsResponse&)>);
     void batch_get_host_stats(
         const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
-    void clear_host_stats(const HostStatsRequest&, function<void(const HostStatsResponse&)>);
     void batch_clear_host_stats(
         const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
@@ -113,16 +113,15 @@ private:
     void get_port_status(const PortStatusRequest&, function<void(const PortStatusResponse&)>);
     void batch_get_port_status(
         const PortStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
-    void get_port_stats(const PortStatsRequest&, function<void(const PortStatsResponse&)>);
+    void get_or_clear_port_stats(
+        const PortStatsRequest&, bool, function<void(const PortStatsResponse&)>);
     void batch_get_port_stats(
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
-    void clear_port_stats(const PortStatsRequest&, function<void(const PortStatsResponse&)>);
     void batch_clear_port_stats(
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
-    void get_stats(const StatsRequest&, function<void(const StatsResponse&)>);
+    void get_or_clear_stats(const StatsRequest&, bool, function<void(const StatsResponse&)>);
     void batch_get_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
-    void clear_stats(const StatsRequest&, function<void(const StatsResponse&)>);
     void batch_clear_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void init_switch(Device* dev);
@@ -133,10 +132,10 @@ private:
     void set_switch_config(const SwitchConfigRequest&, function<void(const SwitchConfigResponse&)>);
     void batch_set_switch_config(
         const SwitchConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
-    void get_switch_stats(const SwitchStatsRequest&, function<void(const SwitchStatsResponse&)>);
+    void get_or_clear_switch_stats(
+        const SwitchStatsRequest&, bool, function<void(const SwitchStatsResponse&)>);
     void batch_get_switch_stats(
         const SwitchStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
-    void clear_switch_stats(const SwitchStatsRequest&, function<void(const SwitchStatsResponse&)>);
     void batch_clear_switch_stats(
         const SwitchStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 };

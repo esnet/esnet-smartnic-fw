@@ -10,6 +10,8 @@ from sn_cfg_proto import (
     BatchOperation,
     BatchRequest,
     ErrorCode,
+    StatsFilters,
+    StatsMetricType,
     StatsRequest,
 )
 
@@ -20,8 +22,32 @@ from .utils import apply_options
 HEADER_SEP = '-' * 40
 
 #---------------------------------------------------------------------------------------------------
-def stats_req(dev_id):
-    return StatsRequest(dev_id=dev_id)
+METRIC_TYPE_MAP = {
+    StatsMetricType.STATS_METRIC_TYPE_COUNTER: 'counter',
+    StatsMetricType.STATS_METRIC_TYPE_GAUGE: 'gauge',
+    StatsMetricType.STATS_METRIC_TYPE_FLAG: 'flag',
+}
+METRIC_TYPE_RMAP = dict((name, enum) for enum, name in METRIC_TYPE_MAP.items())
+
+#---------------------------------------------------------------------------------------------------
+def stats_req(dev_id, **kargs):
+    req_kargs = {'dev_id': dev_id}
+
+    if kargs:
+        filters_kargs = {}
+
+        key = 'metric_types'
+        names = kargs.get(key)
+        if names:
+            enums = []
+            for name in names:
+                enums.append(METRIC_TYPE_RMAP[name])
+            filters_kargs[key] = enums
+
+        if filters_kargs:
+            req_kargs['filters'] = StatsFilters(**filters_kargs)
+
+    return StatsRequest(**req_kargs)
 
 #---------------------------------------------------------------------------------------------------
 def rpc_stats(op, **kargs):
@@ -54,9 +80,17 @@ def _show_stats(dev_id, stats):
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
-    for cnt in stats.counters:
-        if cnt.value != 0:
-            rows.append(f'{cnt.zone}_{cnt.block}_{cnt.name}: {cnt.value}')
+    for metric in stats.metrics:
+        if metric.type == StatsMetricType.STATS_METRIC_TYPE_FLAG:
+            value = 'yes' if metric.value.u64 != 0 else 'no'
+        elif metric.type == StatsMetricType.STATS_METRIC_TYPE_GAUGE:
+            value = metric.value.f64
+        else:
+            value = metric.value.u64
+
+        if value != 0:
+            rows.append(f'{metric.scope.zone}_{metric.scope.block}_{metric.name}: {value}')
+
     click.echo('\n'.join(rows))
 
 def show_stats(client, **kargs):
@@ -94,6 +128,13 @@ def clear_stats_options(fn):
 def show_stats_options(fn):
     options = (
         device_id_option,
+        click.option(
+            '--metric-type', '-m',
+            'metric_types',
+            type=click.Choice(sorted(name for name in METRIC_TYPE_RMAP)),
+            multiple=True,
+            help='Filter to restrict statistic metrics to the given type(s).',
+        ),
     )
     return apply_options(options, fn)
 

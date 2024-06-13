@@ -1,5 +1,6 @@
 #include "agent.hpp"
 #include "device.hpp"
+#include "stats.hpp"
 
 #include <cstdlib>
 #include <sstream>
@@ -31,7 +32,8 @@ void SmartnicConfigImpl::init_host(Device* dev) {
 
         auto stats = new DeviceStats;
         stats->name = name.str();
-        stats->zone = qdma_stats_zone_alloc(dev->stats.domain, adapter, stats->name.c_str());
+        stats->zone = qdma_stats_zone_alloc(
+            dev->stats.domains[DeviceStatsDomain::COUNTERS], adapter, stats->name.c_str());
         if (stats->zone == NULL) {
             cerr << "ERROR: Failed to alloc stats zone for host ID " << host_id << "."  << endl;
             exit(EXIT_FAILURE);
@@ -259,31 +261,9 @@ Status SmartnicConfigImpl::SetHostConfig(
 }
 
 //--------------------------------------------------------------------------------------------------
-struct GetHostStatsContext {
-    Stats* stats;
-};
-
-extern "C" {
-    static int __get_host_stats_counters(const struct stats_for_each_spec* spec) {
-        if (spec->metric->type != stats_metric_type_COUNTER) {
-            return 0; // Skip non-counter metrics.
-        }
-
-        GetHostStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
-        auto cnt = ctx->stats->add_counters();
-        cnt->set_domain(spec->domain->name);
-        cnt->set_zone(spec->zone->name);
-        cnt->set_block(spec->block->name);
-        cnt->set_name(spec->metric->name);
-        cnt->set_value(spec->value.u64);
-
-        return 0;
-    }
-}
-
-//--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::get_host_stats(
+void SmartnicConfigImpl::get_or_clear_host_stats(
     const HostStatsRequest& req,
+    bool do_clear,
     function<void(const HostStatsResponse&)> write_resp) {
     int begin_dev_id = 0;
     int end_dev_id = devices.size() - 1;
@@ -299,6 +279,19 @@ void SmartnicConfigImpl::get_host_stats(
     if (dev_id > -1) {
         begin_dev_id = dev_id;
         end_dev_id = dev_id;
+    }
+
+    GetStatsContext ctx;
+    if (!do_clear) {
+        auto filters = req.filters();
+        auto ntypes = filters.metric_types_size();
+        if (ntypes > 0) {
+            for (auto n = 0; n < ntypes; ++n) {
+                ctx.metric_types.set(filters.metric_types(n));
+            }
+        } else {
+            ctx.metric_types.set(StatsMetricType::STATS_METRIC_TYPE_COUNTER);
+        }
     }
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
@@ -322,12 +315,14 @@ void SmartnicConfigImpl::get_host_stats(
 
         for (host_id = begin_host_id; host_id <= end_host_id; ++host_id) {
             HostStatsResponse resp;
-            auto stats = dev->stats.hosts[host_id];
-            GetHostStatsContext ctx = {
-                .stats = resp.mutable_stats(),
-            };
 
-            stats_zone_for_each_metric(stats->zone, __get_host_stats_counters, &ctx);
+            if (do_clear) {
+                stats_zone_clear_metrics(dev->stats.hosts[host_id]->zone);
+            } else {
+                ctx.stats = resp.mutable_stats();
+                stats_zone_for_each_metric(
+                    dev->stats.hosts[host_id]->zone, get_stats_for_each_metric, &ctx);
+            }
 
             resp.set_error_code(ErrorCode::EC_OK);
             resp.set_dev_id(dev_id);
@@ -342,7 +337,7 @@ void SmartnicConfigImpl::get_host_stats(
 void SmartnicConfigImpl::batch_get_host_stats(
     const HostStatsRequest& req,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
-    get_host_stats(req, [&rdwr](const HostStatsResponse& resp) -> void {
+    get_or_clear_host_stats(req, false, [&rdwr](const HostStatsResponse& resp) -> void {
         BatchResponse bresp;
         auto stats = bresp.mutable_host_stats();
         stats->CopyFrom(resp);
@@ -356,70 +351,17 @@ Status SmartnicConfigImpl::GetHostStats(
     [[maybe_unused]] ServerContext* ctx,
     const HostStatsRequest* req,
     ServerWriter<HostStatsResponse>* writer) {
-    get_host_stats(*req, [&writer](const HostStatsResponse& resp) -> void {
+    get_or_clear_host_stats(*req, false, [&writer](const HostStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::clear_host_stats(
-    const HostStatsRequest& req,
-    function<void(const HostStatsResponse&)> write_resp) {
-    int begin_dev_id = 0;
-    int end_dev_id = devices.size() - 1;
-    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
-
-    if (dev_id > end_dev_id) {
-        HostStatsResponse resp;
-        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
-        write_resp(resp);
-        return;
-    }
-
-    if (dev_id > -1) {
-        begin_dev_id = dev_id;
-        end_dev_id = dev_id;
-    }
-
-    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
-        const auto dev = devices[dev_id];
-
-        int begin_host_id = 0;
-        int end_host_id = dev->nhosts - 1;
-        int host_id = req.host_id(); // 0-based index. -1 means all hosts.
-        if (host_id > end_host_id) {
-            HostStatsResponse resp;
-            resp.set_error_code(ErrorCode::EC_INVALID_HOST_ID);
-            resp.set_dev_id(dev_id);
-            write_resp(resp);
-            continue;
-        }
-
-        if (host_id > -1) {
-            begin_host_id = host_id;
-            end_host_id = host_id;
-        }
-
-        for (host_id = begin_host_id; host_id <= end_host_id; ++host_id) {
-            auto stats = dev->stats.hosts[host_id];
-            stats_zone_clear_metrics(stats->zone);
-
-            HostStatsResponse resp;
-            resp.set_error_code(ErrorCode::EC_OK);
-            resp.set_dev_id(dev_id);
-            resp.set_host_id(host_id);
-
-            write_resp(resp);
-        }
-    }
-}
-
-//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::batch_clear_host_stats(
     const HostStatsRequest& req,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
-    clear_host_stats(req, [&rdwr](const HostStatsResponse& resp) -> void {
+    get_or_clear_host_stats(req, true, [&rdwr](const HostStatsResponse& resp) -> void {
         BatchResponse bresp;
         auto stats = bresp.mutable_host_stats();
         stats->CopyFrom(resp);
@@ -433,7 +375,7 @@ Status SmartnicConfigImpl::ClearHostStats(
     [[maybe_unused]] ServerContext* ctx,
     const HostStatsRequest* req,
     ServerWriter<HostStatsResponse>* writer) {
-    clear_host_stats(*req, [&writer](const HostStatsResponse& resp) -> void {
+    get_or_clear_host_stats(*req, true, [&writer](const HostStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;

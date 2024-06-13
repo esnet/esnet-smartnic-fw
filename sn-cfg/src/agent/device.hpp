@@ -10,6 +10,11 @@
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
+enum DeviceStatsDomain {
+    COUNTERS,
+    NDOMAINS
+};
+
 struct DeviceStats {
     string name;
     struct stats_zone* zone;
@@ -25,7 +30,7 @@ struct Device {
     unsigned int napps;
 
     struct {
-        struct stats_domain* domain;
+        struct stats_domain* domains[DeviceStatsDomain::NDOMAINS];
         vector<DeviceStats*> hosts;
         vector<DeviceStats*> ports;
         DeviceStats* sw;

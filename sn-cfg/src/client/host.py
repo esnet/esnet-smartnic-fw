@@ -134,9 +134,11 @@ def _show_host_stats(dev_id, host_id, stats):
     rows.append(f'Host ID: {host_id} on device ID {dev_id}')
     rows.append(HEADER_SEP)
 
-    for cnt in stats.counters:
-        if cnt.value != 0:
-            rows.append(f'{cnt.name}: {cnt.value}')
+    for metric in stats.metrics:
+        value = metric.value.u64
+        if value != 0:
+            rows.append(f'{metric.name}: {value}')
+
     click.echo('\n'.join(rows))
 
 def show_host_stats(client, **kargs):

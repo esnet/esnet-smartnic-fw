@@ -66,12 +66,47 @@ message StatsCounter {
     uint64 value = 5;
 }
 
+enum StatsMetricType {
+    STATS_METRIC_TYPE_UNKNOWN = 0; // Field is unset.
+    STATS_METRIC_TYPE_COUNTER = 1;
+    STATS_METRIC_TYPE_GAUGE = 2;
+    STATS_METRIC_TYPE_FLAG = 3;
+}
+
+message StatsMetricScope {
+    string domain = 1;
+    string zone = 2;
+    string block = 3;
+}
+
+message StatsMetricValue {
+    uint64 u64 = 1;
+    double f64 = 2;
+}
+
+message StatsMetric {
+    StatsMetricType type = 1;
+    StatsMetricScope scope = 2;
+    string name = 3;
+    StatsMetricValue value = 4;
+}
+
 message Stats {
-    repeated StatsCounter counters = 1;
+    // This field is no longer populated. Use the metrics field instead.
+    repeated StatsCounter counters = 1 [deprecated = true];
+
+    repeated StatsMetric metrics = 2;
+}
+
+message StatsFilters {
+    repeated StatsMetricType metric_types = 1; // Restrict metrics to the given type(s).
+                                               // Leave unset for all types.
 }
 
 message StatsRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    StatsFilters filters = 2; // Filters to restrict statistics on get operations.
+                              // Leave unset for all statistics.
 }
 
 message StatsResponse {
@@ -173,6 +208,8 @@ message HostConfigResponse {
 message HostStatsRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
     sint32 host_id = 2; // 0-based index. Set to -1 for all host interfaces.
+    StatsFilters filters = 3; // Filters to restrict statistics on get operations.
+                              // Leave unset for all counter statistics.
 }
 
 message HostStatsResponse {
@@ -249,6 +286,8 @@ message PortStatusResponse {
 message PortStatsRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
     sint32 port_id = 2; // 0-based index. Set to -1 for all ports.
+    StatsFilters filters = 3; // Filters to restrict statistics on get operations.
+                              // Leave unset for all counter statistics.
 }
 
 message PortStatsResponse {
@@ -327,6 +366,8 @@ message SwitchConfigResponse {
 
 message SwitchStatsRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    StatsFilters filters = 2; // Filters to restrict statistics on get operations.
+                              // Leave unset for all counter statistics.
 }
 
 message SwitchStatsResponse {
