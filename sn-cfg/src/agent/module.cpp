@@ -98,6 +98,36 @@ private:
 };
 
 //--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::init_module(Device* dev) {
+    for (unsigned int mod_id = 0; mod_id < dev->nports; ++mod_id) {
+        ostringstream name;
+        name << "module" << mod_id;
+
+        auto stats = new DeviceStats;
+        stats->name = name.str();
+        stats->zone = cms_module_stats_zone_alloc(
+            dev->stats.domains[DeviceStatsDomain::MODULES], &dev->cms, mod_id, stats->name.c_str());
+        if (stats->zone == NULL) {
+            cerr << "ERROR: Failed to alloc stats zone for module ID " << mod_id << "."  << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        dev->stats.modules.push_back(stats);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::deinit_module(Device* dev) {
+    while (!dev->stats.modules.empty()) {
+        auto stats = dev->stats.modules.back();
+        cms_module_stats_zone_free(stats->zone);
+
+        dev->stats.modules.pop_back();
+        delete stats;
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
 static inline ModuleGpioState bool_to_gpio_state(bool assert) {
     return assert ? ModuleGpioState::GPIO_STATE_ASSERT : ModuleGpioState::GPIO_STATE_DEASSERT;
 }
@@ -949,17 +979,25 @@ Status SmartnicConfigImpl::SetModuleMem(
 }
 
 //--------------------------------------------------------------------------------------------------
-static void add_module_status_alarms(ModuleStatus& status, [[maybe_unused]] ModulePages& pages) {
-    auto alarm = status.add_alarms();
-    alarm->set_name("tbd");
-    alarm->set_active(false);
-}
+struct GetModuleStatsContext {
+    ModuleStatus* status;
+};
 
-//--------------------------------------------------------------------------------------------------
-static void add_module_status_monitors(ModuleStatus& status, [[maybe_unused]] ModulePages& pages) {
-    auto mon = status.add_monitors();
-    mon->set_name("tbd");
-    mon->set_value(0.0);
+extern "C" {
+    static int __get_module_stats(const struct stats_for_each_spec* spec) {
+        GetModuleStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
+        if (cms_module_stats_is_alarm_metric(spec->metric)) {
+            auto alarm = ctx->status->add_alarms();
+            alarm->set_name(spec->metric->name);
+            alarm->set_active(spec->value.u64 != 0);
+        } else if (cms_module_stats_is_monitor_metric(spec->metric)) {
+            auto mon = ctx->status->add_monitors();
+            mon->set_name(spec->metric->name);
+            mon->set_value(spec->value.f64);
+        }
+
+        return 0;
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1003,18 +1041,13 @@ void SmartnicConfigImpl::get_module_status(
 
         for (mod_id = begin_mod_id; mod_id <= end_mod_id; ++mod_id) {
             ModuleStatusResponse resp;
-            auto err = ErrorCode::EC_OK;
+            GetModuleStatsContext ctx = {
+                .status = resp.mutable_status(),
+            };
 
-            ModulePages pages(&dev->cms, mod_id);
-            if (pages.error()) {
-                err = ErrorCode::EC_MODULE_PAGE_READ_FAILED;
-            } else {
-                auto status = resp.mutable_status();
-                add_module_status_alarms(*status, pages);
-                add_module_status_monitors(*status, pages);
-            }
+            stats_zone_for_each_metric(dev->stats.modules[mod_id]->zone, __get_module_stats, &ctx);
 
-            resp.set_error_code(err);
+            resp.set_error_code(ErrorCode::EC_OK);
             resp.set_dev_id(dev_id);
             resp.set_mod_id(mod_id);
 

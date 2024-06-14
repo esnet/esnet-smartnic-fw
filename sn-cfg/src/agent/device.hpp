@@ -14,6 +14,7 @@ using namespace std;
 enum DeviceStatsDomain {
     COUNTERS,
     MONITORS,
+    MODULES,
     NDOMAINS
 };
 
@@ -36,6 +37,7 @@ struct Device {
         struct stats_domain* domains[DeviceStatsDomain::NDOMAINS];
         DeviceStats* card;
         vector<DeviceStats*> hosts;
+        vector<DeviceStats*> modules;
         vector<DeviceStats*> ports;
         DeviceStats* sw;
         vector<DeviceStats*> sysmons;

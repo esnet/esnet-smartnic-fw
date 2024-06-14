@@ -118,6 +118,8 @@ private:
     void batch_clear_host_stats(
         const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
+    void init_module(Device* dev);
+    void deinit_module(Device* dev);
     void get_module_gpio(const ModuleGpioRequest&, function<void(const ModuleGpioResponse&)>);
     void batch_get_module_gpio(
         const ModuleGpioRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
