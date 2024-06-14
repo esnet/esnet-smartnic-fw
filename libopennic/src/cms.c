@@ -3,6 +3,7 @@
 #include "array_size.h"
 #include <assert.h>
 #include <errno.h>
+#include <math.h>
 #include "memory-barriers.h"
 #include <netinet/ether.h>
 #include "stats.h"
@@ -1223,4 +1224,327 @@ struct stats_zone* cms_card_stats_zone_alloc(struct stats_domain* domain,
 //--------------------------------------------------------------------------------------------------
 void cms_card_stats_zone_free(struct stats_zone* zone) {
     stats_zone_free(zone);
+}
+
+//--------------------------------------------------------------------------------------------------
+enum cms_module_metric_type { // Limited to 1 byte (see cms_module_metric_flags below).
+    cms_module_metric_type_ALARM,
+    cms_module_metric_type_MONITOR_MIN,
+    cms_module_metric_type_MONITOR_TEMP = cms_module_metric_type_MONITOR_MIN,
+    cms_module_metric_type_MONITOR_VOLTAGE,
+    cms_module_metric_type_MONITOR_CURRENT,
+    cms_module_metric_type_MONITOR_OPTICAL_POWER,
+    cms_module_metric_type_MONITOR_MAX,
+};
+
+union cms_module_metric_flags {
+    struct {
+        uint64_t type : 8; // [7:0] (enum cms_module_metric_type)
+    };
+    uint64_t _v;
+} __attribute__((packed));
+
+struct cms_module_metric {
+    struct stats_metric_spec spec;
+    union cms_module_metric_flags flags;
+};
+
+#define CMS_MODULE_METRIC_ALARM(_name, _offset, _pos) \
+{ \
+    .spec = { \
+        __STATS_METRIC_SPEC(#_name, NULL, FLAG, 0, 0), \
+        .io = { \
+            .offset = _offset, \
+            .size = sizeof(uint8_t), \
+            .width = 1, \
+            .shift = _pos, \
+        }, \
+    }, \
+    .flags = { \
+        .type = cms_module_metric_type_ALARM, \
+    }, \
+}
+
+#define CMS_MODULE_METRIC_MONITOR(_name, _type, _offset) \
+{ \
+    .spec = { \
+        __STATS_METRIC_SPEC(#_name, NULL, GAUGE, 0, 0), \
+        .io = { \
+            .offset = _offset, \
+            .size = sizeof(union sff_8636_u16), \
+        }, \
+    }, \
+    .flags = { \
+        .type = cms_module_metric_type_MONITOR_##_type, \
+    }, \
+}
+
+// TODO: add units as extra label for each metric?
+static const struct cms_module_metric cms_module_metrics[] = {
+    CMS_MODULE_METRIC_ALARM(channel_los_rx1, 3, 0),
+    CMS_MODULE_METRIC_ALARM(channel_los_rx2, 3, 1),
+    CMS_MODULE_METRIC_ALARM(channel_los_rx3, 3, 2),
+    CMS_MODULE_METRIC_ALARM(channel_los_rx4, 3, 3),
+    CMS_MODULE_METRIC_ALARM(channel_los_tx1, 3, 4),
+    CMS_MODULE_METRIC_ALARM(channel_los_tx2, 3, 5),
+    CMS_MODULE_METRIC_ALARM(channel_los_tx3, 3, 6),
+    CMS_MODULE_METRIC_ALARM(channel_los_tx4, 3, 7),
+
+    CMS_MODULE_METRIC_ALARM(channel_fault_tx1,           4, 0),
+    CMS_MODULE_METRIC_ALARM(channel_fault_tx2,           4, 1),
+    CMS_MODULE_METRIC_ALARM(channel_fault_tx3,           4, 2),
+    CMS_MODULE_METRIC_ALARM(channel_fault_tx4,           4, 3),
+    CMS_MODULE_METRIC_ALARM(channel_fault_tx1_equalizer, 4, 4),
+    CMS_MODULE_METRIC_ALARM(channel_fault_tx2_equalizer, 4, 5),
+    CMS_MODULE_METRIC_ALARM(channel_fault_tx3_equalizer, 4, 6),
+    CMS_MODULE_METRIC_ALARM(channel_fault_tx4_equalizer, 4, 7),
+
+    CMS_MODULE_METRIC_ALARM(channel_lol_rx1, 5, 0),
+    CMS_MODULE_METRIC_ALARM(channel_lol_rx2, 5, 1),
+    CMS_MODULE_METRIC_ALARM(channel_lol_rx3, 5, 2),
+    CMS_MODULE_METRIC_ALARM(channel_lol_rx4, 5, 3),
+    CMS_MODULE_METRIC_ALARM(channel_lol_tx1, 5, 4),
+    CMS_MODULE_METRIC_ALARM(channel_lol_tx2, 5, 5),
+    CMS_MODULE_METRIC_ALARM(channel_lol_tx3, 5, 6),
+    CMS_MODULE_METRIC_ALARM(channel_lol_tx4, 5, 7),
+
+    CMS_MODULE_METRIC_ALARM(temp_low_warning,  6, 4),
+    CMS_MODULE_METRIC_ALARM(temp_high_warning, 6, 5),
+    CMS_MODULE_METRIC_ALARM(temp_low_alarm,    6, 6),
+    CMS_MODULE_METRIC_ALARM(temp_high_alarm,   6, 7),
+
+    CMS_MODULE_METRIC_ALARM(vcc_low_warning,  7, 4),
+    CMS_MODULE_METRIC_ALARM(vcc_high_warning, 7, 5),
+    CMS_MODULE_METRIC_ALARM(vcc_low_alarm,    7, 6),
+    CMS_MODULE_METRIC_ALARM(vcc_high_alarm,   7, 7),
+
+    CMS_MODULE_METRIC_ALARM(channel_power_low_warning_rx2,   9, 0),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_warning_rx2,  9, 1),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_alarm_rx2,     9, 2),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_alarm_rx2,    9, 3),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_warning_rx1,   9, 4),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_warning_rx1,  9, 5),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_alarm_rx1,     9, 6),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_alarm_rx1,    9, 7),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_warning_rx4,  10, 0),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_warning_rx4, 10, 1),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_alarm_rx4,    10, 2),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_alarm_rx4,   10, 3),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_warning_rx3,  10, 4),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_warning_rx3, 10, 5),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_alarm_rx3,    10, 6),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_alarm_rx3,   10, 7),
+
+    CMS_MODULE_METRIC_ALARM(channel_bias_low_warning_tx2,  11, 0),
+    CMS_MODULE_METRIC_ALARM(channel_bias_high_warning_tx2, 11, 1),
+    CMS_MODULE_METRIC_ALARM(channel_bias_low_alarm_tx2,    11, 2),
+    CMS_MODULE_METRIC_ALARM(channel_bias_high_alarm_tx2,   11, 3),
+    CMS_MODULE_METRIC_ALARM(channel_bias_low_warning_tx1,  11, 4),
+    CMS_MODULE_METRIC_ALARM(channel_bias_high_warning_tx1, 11, 5),
+    CMS_MODULE_METRIC_ALARM(channel_bias_low_alarm_tx1,    11, 6),
+    CMS_MODULE_METRIC_ALARM(channel_bias_high_alarm_tx1,   11, 7),
+    CMS_MODULE_METRIC_ALARM(channel_bias_low_warning_tx4,  12, 0),
+    CMS_MODULE_METRIC_ALARM(channel_bias_high_warning_tx4, 12, 1),
+    CMS_MODULE_METRIC_ALARM(channel_bias_low_alarm_tx4,    12, 2),
+    CMS_MODULE_METRIC_ALARM(channel_bias_high_alarm_tx4,   12, 3),
+    CMS_MODULE_METRIC_ALARM(channel_bias_low_warning_tx3,  12, 4),
+    CMS_MODULE_METRIC_ALARM(channel_bias_high_warning_tx3, 12, 5),
+    CMS_MODULE_METRIC_ALARM(channel_bias_low_alarm_tx3,    12, 6),
+    CMS_MODULE_METRIC_ALARM(channel_bias_high_alarm_tx3,   12, 7),
+
+    CMS_MODULE_METRIC_ALARM(channel_power_low_warning_tx2,  13, 0),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_warning_tx2, 13, 1),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_alarm_tx2,    13, 2),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_alarm_tx2,   13, 3),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_warning_tx1,  13, 4),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_warning_tx1, 13, 5),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_alarm_tx1,    13, 6),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_alarm_tx1,   13, 7),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_warning_tx4,  14, 0),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_warning_tx4, 14, 1),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_alarm_tx4,    14, 2),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_alarm_tx4,   14, 3),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_warning_tx3,  14, 4),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_warning_tx3, 14, 5),
+    CMS_MODULE_METRIC_ALARM(channel_power_low_alarm_tx3,    14, 6),
+    CMS_MODULE_METRIC_ALARM(channel_power_high_alarm_tx3,   14, 7),
+
+    CMS_MODULE_METRIC_MONITOR(temp, TEMP,    22),
+    CMS_MODULE_METRIC_MONITOR(vcc,  VOLTAGE, 26),
+
+    CMS_MODULE_METRIC_MONITOR(channel_power_rx1, OPTICAL_POWER, 34),
+    CMS_MODULE_METRIC_MONITOR(channel_power_rx2, OPTICAL_POWER, 36),
+    CMS_MODULE_METRIC_MONITOR(channel_power_rx3, OPTICAL_POWER, 38),
+    CMS_MODULE_METRIC_MONITOR(channel_power_rx4, OPTICAL_POWER, 40),
+
+    CMS_MODULE_METRIC_MONITOR(channel_bias_tx1, CURRENT, 42),
+    CMS_MODULE_METRIC_MONITOR(channel_bias_tx2, CURRENT, 44),
+    CMS_MODULE_METRIC_MONITOR(channel_bias_tx3, CURRENT, 46),
+    CMS_MODULE_METRIC_MONITOR(channel_bias_tx4, CURRENT, 48),
+
+    CMS_MODULE_METRIC_MONITOR(channel_power_tx1, OPTICAL_POWER, 50),
+    CMS_MODULE_METRIC_MONITOR(channel_power_tx2, OPTICAL_POWER, 52),
+    CMS_MODULE_METRIC_MONITOR(channel_power_tx3, OPTICAL_POWER, 54),
+    CMS_MODULE_METRIC_MONITOR(channel_power_tx4, OPTICAL_POWER, 56),
+};
+
+//--------------------------------------------------------------------------------------------------
+union cms_module_block_io_data {
+    struct {
+        uint64_t cage : 2; // [1:0]
+    };
+    uint64_t _v;
+} __attribute__((packed));
+
+struct cms_module_block_latch_data {
+    union cms_module_page* lo;
+};
+
+//--------------------------------------------------------------------------------------------------
+static void cms_module_stats_latch_metrics(const struct stats_block_spec* bspec, void* data) {
+    struct cms* cms = (typeof(cms))bspec->io.base;
+    union cms_module_block_io_data io = {._v = bspec->io.data.u64};
+    struct cms_module_block_latch_data* latch = data;
+
+    struct cms_module_id id = {.cage = io.cage};
+    latch->lo = cms_module_page_read(cms, &id);
+}
+
+//--------------------------------------------------------------------------------------------------
+static void cms_module_stats_release_metrics(const struct stats_block_spec* UNUSED(bspec),
+                                             void* data) {
+    struct cms_module_block_latch_data* latch = data;
+    if (latch->lo != NULL) {
+        cms_module_page_free(latch->lo);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+static uint64_t cms_module_stats_read_metric(const struct stats_block_spec* UNUSED(bspec),
+                                             const struct stats_metric_spec* mspec,
+                                             void* data) {
+    struct cms_module_block_latch_data* latch = data;
+    bool have_lo = latch->lo != NULL;
+
+    union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
+    uint64_t value = 0;
+    switch (flags.type) {
+    case cms_module_metric_type_ALARM:
+        if (have_lo) {
+            value = (latch->lo->u8[mspec->io.offset] >> mspec->io.shift) & 1;
+        }
+        break;
+
+    case cms_module_metric_type_MONITOR_MIN ... cms_module_metric_type_MONITOR_MAX - 1:
+        if (have_lo) {
+            union sff_8636_u16* u16 = (typeof(u16))&latch->lo->u8[mspec->io.offset];
+            value = (u16->msb << 8) | u16->lsb;
+        } else {
+            value = UINT64_MAX;
+        }
+        break;
+    }
+
+    return value;
+}
+
+//--------------------------------------------------------------------------------------------------
+static double cms_module_stats_convert_metric(const struct stats_block_spec* UNUSED(bspec),
+                                              const struct stats_metric_spec* mspec,
+                                              uint64_t value,
+                                              void* UNUSED(data)) {
+    if (value == UINT64_MAX) {
+        return HUGE_VAL;
+    }
+
+    union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
+    double f64 = 0.0;
+    switch (flags.type) {
+    case cms_module_metric_type_ALARM:
+        f64 = value != 0 ? 1.0 : 0.0;
+        break;
+
+    case cms_module_metric_type_MONITOR_TEMP:
+        f64 = (double)((int16_t)value) / 256.0; // degrees C
+        break;
+
+    case cms_module_metric_type_MONITOR_VOLTAGE:
+        f64 = (double)((uint16_t)value) * 100e-6; // Volts
+        break;
+
+    case cms_module_metric_type_MONITOR_CURRENT:
+        f64 = (double)((uint16_t)value) * 2e-6; // Amps
+        break;
+
+    case cms_module_metric_type_MONITOR_OPTICAL_POWER:
+        f64 = (double)((uint16_t)value) * 0.1e-6; // Watts
+        break;
+    }
+
+    return f64;
+}
+
+//--------------------------------------------------------------------------------------------------
+struct stats_zone* cms_module_stats_zone_alloc(struct stats_domain* domain,
+                                               struct cms* cms,
+                                               uint8_t cage,
+                                               const char* name) {
+    if (!cms_reg_map_is_ready(cms->blk)) {
+        log_err(EBUSY, "regmap ready timeout");
+        return NULL;
+    }
+
+    struct stats_metric_spec mspecs[ARRAY_SIZE(cms_module_metrics)];
+    struct stats_metric_spec* mspec = mspecs;
+    const struct cms_module_metric* mm;
+    for (mm = cms_module_metrics; mm < &cms_module_metrics[ARRAY_SIZE(cms_module_metrics)]; ++mm) {
+        *mspec = mm->spec;
+        mspec->io.data.u64 = mm->flags._v;
+        mspec += 1;
+    }
+
+    union cms_module_block_io_data data = {
+        .cage = cage,
+    };
+    struct stats_block_spec bspecs[] = {
+      {
+          .name = "cms",
+          .metrics = mspecs,
+          .nmetrics = ARRAY_SIZE(mspecs),
+          .io = {
+              .base = cms,
+              .data.u64 = data._v,
+          },
+          .latch = {
+              .data_size = sizeof(struct cms_module_block_latch_data),
+          },
+          .latch_metrics = cms_module_stats_latch_metrics,
+          .release_metrics = cms_module_stats_release_metrics,
+          .read_metric = cms_module_stats_read_metric,
+          .convert_metric = cms_module_stats_convert_metric,
+      },
+    };
+    struct stats_zone_spec zspec = {
+        .name = name,
+        .blocks = bspecs,
+        .nblocks = ARRAY_SIZE(bspecs),
+    };
+    return stats_zone_alloc(domain, &zspec);
+}
+
+//--------------------------------------------------------------------------------------------------
+void cms_module_stats_zone_free(struct stats_zone* zone) {
+    stats_zone_free(zone);
+}
+
+//--------------------------------------------------------------------------------------------------
+bool cms_module_stats_is_alarm_metric(const struct stats_metric_spec* mspec) {
+    union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
+    return flags.type == cms_module_metric_type_ALARM;
+}
+
+bool cms_module_stats_is_monitor_metric(const struct stats_metric_spec* mspec) {
+    union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
+    return flags.type >= cms_module_metric_type_MONITOR_MIN &&
+           flags.type < cms_module_metric_type_MONITOR_MAX;
 }
