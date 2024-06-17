@@ -16,6 +16,7 @@ ERROR_MAP = {
 
     # Device configuration error codes.
     ErrorCode.EC_INVALID_DEVICE_ID: 'invalid-device-id',
+    ErrorCode.EC_CARD_INFO_READ_FAILED: 'card-info-read-failed',
 
     # Host configuration error codes.
     ErrorCode.EC_INVALID_HOST_ID: 'invalid-host-id',
@@ -58,6 +59,18 @@ ERROR_MAP = {
 
     # Defaults configuration error codes.
     ErrorCode.EC_UNKNOWN_DEFAULTS_PROFILE: 'unknown-defaults-profile',
+
+    # Module configuration error codes.
+    ErrorCode.EC_INVALID_MODULE_ID: 'invalid-module-id',
+    ErrorCode.EC_MODULE_PAGE_READ_FAILED: 'module-page-read-failed',
+    ErrorCode.EC_INVALID_MODULE_MEM_OFFSET: 'invalid-module-mem-offset',
+    ErrorCode.EC_INVALID_MODULE_MEM_PAGE: 'invalid-module-mem-page',
+    ErrorCode.EC_INVALID_MODULE_MEM_COUNT: 'invalid-module-mem-count',
+    ErrorCode.EC_MODULE_MEM_READ_FAILED: 'module-mem-read-failed',
+    ErrorCode.EC_MODULE_MEM_WRITE_FAILED: 'module-mem-write-failed',
+    ErrorCode.EC_UNKNOWN_MODULE_GPIO_TYPE: 'unknown-module-gpio-type',
+    ErrorCode.EC_MODULE_GPIO_READ_FAILED: 'module-gpio-read-failed',
+    ErrorCode.EC_MODULE_GPIO_WRITE_FAILED: 'module-gpio-write-failed',
 }
 
 def error_code_str(ec):

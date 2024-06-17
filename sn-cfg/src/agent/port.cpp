@@ -1,5 +1,6 @@
 #include "agent.hpp"
 #include "device.hpp"
+#include "stats.hpp"
 
 #include <cstdlib>
 #include <sstream>
@@ -30,7 +31,8 @@ void SmartnicConfigImpl::init_port(Device* dev) {
 
         auto stats = new DeviceStats;
         stats->name = name.str();
-        stats->zone = cmac_stats_zone_alloc(dev->stats.domain, cmac, stats->name.c_str());
+        stats->zone = cmac_stats_zone_alloc(
+            dev->stats.domains[DeviceStatsDomain::COUNTERS], cmac, stats->name.c_str());
         if (stats->zone == NULL) {
             cerr << "ERROR: Failed to alloc stats zone for port ID " << port_id << "."  << endl;
             exit(EXIT_FAILURE);
@@ -389,29 +391,9 @@ Status SmartnicConfigImpl::GetPortStatus(
 }
 
 //--------------------------------------------------------------------------------------------------
-struct GetPortStatsContext {
-    Stats* stats;
-};
-
-extern "C" {
-    static int __get_port_stats_counters(const struct stats_for_each_spec* spec,
-                                         uint64_t value, void* arg) {
-        GetPortStatsContext* ctx = static_cast<GetPortStatsContext*>(arg);
-
-        auto cnt = ctx->stats->add_counters();
-        cnt->set_domain(spec->domain->name);
-        cnt->set_zone(spec->zone->name);
-        cnt->set_block(spec->block->name);
-        cnt->set_name(spec->counter->name);
-        cnt->set_value(value);
-
-        return 0;
-    }
-}
-
-//--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::get_port_stats(
+void SmartnicConfigImpl::get_or_clear_port_stats(
     const PortStatsRequest& req,
+    bool do_clear,
     function<void(const PortStatsResponse&)> write_resp) {
     int begin_dev_id = 0;
     int end_dev_id = devices.size() - 1;
@@ -427,6 +409,21 @@ void SmartnicConfigImpl::get_port_stats(
     if (dev_id > -1) {
         begin_dev_id = dev_id;
         end_dev_id = dev_id;
+    }
+
+    GetStatsContext ctx;
+    if (!do_clear) {
+        auto filters = req.filters();
+        ctx.non_zero = filters.non_zero();
+
+        auto ntypes = filters.metric_types_size();
+        if (ntypes > 0) {
+            for (auto n = 0; n < ntypes; ++n) {
+                ctx.metric_types.set(filters.metric_types(n));
+            }
+        } else {
+            ctx.metric_types.set(StatsMetricType::STATS_METRIC_TYPE_COUNTER);
+        }
     }
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
@@ -450,12 +447,14 @@ void SmartnicConfigImpl::get_port_stats(
 
         for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
             PortStatsResponse resp;
-            auto stats = dev->stats.ports[port_id];
-            GetPortStatsContext ctx = {
-                .stats = resp.mutable_stats(),
-            };
 
-            stats_zone_for_each_counter(stats->zone, __get_port_stats_counters, &ctx);
+            if (do_clear) {
+                stats_zone_clear_metrics(dev->stats.ports[port_id]->zone);
+            } else {
+                ctx.stats = resp.mutable_stats();
+                stats_zone_for_each_metric(
+                    dev->stats.ports[port_id]->zone, get_stats_for_each_metric, &ctx);
+            }
 
             resp.set_error_code(ErrorCode::EC_OK);
             resp.set_dev_id(dev_id);
@@ -470,7 +469,7 @@ void SmartnicConfigImpl::get_port_stats(
 void SmartnicConfigImpl::batch_get_port_stats(
     const PortStatsRequest& req,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
-    get_port_stats(req, [&rdwr](const PortStatsResponse& resp) -> void {
+    get_or_clear_port_stats(req, false, [&rdwr](const PortStatsResponse& resp) -> void {
         BatchResponse bresp;
         auto stats = bresp.mutable_port_stats();
         stats->CopyFrom(resp);
@@ -484,70 +483,17 @@ Status SmartnicConfigImpl::GetPortStats(
     [[maybe_unused]] ServerContext* ctx,
     const PortStatsRequest* req,
     ServerWriter<PortStatsResponse>* writer) {
-    get_port_stats(*req, [&writer](const PortStatsResponse& resp) -> void {
+    get_or_clear_port_stats(*req, false, [&writer](const PortStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::clear_port_stats(
-    const PortStatsRequest& req,
-    function<void(const PortStatsResponse&)> write_resp) {
-    int begin_dev_id = 0;
-    int end_dev_id = devices.size() - 1;
-    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
-
-    if (dev_id > end_dev_id) {
-        PortStatsResponse resp;
-        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
-        write_resp(resp);
-        return;
-    }
-
-    if (dev_id > -1) {
-        begin_dev_id = dev_id;
-        end_dev_id = dev_id;
-    }
-
-    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
-        const auto dev = devices[dev_id];
-
-        int begin_port_id = 0;
-        int end_port_id = dev->nports - 1;
-        int port_id = req.port_id(); // 0-based index. -1 means all ports.
-        if (port_id > end_port_id) {
-            PortStatsResponse resp;
-            resp.set_error_code(ErrorCode::EC_INVALID_PORT_ID);
-            resp.set_dev_id(dev_id);
-            write_resp(resp);
-            continue;
-        }
-
-        if (port_id > -1) {
-            begin_port_id = port_id;
-            end_port_id = port_id;
-        }
-
-        for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
-            auto stats = dev->stats.ports[port_id];
-            stats_zone_clear_counters(stats->zone);
-
-            PortStatsResponse resp;
-            resp.set_error_code(ErrorCode::EC_OK);
-            resp.set_dev_id(dev_id);
-            resp.set_port_id(port_id);
-
-            write_resp(resp);
-        }
-    }
-}
-
-//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::batch_clear_port_stats(
     const PortStatsRequest& req,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
-    clear_port_stats(req, [&rdwr](const PortStatsResponse& resp) -> void {
+    get_or_clear_port_stats(req, true, [&rdwr](const PortStatsResponse& resp) -> void {
         BatchResponse bresp;
         auto stats = bresp.mutable_port_stats();
         stats->CopyFrom(resp);
@@ -561,7 +507,7 @@ Status SmartnicConfigImpl::ClearPortStats(
     [[maybe_unused]] ServerContext* ctx,
     const PortStatsRequest* req,
     ServerWriter<PortStatsResponse>* writer) {
-    clear_port_stats(*req, [&writer](const PortStatsResponse& resp) -> void {
+    get_or_clear_port_stats(*req, true, [&writer](const PortStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;

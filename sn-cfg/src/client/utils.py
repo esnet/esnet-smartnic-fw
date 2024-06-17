@@ -2,9 +2,11 @@
 __all__ = (
     'apply_options',
     'ChoiceFields',
+    'MIXED_INT',
 )
 
 import click
+import gettext
 
 #---------------------------------------------------------------------------------------------------
 def apply_options(options, fn):
@@ -33,8 +35,6 @@ class ChoiceFields(click.ParamType):
         return f'[{metavar}]'
 
     def get_missing_message(self, param):
-        import gettext
-
         names = self.sep.join(f'<{name}>' for name in self.field_names)
         choices = '\n'.join(
             '\n\t- '.join((f'- Choices for field <{name}>:',) + choices)
@@ -46,7 +46,6 @@ class ChoiceFields(click.ParamType):
         fields = value.split(self.sep)
         nfields = len(fields)
         if nfields != self.nfields:
-            import gettext
             msg = gettext.gettext(
                 f'{value!r} must have exactly {self.nfields} fields separated by "{self.sep}". '
                 f'The given value has {nfields} fields.')
@@ -54,7 +53,6 @@ class ChoiceFields(click.ParamType):
 
         for i, (field, choices) in enumerate(zip(fields, self.field_choices)):
             if field not in choices:
-                import gettext
                 choices = ' | '.join(choices)
                 msg = gettext.gettext(
                     f'Field {i+1}, with value {field!r}, is unknown. Must be one of: {choices}.')
@@ -95,3 +93,43 @@ class ChoiceFields(click.ParamType):
             for choice in choices
             for remaining in remaining_choices(self.field_choices[nfields:])
         ]
+
+#---------------------------------------------------------------------------------------------------
+INT_PREFIXES = {
+    '0b': 2,
+    '0o': 8,
+    '0x': 16,
+}
+
+class MixedInt(click.ParamType):
+    name = 'mixed_int' # Needed for auto-generated help (or implement get_metavar method instead).
+
+    def convert(self, value, param, ctx):
+        if isinstance(value, int):
+            return value
+
+        if not isinstance(value, str):
+            msg = gettext.gettext(f'"{value}" is not a known integer format.')
+            self.fail(msg, param, ctx)
+
+        try:
+            return int(value)
+        except ValueError:
+            pass
+
+        prefix = value[:2]
+        base = INT_PREFIXES.get(prefix.lower())
+        if base is None:
+            msg = gettext.gettext(
+                f'Unable to determine the numerical base for prefix "{prefix}" needed to convert '
+                f'"{value}" to an integer representation.')
+            self.fail(msg, param, ctx)
+
+        try:
+            return int(value[2:], base)
+        except ValueError:
+            msg = gettext.gettext(f'Unable to convert "{value}" as a base {base} integer.')
+            self.fail(msg, param, ctx)
+
+# Since there are no arguments, instantiate a singleton for the parameter type.
+MIXED_INT = MixedInt()

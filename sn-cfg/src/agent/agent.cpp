@@ -122,41 +122,59 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         auto dev = new Device{
             .bus_id = bus_id,
             .bar2 = bar2,
+            .cms = {},
 
             .nhosts = 2,
             .nports = 2,
             .napps = 2,
 
-            .stats = {
-                .domain = NULL,
-                .hosts = {},
-                .ports = {},
-                .sw = NULL,
-            },
+            .stats = {},
         };
 
         struct stats_domain_spec spec = {
             .name = dev->bus_id.c_str(),
-            .thread = {
-                .interval_ms = 1 * 1000,
-            },
-
+            .thread = {},
             .prometheus = {
                 .registry = prometheus.registry,
             },
         };
-        dev->stats.domain = stats_domain_alloc(&spec);
-        if (dev->stats.domain == NULL) {
-            cerr << "ERROR: Failed to allocate statistics domain for device " << bus_id << endl;
-            exit(EXIT_FAILURE);
+
+        for (auto dom = 0; dom < DeviceStatsDomain::NDOMAINS; ++dom) {
+            unsigned int seconds;
+            switch (dom) {
+            case DeviceStatsDomain::COUNTERS:
+                seconds = 1;
+                break;
+
+            case DeviceStatsDomain::MODULES:
+                seconds = 20;
+                break;
+
+            case DeviceStatsDomain::MONITORS:
+            default:
+                seconds = 10;
+                break;
+            }
+            spec.thread.interval_ms = seconds * 1000;
+
+            dev->stats.domains[dom] = stats_domain_alloc(&spec);
+            if (dev->stats.domains[dom] == NULL) {
+                cerr << "ERROR: Failed to allocate statistics domain " << dom
+                     << " on device " << bus_id << "." << endl;
+                exit(EXIT_FAILURE);
+            }
         }
 
+        init_device(dev);
         init_host(dev);
+        init_module(dev);
         init_port(dev);
         init_switch(dev);
 
-        stats_domain_clear_counters(dev->stats.domain);
-        stats_domain_start(dev->stats.domain);
+        for (auto domain : dev->stats.domains) {
+            stats_domain_clear_metrics(domain);
+            stats_domain_start(domain);
+        }
 
         devices.push_back(dev);
     }
@@ -177,10 +195,15 @@ SmartnicConfigImpl::~SmartnicConfigImpl() {
     while (!devices.empty()) {
         auto dev = devices.back();
 
+        deinit_device(dev);
         deinit_host(dev);
+        deinit_module(dev);
         deinit_port(dev);
         deinit_switch(dev);
-        stats_domain_free(dev->stats.domain);
+
+        for (auto domain : dev->stats.domains) {
+            stats_domain_free(domain);
+        }
 
         smartnic_unmap_bar2(dev->bar2);
 

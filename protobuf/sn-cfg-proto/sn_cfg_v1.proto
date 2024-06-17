@@ -13,6 +13,7 @@ enum ErrorCode {
 
     // Device configuration error codes.
     EC_INVALID_DEVICE_ID = 200;
+    EC_CARD_INFO_READ_FAILED = 201;
 
     // Host configuration error codes.
     EC_INVALID_HOST_ID = 300;
@@ -55,6 +56,18 @@ enum ErrorCode {
 
     // Defaults configuration error codes.
     EC_UNKNOWN_DEFAULTS_PROFILE = 600;
+
+    // Module configuration error codes.
+    EC_INVALID_MODULE_ID = 700;
+    EC_MODULE_PAGE_READ_FAILED = 701;
+    EC_INVALID_MODULE_MEM_OFFSET = 702;
+    EC_INVALID_MODULE_MEM_PAGE = 703;
+    EC_INVALID_MODULE_MEM_COUNT = 704;
+    EC_MODULE_MEM_READ_FAILED = 705;
+    EC_MODULE_MEM_WRITE_FAILED = 706;
+    EC_UNKNOWN_MODULE_GPIO_TYPE = 707;
+    EC_MODULE_GPIO_READ_FAILED = 708;
+    EC_MODULE_GPIO_WRITE_FAILED = 709;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -66,12 +79,48 @@ message StatsCounter {
     uint64 value = 5;
 }
 
+enum StatsMetricType {
+    STATS_METRIC_TYPE_UNKNOWN = 0; // Field is unset.
+    STATS_METRIC_TYPE_COUNTER = 1;
+    STATS_METRIC_TYPE_GAUGE = 2;
+    STATS_METRIC_TYPE_FLAG = 3;
+}
+
+message StatsMetricScope {
+    string domain = 1;
+    string zone = 2;
+    string block = 3;
+}
+
+message StatsMetricValue {
+    uint64 u64 = 1;
+    double f64 = 2;
+}
+
+message StatsMetric {
+    StatsMetricType type = 1;
+    StatsMetricScope scope = 2;
+    string name = 3;
+    StatsMetricValue value = 4;
+}
+
 message Stats {
-    repeated StatsCounter counters = 1;
+    // This field is no longer populated. Use the metrics field instead.
+    repeated StatsCounter counters = 1 [deprecated = true];
+
+    repeated StatsMetric metrics = 2;
+}
+
+message StatsFilters {
+    repeated StatsMetricType metric_types = 1; // Restrict metrics to the given type(s).
+                                               // Leave unset for all types.
+    bool non_zero = 2; // Restrict metrics to those whose value is not zero.
 }
 
 message StatsRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    StatsFilters filters = 2; // Filters to restrict statistics on get operations.
+                              // Leave unset for all statistics.
 }
 
 message StatsResponse {
@@ -109,9 +158,26 @@ message DeviceBuildInfo {
     repeated uint32 dna = 3; // Array of length 3, value from syscfg.dna[3] (same ordering).
 }
 
+message DeviceCardInfo {
+    string name = 1;
+    string profile = 2;
+    string serial_number = 3;
+    string revision = 4;
+    string sc_version = 5;
+
+    bool fan_present = 10;
+    uint32 total_power_avail = 11; // in Watts
+    string config_mode = 12;
+
+    repeated string cage_types = 20;
+
+    repeated string mac_addrs = 30;
+}
+
 message DeviceInfo {
     DevicePciInfo pci = 1;
     DeviceBuildInfo build = 2;
+    DeviceCardInfo card = 3;
 }
 
 message DeviceInfoRequest {
@@ -129,8 +195,26 @@ message DeviceSystemMonitor {
     float temperature = 2; // Value from sysmon0.temperature.
 }
 
+message DeviceStatusAlarm {
+    string source = 1;
+    string name = 2;
+    bool active = 3;
+}
+
+message DeviceStatusMonitor {
+    string source = 1;
+    string name = 2;
+    double value = 3;
+}
+
 message DeviceStatus {
-    repeated DeviceSystemMonitor sysmons = 1; // One per valid system monitor.
+    // This field is no longer populated. Use the monitors field with:
+    // - source == "sysmon<index>" ("sysmon0", "sysmon1", ...)
+    // - name == "temp"
+    repeated DeviceSystemMonitor sysmons = 1 [deprecated = true];
+
+    repeated DeviceStatusMonitor monitors = 2;
+    repeated DeviceStatusAlarm alarms = 3;
 }
 
 message DeviceStatusRequest {
@@ -173,6 +257,8 @@ message HostConfigResponse {
 message HostStatsRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
     sint32 host_id = 2; // 0-based index. Set to -1 for all host interfaces.
+    StatsFilters filters = 3; // Filters to restrict statistics on get operations.
+                              // Leave unset for all counter statistics.
 }
 
 message HostStatsResponse {
@@ -180,6 +266,158 @@ message HostStatsResponse {
     uint32 dev_id = 2;
     uint32 host_id = 3;
     Stats stats = 4;
+}
+
+//--------------------------------------------------------------------------------------------------
+enum ModuleGpioState {
+    GPIO_STATE_UNKNOWN = 0;
+    GPIO_STATE_ASSERT = 1;
+    GPIO_STATE_DEASSERT = 2;
+}
+
+message ModuleGpio {
+    // An enum is used instead of a bool in order to allow the server to detect which GPIOs
+    // are being modified during set operations.
+    ModuleGpioState reset = 1;          // read/write
+    ModuleGpioState low_power_mode = 2; // read/write
+    ModuleGpioState select = 3;         // read-only
+    ModuleGpioState present = 4;        // read-only
+    ModuleGpioState interrupt = 5;      // read-only
+}
+
+message ModuleGpioRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 mod_id = 2; // 0-based index. Set to -1 for all modules.
+
+    // Configuration data used for set operations. Leave unset for get operations.
+    ModuleGpio gpio = 3;
+}
+
+message ModuleGpioResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 mod_id = 3;
+
+    // Configuration data returned on get operations. Will be unset for set operations.
+    ModuleGpio gpio = 4;
+}
+
+message ModuleInfoVendorDate {
+    string year = 1;
+    string month = 2;
+    string day = 3;
+    string vendor = 4;
+}
+
+message ModuleInfoVendor {
+    string name = 1;
+    string oui = 2;
+    string revision = 3;
+    string part_number = 4;
+    string serial_number = 5;
+    string clei = 6;
+    ModuleInfoVendorDate date = 7;
+}
+
+message ModuleInfoSpecComplianceFibre {
+    repeated string length = 1; // List of support fibre lengths. May be empty.
+    repeated string tx_technology = 2; // List of support fibre Tx technology types. May be empty.
+    repeated string media = 3; // List of support fibre media types. May be empty.
+    repeated string speed = 4; // List of support fibre speeds. May be empty.
+}
+
+message ModuleInfoSpecCompliance {
+    repeated string ethernet = 1; // List of supported ethernet types. May be empty.
+    repeated string sonet = 2; // List of supported SONET types. May be empty.
+    repeated string sas = 3; // List of supported SAS types. May be empty.
+    repeated string gigabit_ethernet = 4; // List of supported GigaBit ethernet types. May be empty.
+    ModuleInfoSpecComplianceFibre fibre = 5;
+}
+
+message ModuleInfoDeviceIdentifier {
+    string identifier = 1;
+    string revision_compliance = 2;
+    bytes optional_upper_pages = 3; // List of supported upper pages (each byte is a page number).
+    uint32 power_class = 4;
+    bool rx_cdr = 5;
+    bool tx_cdr = 6;
+    string connector_type = 7;
+    string encoding = 8;
+    uint32 baud_rate = 9; // in Megabaud
+    ModuleInfoSpecCompliance spec_compliance = 10;
+}
+
+message ModuleInfoDevice {
+    ModuleInfoDeviceIdentifier identifier = 1;
+}
+
+message ModuleInfo {
+    ModuleInfoVendor vendor = 1;
+    ModuleInfoDevice device = 2;
+}
+
+message ModuleInfoRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 mod_id = 2; // 0-based index. Set to -1 for all modules.
+}
+
+message ModuleInfoResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 mod_id = 3;
+    ModuleInfo info = 4;
+}
+
+message ModuleMem {
+    uint32 offset = 1; // Offset into the 256 byte module memory. Memory is divided in 2 128 byte
+                       // pages, where the lower page (bytes 0-127) are fixed and the upper page
+                       // (bytes 128-255) are dynamically selected by the page index.
+    uint32 page = 2;   // Index used to select one of 256 possible dynamic upper memory pages. Only
+                       // needed when accessing bytes in the offset range 128-255.
+    uint32 count = 3;  // For get operations, indicates the number of bytes to read starting from
+                       // the given offset. Must not exceed 256 bytes (offset + count <= 256).
+                       // Not used for set operations.
+    bytes data = 4;    // Bytes returned on get operations or given for set operations.
+}
+
+message ModuleMemRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 mod_id = 2; // 0-based index. Set to -1 for all modules.
+    ModuleMem mem = 3;
+}
+
+message ModuleMemResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 mod_id = 3;
+    ModuleMem mem = 4;        // Data returned on get operations. Will be unset for set operations.
+}
+
+message ModuleStatusAlarm {
+    string name = 1;
+    bool active = 2;
+}
+
+message ModuleStatusMonitor {
+    string name = 1;
+    double value = 2;
+}
+
+message ModuleStatus {
+    repeated ModuleStatusAlarm alarms = 1;
+    repeated ModuleStatusMonitor monitors = 2;
+}
+
+message ModuleStatusRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 mod_id = 2; // 0-based index. Set to -1 for all modules.
+}
+
+message ModuleStatusResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 mod_id = 3;
+    ModuleStatus status = 4;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -249,6 +487,8 @@ message PortStatusResponse {
 message PortStatsRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
     sint32 port_id = 2; // 0-based index. Set to -1 for all ports.
+    StatsFilters filters = 3; // Filters to restrict statistics on get operations.
+                              // Leave unset for all counter statistics.
 }
 
 message PortStatsResponse {
@@ -327,6 +567,8 @@ message SwitchConfigResponse {
 
 message SwitchStatsRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    StatsFilters filters = 2; // Filters to restrict statistics on get operations.
+                              // Leave unset for all counter statistics.
 }
 
 message SwitchStatsResponse {
@@ -371,6 +613,12 @@ message BatchRequest {
 
         // Statistics configuration.
         StatsRequest stats = 60;
+
+        // Module configuration.
+        ModuleInfoRequest module_info = 70;
+        ModuleStatusRequest module_status = 71;
+        ModuleMemRequest module_mem = 72;
+        ModuleGpioRequest module_gpio = 73;
     };
 }
 
@@ -402,6 +650,12 @@ message BatchResponse {
 
         // Statistics configuration.
         StatsResponse stats = 60;
+
+        // Module configuration.
+        ModuleInfoResponse module_info = 70;
+        ModuleStatusResponse module_status = 71;
+        ModuleMemResponse module_mem = 72;
+        ModuleGpioResponse module_gpio = 73;
     };
 }
 
@@ -422,6 +676,14 @@ service SmartnicConfig {
     rpc SetHostConfig(HostConfigRequest) returns (stream HostConfigResponse);
     rpc GetHostStats(HostStatsRequest) returns (stream HostStatsResponse);
     rpc ClearHostStats(HostStatsRequest) returns (stream HostStatsResponse);
+
+    // Module configuration.
+    rpc GetModuleGpio(ModuleGpioRequest) returns (stream ModuleGpioResponse);
+    rpc SetModuleGpio(ModuleGpioRequest) returns (stream ModuleGpioResponse);
+    rpc GetModuleInfo(ModuleInfoRequest) returns (stream ModuleInfoResponse);
+    rpc GetModuleMem(ModuleMemRequest) returns (stream ModuleMemResponse);
+    rpc SetModuleMem(ModuleMemRequest) returns (stream ModuleMemResponse);
+    rpc GetModuleStatus(ModuleStatusRequest) returns (stream ModuleStatusResponse);
 
     // Port configuration.
     rpc GetPortConfig(PortConfigRequest) returns (stream PortConfigResponse);

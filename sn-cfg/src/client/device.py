@@ -48,16 +48,37 @@ def _show_device_info(dev_id, info):
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
+    pci = info.pci
     rows.append('PCI:')
-    rows.append(f'    Bus ID:    {info.pci.bus_id}')
-    rows.append(f'    Vendor ID: 0x{info.pci.vendor_id:04x}')
-    rows.append(f'    Device ID: 0x{info.pci.device_id:04x}')
+    rows.append(f'    Bus ID:    {pci.bus_id}')
+    rows.append(f'    Vendor ID: 0x{pci.vendor_id:04x}')
+    rows.append(f'    Device ID: 0x{pci.device_id:04x}')
 
+    build = info.build
     rows.append('Build:')
-    rows.append(f'    Number: 0x{info.build.number:08x}')
-    rows.append(f'    Status: 0x{info.build.status:08x}')
-    for i, d in enumerate(info.build.dna):
+    rows.append(f'    Number: 0x{build.number:08x}')
+    rows.append(f'    Status: 0x{build.status:08x}')
+    for i, d in enumerate(build.dna):
         rows.append(f'    DNA[{i}]: 0x{d:08x}')
+
+    card = info.card
+    rows.append('Card:')
+    rows.append(f'    Name:                  {card.name}')
+    rows.append(f'    Profile:               {card.profile}')
+    rows.append(f'    Serial Number:         {card.serial_number}')
+    rows.append(f'    Revision:              {card.revision}')
+    rows.append(f'    SC Version:            {card.sc_version}')
+    rows.append(f'    Config Mode:           {card.config_mode}')
+    rows.append(f'    Fan Present:           {card.sc_version}')
+    rows.append(f'    Total Power Available: {card.total_power_avail}W')
+
+    rows.append(f'    Cage Types:')
+    for i, cage_type in enumerate(card.cage_types):
+        rows.append(f'        {i}: {cage_type}')
+
+    rows.append(f'    MAC Addresses:')
+    for i, addr in enumerate(card.mac_addrs):
+        rows.append(f'        {i}: {addr}')
 
     click.echo('\n'.join(rows))
 
@@ -86,7 +107,7 @@ def batch_device_info(op, **kargs):
     return batch_generate_device_info_req(op, **kargs), batch_process_device_info_resp
 
 #---------------------------------------------------------------------------------------------------
-def device_status_req(dev_id):
+def device_status_req(dev_id, **status_kargs):
     return DeviceStatusRequest(dev_id=dev_id)
 
 #---------------------------------------------------------------------------------------------------
@@ -105,41 +126,70 @@ def rpc_get_device_status(stub, **kargs):
         yield resp.dev_id, resp.status
 
 #---------------------------------------------------------------------------------------------------
-def _show_device_status(dev_id, status):
+def _show_device_status(dev_id, status, kargs):
     rows = []
     rows.append(HEADER_SEP)
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
-    if status.sysmons:
-        rows.append('System Monitors:')
-        for sm in status.sysmons:
-            rows.append(f'    {sm.index}:')
-            rows.append(f'        temperature: {sm.temperature:7.3f}℃')
+    if status.alarms:
+        all_alarms = kargs.get('all_alarms', False)
+        alarms = {}
+        for alarm in status.alarms:
+            if all_alarms or alarm.active:
+                src = alarms.setdefault(alarm.source, {})
+                src[alarm.name] = "yes" if alarm.active else "no"
+
+        if alarms:
+            rows.append('Device Alarms:')
+            for src in sorted(alarms):
+                rows.append(f'    {src}:')
+
+                name_len = max(len(name) for name in alarms[src])
+                for name in sorted(alarms[src]):
+                    rows.append(f'        {name:>{name_len}}: {alarms[src][name]}')
+
+    if status.monitors:
+        monitors = {}
+        for mon in status.monitors:
+            src = monitors.setdefault(mon.source, {})
+            src[mon.name] = f'{mon.value:.4g}'
+
+        rows.append('Device Monitors:')
+        for src in sorted(monitors):
+            rows.append(f'    {src}:')
+
+            name_len = max(len(name) for name in monitors[src])
+            for name in sorted(monitors[src]):
+                rows.append(f'        {name:>{name_len}}: {monitors[src][name]}')
+
     click.echo('\n'.join(rows))
 
 def show_device_status(client, **kargs):
     for dev_id, status in rpc_get_device_status(client.stub, **kargs):
-        _show_device_status(dev_id, status)
+        _show_device_status(dev_id, status, kargs)
 
 #---------------------------------------------------------------------------------------------------
 def batch_generate_device_status_req(op, **kargs):
     yield BatchRequest(op=op, device_status=device_status_req(**kargs))
 
-def batch_process_device_status_resp(resp):
-    if not resp.HasField('device_status'):
-        return False
+def batch_process_device_status_resp(kargs):
+    def process(resp):
+        if not resp.HasField('device_status'):
+            return False
 
-    resp = resp.device_status
-    if resp.error_code != ErrorCode.EC_OK:
-        raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+        resp = resp.device_status
+        if resp.error_code != ErrorCode.EC_OK:
+            raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('status'):
-        _show_device_status(resp.dev_id, resp.status)
-    return True
+        if resp.HasField('status'):
+            _show_device_status(resp.dev_id, resp.status, kargs)
+        return True
+
+    return process
 
 def batch_device_status(op, **kargs):
-    return batch_generate_device_status_req(op, **kargs), batch_process_device_status_resp
+    return batch_generate_device_status_req(op, **kargs), batch_process_device_status_resp(kargs)
 
 #---------------------------------------------------------------------------------------------------
 device_id_option = click.option(
@@ -156,7 +206,18 @@ def device_info_options(fn):
     )
     return apply_options(options, fn)
 
-device_status_options = device_info_options
+def device_status_options(fn):
+    options = (
+        device_id_option,
+        click.option(
+            '--all-alarms',
+            is_flag=True,
+            help='''
+            Include all alarms in the display. Default is to only display active alarms.
+            ''',
+        ),
+    )
+    return apply_options(options, fn)
 
 #---------------------------------------------------------------------------------------------------
 def add_batch_commands(cmd):

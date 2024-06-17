@@ -1,5 +1,6 @@
 #include "agent.hpp"
 #include "device.hpp"
+#include "stats.hpp"
 
 #include <cstdlib>
 
@@ -16,7 +17,8 @@ using namespace std;
 void SmartnicConfigImpl::init_switch(Device* dev) {
     auto stats = new DeviceStats;
     stats->name = "switch";
-    stats->zone = switch_stats_zone_alloc(dev->stats.domain, dev->bar2, stats->name.c_str());
+    stats->zone = switch_stats_zone_alloc(
+        dev->stats.domains[DeviceStatsDomain::COUNTERS], dev->bar2, stats->name.c_str());
     if (stats->zone == NULL) {
         cerr << "ERROR: Failed to alloc stats zone for switch." << endl;
         exit(EXIT_FAILURE);
@@ -494,29 +496,9 @@ Status SmartnicConfigImpl::SetSwitchConfig(
 }
 
 //--------------------------------------------------------------------------------------------------
-struct GetSwitchStatsContext {
-    Stats* stats;
-};
-
-extern "C" {
-    static int __get_switch_stats_counters(const struct stats_for_each_spec* spec,
-                                           uint64_t value, void* arg) {
-        GetSwitchStatsContext* ctx = static_cast<GetSwitchStatsContext*>(arg);
-
-        auto cnt = ctx->stats->add_counters();
-        cnt->set_domain(spec->domain->name);
-        cnt->set_zone(spec->zone->name);
-        cnt->set_block(spec->block->name);
-        cnt->set_name(spec->counter->name);
-        cnt->set_value(value);
-
-        return 0;
-    }
-}
-
-//--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::get_switch_stats(
+void SmartnicConfigImpl::get_or_clear_switch_stats(
     const SwitchStatsRequest& req,
+    bool do_clear,
     function<void(const SwitchStatsResponse&)> write_resp) {
     int begin_dev_id = 0;
     int end_dev_id = devices.size() - 1;
@@ -534,14 +516,31 @@ void SmartnicConfigImpl::get_switch_stats(
         end_dev_id = dev_id;
     }
 
+    GetStatsContext ctx;
+    if (!do_clear) {
+        auto filters = req.filters();
+        ctx.non_zero = filters.non_zero();
+
+        auto ntypes = filters.metric_types_size();
+        if (ntypes > 0) {
+            for (auto n = 0; n < ntypes; ++n) {
+                ctx.metric_types.set(filters.metric_types(n));
+            }
+        } else {
+            ctx.metric_types.set(StatsMetricType::STATS_METRIC_TYPE_COUNTER);
+        }
+    }
+
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
         SwitchStatsResponse resp;
-        GetSwitchStatsContext ctx = {
-            .stats = resp.mutable_stats(),
-        };
 
-        stats_zone_for_each_counter(dev->stats.sw->zone, __get_switch_stats_counters, &ctx);
+        if (do_clear) {
+            stats_zone_clear_metrics(dev->stats.sw->zone);
+        } else {
+            ctx.stats = resp.mutable_stats();
+            stats_zone_for_each_metric(dev->stats.sw->zone, get_stats_for_each_metric, &ctx);
+        }
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);
@@ -554,7 +553,7 @@ void SmartnicConfigImpl::get_switch_stats(
 void SmartnicConfigImpl::batch_get_switch_stats(
     const SwitchStatsRequest& req,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
-    get_switch_stats(req, [&rdwr](const SwitchStatsResponse& resp) -> void {
+    get_or_clear_switch_stats(req, false, [&rdwr](const SwitchStatsResponse& resp) -> void {
         BatchResponse bresp;
         auto stats = bresp.mutable_switch_stats();
         stats->CopyFrom(resp);
@@ -568,49 +567,17 @@ Status SmartnicConfigImpl::GetSwitchStats(
     [[maybe_unused]] ServerContext* ctx,
     const SwitchStatsRequest* req,
     ServerWriter<SwitchStatsResponse>* writer) {
-    get_switch_stats(*req, [&writer](const SwitchStatsResponse& resp) -> void {
+    get_or_clear_switch_stats(*req, false, [&writer](const SwitchStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::clear_switch_stats(
-    const SwitchStatsRequest& req,
-    function<void(const SwitchStatsResponse&)> write_resp) {
-    int begin_dev_id = 0;
-    int end_dev_id = devices.size() - 1;
-    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
-
-    if (dev_id > end_dev_id) {
-        SwitchStatsResponse resp;
-        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
-        write_resp(resp);
-        return;
-    }
-
-    if (dev_id > -1) {
-        begin_dev_id = dev_id;
-        end_dev_id = dev_id;
-    }
-
-    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
-        const auto dev = devices[dev_id];
-        stats_zone_clear_counters(dev->stats.sw->zone);
-
-        SwitchStatsResponse resp;
-        resp.set_error_code(ErrorCode::EC_OK);
-        resp.set_dev_id(dev_id);
-
-        write_resp(resp);
-    }
-}
-
-//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::batch_clear_switch_stats(
     const SwitchStatsRequest& req,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
-    clear_switch_stats(req, [&rdwr](const SwitchStatsResponse& resp) -> void {
+    get_or_clear_switch_stats(req, true, [&rdwr](const SwitchStatsResponse& resp) -> void {
         BatchResponse bresp;
         auto stats = bresp.mutable_switch_stats();
         stats->CopyFrom(resp);
@@ -624,7 +591,7 @@ Status SmartnicConfigImpl::ClearSwitchStats(
     [[maybe_unused]] ServerContext* ctx,
     const SwitchStatsRequest* req,
     ServerWriter<SwitchStatsResponse>* writer) {
-    clear_switch_stats(*req, [&writer](const SwitchStatsResponse& resp) -> void {
+    get_or_clear_switch_stats(*req, true, [&writer](const SwitchStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;
