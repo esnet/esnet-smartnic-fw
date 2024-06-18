@@ -165,7 +165,7 @@ message DeviceCardInfo {
     string revision = 4;
     string sc_version = 5;
 
-    bool fan_present = 10;
+    string fan_presence = 10;
     uint32 total_power_avail = 11; // in Watts
     string config_mode = 12;
 
