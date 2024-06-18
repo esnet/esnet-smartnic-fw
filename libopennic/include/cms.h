@@ -81,7 +81,7 @@ struct cms_card_info {
     const char* revision;
     const char* sc_version;
 
-    bool fan_present;
+    char fan_presence;
     unsigned int total_power_avail;
     enum cms_card_info_config_mode config_mode;
 

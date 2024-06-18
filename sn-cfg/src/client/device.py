@@ -69,7 +69,7 @@ def _show_device_info(dev_id, info):
     rows.append(f'    Revision:              {card.revision}')
     rows.append(f'    SC Version:            {card.sc_version}')
     rows.append(f'    Config Mode:           {card.config_mode}')
-    rows.append(f'    Fan Present:           {card.sc_version}')
+    rows.append(f'    Fan Presence:          {card.fan_presence}')
     rows.append(f'    Total Power Available: {card.total_power_avail}W')
 
     rows.append(f'    Cage Types:')

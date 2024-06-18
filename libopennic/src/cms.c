@@ -472,7 +472,7 @@ static size_t cms_card_info_parse_field(struct cms_card_info_field* field,
             break;
         }
 
-        info->fan_present = field->value.u8 != '0';
+        info->fan_presence = field->value.u8;
         break;
 
     case cms_card_info_key_CONFIG_MODE:

@@ -154,7 +154,7 @@ static ErrorCode add_card_info(Device* dev, DeviceInfo* info) {
     card->set_revision(ci->revision);
     card->set_sc_version(ci->sc_version);
 
-    card->set_fan_present(ci->fan_present);
+    card->set_fan_presence(&ci->fan_presence, 1);
     card->set_total_power_avail(ci->total_power_avail);
     card->set_config_mode(cms_card_info_config_mode_to_str(ci->config_mode));
 
