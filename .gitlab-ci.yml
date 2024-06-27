@@ -6,9 +6,12 @@ include:
   - project: 'ht/cicd-common'
     ref: 'main'
     file: 'smartnic-ansible.yml'
-  - project: 'ht/cicd-common'
-    ref: 'main'
-    file: 'harbor-cve.yml'
+  - component: $CI_SERVER_FQDN/ht/cicd-common/harbor-cve@main
+    inputs:
+      harbor_host:    $HSITE
+      harbor_user:    $HUSER_CVE
+      harbor_token:   $HTOKEN_CVE
+      harbor_project: $CI_PROJECT_NAMESPACE
 
 workflow:
   name: '$SN_HW_APP_NAME - $SN_HW_GROUP/$SN_HW_REPO ($SN_HW_BRANCH) $SN_HW_BOARD'
