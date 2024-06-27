@@ -261,47 +261,6 @@ review:
     - package
     - wharf_release
 
-# This is an unfortunate hack to workaround downstream SW build failures.
-#
-# This repo's pipeline is invoked by many different HW/FPGA builds.  This results in the "latest successful" build
-# containing a fairly random choice of a HW pipeline.  The downstream SW repo for HT wants to pull the artifacts
-# from the "latest successful" FW pipeline as part of its builds.  This job ensures that we force the FW pipelines
-# to "fail" whenever they're non-HT builds so they are no longer candidates for "latest successful".
-#
-# Note that this failure does not stop this FW pipeline from producing a perfectly usable artifact.  It only
-# prevents non-HT pipelines from looking "successful" from the perspective of gitlab CI.
-
-fail_if_not_default_context:
-  stage: trigger_downstream
-  image: ubuntu:focal
-  script:
-    - |
-      echo "Default Context"
-      cat <<_EOF | tee def_context.txt
-      SN_HW_GROUP:    $SN_HW_GROUP_DEFAULT
-      SN_HW_REPO:     $SN_HW_REPO_DEFAULT
-      SN_HW_BRANCH:   $SN_HW_BRANCH_DEFAULT
-      SN_HW_API_JOB:  $SN_HW_API_JOB_DEFAULT
-      SN_HW_BOARD:    $SN_HW_BOARD_DEFAULT
-      SN_HW_APP_NAME: $SN_HW_APP_NAME_DEFAULT
-      _EOF
-    - |
-      echo "Current Context"
-      cat <<_EOF | tee cur_context.txt
-      SN_HW_GROUP:    $SN_HW_GROUP
-      SN_HW_REPO:     $SN_HW_REPO
-      SN_HW_BRANCH:   $SN_HW_BRANCH
-      SN_HW_API_JOB:  $SN_HW_API_JOB
-      SN_HW_BOARD:    $SN_HW_BOARD
-      SN_HW_APP_NAME: $SN_HW_APP_NAME
-      _EOF
-    # Ensure that we're building in the default context
-    - diff def_context.txt cur_context.txt
-  needs:
-    - package
-  rules:
-    - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH)
-
 .trigger_sw:
   stage: trigger_downstream
   # Make sure the downstream pipeline doesn't inherit any of the global env vars from this project
