@@ -138,6 +138,8 @@ package:
     # Copy HW_APP_NAME into FW_APP_NAME
     SN_FW_APP_NAME: ${SN_HW_APP_NAME}
     SN_FW_VER: ${CI_PIPELINE_ID}
+    SN_FW_PIPELINE_ID: ${CI_PIPELINE_ID}
+    SN_FW_API_JOB: ${CI_JOB_NAME}
   before_script:
     # Install bash and GNU find (with full regex support).
     - apk add bash findutils
@@ -184,6 +186,8 @@ package:
       SN_FW_BRANCH=${SN_FW_BRANCH}
       SN_FW_APP_NAME=${SN_FW_APP_NAME}
       SN_FW_VER=${SN_FW_VER}
+      SN_FW_PIPELINE_ID=${SN_FW_PIPELINE_ID}
+      SN_FW_API_JOB=${SN_FW_API_JOB}
       SN_FW_API_JOB_NUMBER=$CI_JOB_ID
       SMARTNIC_FW_IMAGE_URI=$PUBLISH_URI$TAG_SUFFIX
       _EOF
@@ -306,12 +310,13 @@ fail_if_not_default_context:
       - SN_HW_APP_NAME
       - SN_FW_GROUP
       - SN_FW_REPO
-      - SN_FW_BRANCH
-      - SN_FW_APP_NAME
-      - SMARTNIC_FW_IMAGE_URI
+      - SN_FW_PIPELINE_ID
+      - SN_FW_API_JOB
   variables:
-    # override the artifact URL in the triggered repo so it pulls directly from the package job from this pipeline
-    ESNET_SMARTNIC_FWAPI_URL: "$CI_PROJECT_URL/-/jobs/$SN_FW_API_JOB_NUMBER/artifacts/download?file_type=archive"
+    SN_FW_GROUP: ${SN_FW_GROUP}
+    SN_FW_REPO: ${SN_FW_REPO}
+    SN_FW_PIPELINE_ID: ${SN_FW_PIPELINE_ID}
+    SN_FW_API_JOB: ${SN_FW_API_JOB}
   rules:
     # Compare HW_APP_NAME to HW_EXPECTED_APP_NAME here since the dynamically computed FW_APP_NAME is not visible to the rules section
     - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_HW_EXPECTED_APP_NAME)
@@ -324,7 +329,6 @@ trigger_sw_ht:
   variables:
     SN_HW_EXPECTED_APP_NAME: esnet-smartnic-ht
     SN_SW_APP_NAME: hightouch
-    SN_FW_API_JOB: package
   trigger:
     project: ht/hightouch-xilinx
     branch: main
@@ -337,7 +341,6 @@ trigger_sw_demo:
   variables:
     SN_HW_EXPECTED_APP_NAME: p4_only
     SN_SW_APP_NAME: demo
-    SN_FW_API_JOB: package
   trigger:
     project: ht/esnet-smartnic-sw-demo
     branch: main
