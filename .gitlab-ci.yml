@@ -109,14 +109,14 @@ pull_sn_hw:
   needs: []
 
 .docker:
-  image: docker:20.10.21
+  image: docker:26.1
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERT_DIR: ""
     INTERNAL_IMAGE_URI: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
     PUBLISH_URI: $HSITE/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
   services:
-    - docker:20.10.21-dind
+    - docker:26.1-dind
 
 pull_cve_allowlist:
   extends: .harbor_cve_allowlist
