@@ -3,9 +3,10 @@ include:
   - template: 'Workflows/Branch-Pipelines.gitlab-ci.yml'
   - project: 'security/container-scanning'
     file: '.ESnet-container-scan.yml'
-  - project: 'ht/cicd-common'
-    ref: 'main'
-    file: 'smartnic-ansible.yml'
+  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@main
+    inputs:
+      aap_host:  $AAP_HOST
+      aap_token: $AAP_TOKEN
   - component: $CI_SERVER_FQDN/ht/cicd-common/harbor-cve@main
     inputs:
       harbor_host:    $HSITE
@@ -234,7 +235,7 @@ wharf_release:
     - package
 
 review:
-  extends: .ansible_stack_start
+  extends: .aap_run
   stage: review
   environment:
     name: review/${AAP_LIMIT}
@@ -248,13 +249,11 @@ review:
           - ftap-ht3.es.net
           - ftap-ht4.es.net
   variables:
-    ARTIFACT_JOB_ID: ${SN_FW_API_JOB_NUMBER}
     # host, hostgroup or list of hosts
     # AAP_LIMIT: # from parallel matrix
     # AAP job template
     AAP_JOB_TEMPLATE: 458
-    # AAP_TOKEN: from gitlab variables
-    # AAP_HOST:  from gitlab variables
+    EXTRA_VARS: "{ 'jobid': ${SN_FW_API_JOB_NUMBER} }"
   rules:
     - when: manual
       allow_failure: true
