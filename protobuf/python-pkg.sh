@@ -8,6 +8,7 @@ pkg_ver="$1"; shift
 pkg_desc="$1"; shift
 priv_dir="$1"; shift
 out_dir="$1"; shift
+src_dir="$1"; shift
 inputs=( "$@" )
 
 pkg_dir="${priv_dir}/${pkg_name}"
@@ -17,7 +18,7 @@ mkdir -p "${pkg_dir}"
 
 # Copy over static Python library files from the source tree.
 for input in "${inputs[@]}"; do
-    base=$(basename "${input}")
+    base="${input#${src_dir}}"
 
     # Filter-out the protobuf/grpc generated files.
     if [[ "${base}" =~ '_pb2' ]]; then
@@ -25,9 +26,11 @@ for input in "${inputs[@]}"; do
     fi
 
     dst="${pkg_dir}/${base}"
-    if ! [[ -e "${dst}" ]]; then
-        cp -v "${input}" "${pkg_dir}/."
+    dst_dir=$(dirname "${dst}")
+    if ! [[ -e "${dst_dir}" ]]; then
+        mkdir -p "${dst_dir}"
     fi
+    cp -v "${input}" "${dst}"
 done
 
 #---------------------------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 #---------------------------------------------------------------------------------------------------
-from sn_p4_v1_pb2 import *
-from sn_p4_v1_pb2_grpc import *
+from . import v1
+from . import v2
 
-# For RPCs with an empty request message, call the RPC as client.rpc(Empty()).
-from google.protobuf.empty_pb2 import Empty
+# Continue exporting v1 interface until legacy uses are converted to v2.
+from .v1 import *

@@ -19,7 +19,7 @@ sn_p4_cli = executable(
     libgmp_dep,
     libopennic_dep,
     libsnp4_dep,
-    sn_p4_proto_cpp,
+    sn_p4_v1_proto_cpp,
   ],
   install : true,
 )

@@ -1,4 +1,3 @@
 #---------------------------------------------------------------------------------------------------
-import sn_p4_proto.v1 as proto
-
-from .client import *
+from sn_p4_v2_pb2 import *
+from sn_p4_v2_pb2_grpc import *
