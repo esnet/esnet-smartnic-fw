@@ -374,6 +374,43 @@ static enum snp4_status snp4_info_get_tables(struct snp4_info_table * tables, ui
   return SNP4_STATUS_OK;
 }
 
+static enum snp4_status snp4_info_get_counter_blocks(struct snp4_info_counter_block * counter_blocks, uint16_t max_counter_blocks, uint16_t * num_counter_blocks, XilVitisNetP4TargetCounterConfig * cfg_counters[], unsigned int size) {
+  // Make sure our info struct will hold all of this pipeline's counter blocks
+  if (size > max_counter_blocks) {
+    return SNP4_STATUS_INFO_TOO_MANY_COUNTER_BLOCKS;
+  }
+  *num_counter_blocks = size;
+
+  for (unsigned int idx = 0; idx < size; idx++) {
+    XilVitisNetP4TargetCounterConfig *xc = cfg_counters[idx];
+    struct snp4_info_counter_block * block = &counter_blocks[idx];
+
+    block->name = xc->NameStringPtr;
+    block->width = xc->Config.Width;
+    block->num_counters = xc->Config.NumCounters;
+
+    switch (xc->Config.CounterType) {
+    case XIL_VITIS_NET_P4_COUNTER_PACKETS:
+      block->type = SNP4_INFO_COUNTER_TYPE_PACKETS;
+      break;
+    case XIL_VITIS_NET_P4_COUNTER_BYTES:
+      block->type = SNP4_INFO_COUNTER_TYPE_BYTES;
+      break;
+    case XIL_VITIS_NET_P4_COUNTER_PACKETS_AND_BYTES:
+      block->type = SNP4_INFO_COUNTER_TYPE_PACKETS_AND_BYTES;
+      break;
+    case XIL_VITIS_NET_P4_COUNTER_FLAG:
+      block->type = SNP4_INFO_COUNTER_TYPE_FLAG;
+      break;
+    default:
+      return SNP4_STATUS_INFO_INVALID_COUNTER_TYPE;
+      break;
+    }
+  }
+
+  return SNP4_STATUS_OK;
+}
+
 enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info_pipeline * pipeline)
 {
   const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(sdnet_idx);
@@ -384,9 +421,20 @@ enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info
   pipeline->name = intf->info.name;
 
   struct XilVitisNetP4TargetConfig *cfg = intf->target.config;
-  return snp4_info_get_tables(pipeline->tables,
-			      ARRAY_SIZE(pipeline->tables),
-			      &pipeline->num_tables,
-			      cfg->TableListPtr,
-			      cfg->TableListSize);
+
+  enum snp4_status rc;
+  rc = snp4_info_get_tables(pipeline->tables,
+                            ARRAY_SIZE(pipeline->tables),
+                            &pipeline->num_tables,
+                            cfg->TableListPtr,
+                            cfg->TableListSize);
+  if (rc != SNP4_STATUS_OK) {
+      return rc;
+  }
+
+  return snp4_info_get_counter_blocks(pipeline->counter_blocks,
+                                      ARRAY_SIZE(pipeline->counter_blocks),
+                                      &pipeline->num_counter_blocks,
+                                      cfg->CounterListPtr,
+                                      cfg->CounterListSize);
 }

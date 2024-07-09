@@ -24,6 +24,38 @@ struct vitis_net_p4_drv_intf {
     } common;
 
     struct {
+        XilVitisNetP4ReturnType (*init)(
+            XilVitisNetP4CounterCtx *CtxPtr, XilVitisNetP4EnvIf *EnvIfPtr,
+            XilVitisNetP4CounterConfig *ConfigPtr);
+
+        XilVitisNetP4ReturnType (*exit)(XilVitisNetP4CounterCtx *CtxPtr);
+
+        XilVitisNetP4ReturnType (*reset)(XilVitisNetP4CounterCtx *CtxPtr);
+
+        XilVitisNetP4ReturnType (*simple_read)(
+            XilVitisNetP4CounterCtx *CtxPtr, uint32_t Index, uint64_t *ValuePtr);
+
+        XilVitisNetP4ReturnType (*simple_write)(
+            XilVitisNetP4CounterCtx *CtxPtr, uint32_t Index, uint64_t Value);
+
+        XilVitisNetP4ReturnType (*combo_read)(
+            XilVitisNetP4CounterCtx *CtxPtr, uint32_t Index,
+            uint64_t *PacketCountPtr, uint64_t *ByteCountPtr);
+
+        XilVitisNetP4ReturnType (*combo_write)(
+            XilVitisNetP4CounterCtx *CtxPtr, uint32_t Index,
+            uint64_t PacketCount, uint64_t ByteCount);
+
+        XilVitisNetP4ReturnType (*collect_simple_read)(
+            XilVitisNetP4CounterCtx *CtxPtr,  uint32_t Index,
+            uint32_t NumCounters, uint64_t *ValuePtr);
+
+        XilVitisNetP4ReturnType (*collect_combo_read)(
+            XilVitisNetP4CounterCtx *CtxPtr,  uint32_t Index,
+            uint32_t NumCounters, uint64_t *Packets, uint64_t *Bytes);
+    } counter;
+
+    struct {
         XilVitisNetP4ReturnType (*reset)(XilVitisNetP4TableCtx *CtxPtr);
 
         XilVitisNetP4ReturnType (*update)(

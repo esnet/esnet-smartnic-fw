@@ -48,6 +48,7 @@ extern void snp4_print_target_config (unsigned int sdnet_idx);
 // Define some limits for the supported pipeline properties handled by this library
 // NOTE: These are not necessarily related to the limits of the underlying hardware
 #define SNP4_MAX_PIPELINE_TABLES 64
+#define SNP4_MAX_PIPELINE_COUNTER_BLOCKS 64
 #define SNP4_MAX_TABLE_MATCHES 64
 #define SNP4_MAX_TABLE_ACTIONS 64
 #define SNP4_MAX_ACTION_PARAMS 64
@@ -116,10 +117,26 @@ struct snp4_info_table {
   uint16_t priority_bits;
 };
 
+enum snp4_info_counter_type {
+  SNP4_INFO_COUNTER_TYPE_PACKETS,
+  SNP4_INFO_COUNTER_TYPE_BYTES,
+  SNP4_INFO_COUNTER_TYPE_PACKETS_AND_BYTES,
+  SNP4_INFO_COUNTER_TYPE_FLAG,
+};
+
+struct snp4_info_counter_block {
+  const char * name;
+  enum snp4_info_counter_type type;
+  uint32_t width;
+  uint32_t num_counters;
+};
+
 struct snp4_info_pipeline {
   const char * name;
   struct snp4_info_table tables[SNP4_MAX_PIPELINE_TABLES];
   uint16_t num_tables;
+  struct snp4_info_counter_block counter_blocks[SNP4_MAX_PIPELINE_COUNTER_BLOCKS];
+  uint16_t num_counter_blocks;
 };
 
 enum snp4_status {
@@ -163,6 +180,9 @@ enum snp4_status {
   SNP4_STATUS_INFO_TOO_MANY_PARAMS,
   SNP4_STATUS_INFO_INVALID_ENDIAN,
   SNP4_STATUS_INFO_INVALID_MODE,
+
+  SNP4_STATUS_INFO_TOO_MANY_COUNTER_BLOCKS,
+  SNP4_STATUS_INFO_INVALID_COUNTER_TYPE,
 };
 
 extern enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info_pipeline * pipeline);
@@ -278,6 +298,16 @@ struct sn_cfg_set {
 
 extern struct sn_cfg_set *snp4_cfg_set_load_p4bm(FILE * f);
 extern void snp4_cfg_set_free(struct sn_cfg_set *cfg_set);
+
+// NOTE: Counters are cleared on read by the underlying vitisnetp4 driver.
+extern bool snp4_counter_simple_read(void * snp4_handle, const char * block_name, uint32_t index, uint64_t * count);
+extern bool snp4_counter_simple_write(void * snp4_handle, const char * block_name, uint32_t index, uint64_t value);
+extern bool snp4_counter_combo_read(void * snp4_handle, const char * block_name, uint32_t index, uint64_t * packets, uint64_t * bytes);
+extern bool snp4_counter_combo_write(void * snp4_handle, const char * block_name, uint32_t index, uint64_t packets, uint64_t bytes);
+extern bool snp4_counter_block_simple_read(void * snp4_handle, const char * block_name, uint64_t * counts, size_t ncounts); // counts is array of size ncounts
+extern bool snp4_counter_block_combo_read(void * snp4_handle, const char * block_name, uint64_t * packets, uint64_t * bytes, size_t ncounts); // packets/bytes are arrays of size ncounts
+extern bool snp4_counter_block_reset(void * snp4_handle, const char * block_name);
+extern bool snp4_counter_block_reset_all(void * snp4_handle);
 
 #ifdef __cplusplus
 }
