@@ -77,8 +77,6 @@ enum snp4_info_match_type {
 };
 
 struct snp4_info_match {
-  const char * name;
-
   enum snp4_info_match_type type;
   uint16_t bits;
 };
@@ -88,10 +86,22 @@ enum snp4_info_table_endian {
   SNP4_INFO_TABLE_ENDIAN_BIG = 1,
 };
 
+enum snp4_info_table_mode {
+  SNP4_INFO_TABLE_MODE_BCAM,
+  SNP4_INFO_TABLE_MODE_STCAM,
+  SNP4_INFO_TABLE_MODE_TCAM,
+  SNP4_INFO_TABLE_MODE_DCAM,
+  SNP4_INFO_TABLE_MODE_TINY_BCAM,
+  SNP4_INFO_TABLE_MODE_TINY_TCAM,
+};
+
 struct snp4_info_table {
   const char * name;
+  uint32_t num_entries;
 
   enum snp4_info_table_endian endian;
+  enum snp4_info_table_mode mode;
+  uint32_t num_masks; // Only valid when mode is SNP4_INFO_TABLE_MODE_STCAM.
 
   uint16_t key_bits;
   struct snp4_info_match matches[SNP4_MAX_TABLE_MATCHES];
@@ -107,6 +117,7 @@ struct snp4_info_table {
 };
 
 struct snp4_info_pipeline {
+  const char * name;
   struct snp4_info_table tables[SNP4_MAX_PIPELINE_TABLES];
   uint16_t num_tables;
 };
@@ -151,6 +162,7 @@ enum snp4_status {
   SNP4_STATUS_INFO_TOO_MANY_ACTIONS,
   SNP4_STATUS_INFO_TOO_MANY_PARAMS,
   SNP4_STATUS_INFO_INVALID_ENDIAN,
+  SNP4_STATUS_INFO_INVALID_MODE,
 };
 
 extern enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info_pipeline * pipeline);

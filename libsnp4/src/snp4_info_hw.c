@@ -303,6 +303,7 @@ static enum snp4_status snp4_info_get_tables(struct snp4_info_table * tables, ui
     struct snp4_info_table * table = &tables[tidx];
 
     table->name = xt->NameStringPtr;
+    table->num_entries = xt->Config.CamConfig.NumEntries;
 
     switch (xt->Config.Endian) {
     case XIL_VITIS_NET_P4_LITTLE_ENDIAN:
@@ -314,6 +315,36 @@ static enum snp4_status snp4_info_get_tables(struct snp4_info_table * tables, ui
     default:
       return SNP4_STATUS_INFO_INVALID_ENDIAN;
       break;
+    }
+
+    switch (xt->Config.Mode) {
+    case XIL_VITIS_NET_P4_TABLE_MODE_BCAM:
+        table->mode = SNP4_INFO_TABLE_MODE_BCAM;
+        break;
+
+    case XIL_VITIS_NET_P4_TABLE_MODE_STCAM:
+        table->mode = SNP4_INFO_TABLE_MODE_STCAM;
+        table->num_masks = xt->Config.CamConfig.NumMasks;
+        break;
+
+    case XIL_VITIS_NET_P4_TABLE_MODE_TCAM:
+        table->mode = SNP4_INFO_TABLE_MODE_TCAM;
+        break;
+
+    case XIL_VITIS_NET_P4_TABLE_MODE_DCAM:
+        table->mode = SNP4_INFO_TABLE_MODE_DCAM;
+        break;
+
+    case XIL_VITIS_NET_P4_TABLE_MODE_TINY_BCAM:
+        table->mode = SNP4_INFO_TABLE_MODE_TINY_BCAM;
+        break;
+
+    case XIL_VITIS_NET_P4_TABLE_MODE_TINY_TCAM:
+        table->mode = SNP4_INFO_TABLE_MODE_TINY_TCAM;
+        break;
+
+    default:
+        return SNP4_STATUS_INFO_INVALID_MODE;
     }
 
     table->key_bits = xt->Config.KeySizeBits;
@@ -350,8 +381,9 @@ enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info
     return SNP4_STATUS_NULL_PIPELINE;
   }
 
-  struct XilVitisNetP4TargetConfig *cfg = intf->target.config;
+  pipeline->name = intf->info.name;
 
+  struct XilVitisNetP4TargetConfig *cfg = intf->target.config;
   return snp4_info_get_tables(pipeline->tables,
 			      ARRAY_SIZE(pipeline->tables),
 			      &pipeline->num_tables,
