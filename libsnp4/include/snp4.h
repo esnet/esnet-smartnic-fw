@@ -170,6 +170,7 @@ extern const struct snp4_info_table * snp4_info_get_table_by_name(const struct s
 extern const struct snp4_info_action * snp4_info_get_action_by_name(const struct snp4_info_table * table, const char * action_name);
 
 enum sn_match_format {
+  SN_MATCH_FORMAT_UNSET,
   SN_MATCH_FORMAT_KEY_MASK,
   SN_MATCH_FORMAT_KEY_ONLY,
   SN_MATCH_FORMAT_PREFIX,
@@ -206,6 +207,7 @@ struct sn_match {
 };
 
 enum sn_param_format {
+  SN_PARAM_FORMAT_UNSET,
   SN_PARAM_FORMAT_UI,	/* unsigned long */
   SN_PARAM_FORMAT_MPZ,	/* mpz_t */
 };
@@ -219,12 +221,12 @@ struct sn_param {
 };
 
 struct sn_rule {
-  char * table_name;
-  
+  const char * table_name;
+
   struct sn_match matches[SNP4_MAX_TABLE_MATCHES];
   size_t num_matches;
 
-  char * action_name;
+  const char * action_name;
   struct sn_param params[SNP4_MAX_ACTION_PARAMS];
   size_t num_params;
 
@@ -245,7 +247,9 @@ struct sn_pack {
 extern enum snp4_status snp4_rule_pack(const struct snp4_info_pipeline * pipeline, const struct sn_rule * rule, struct sn_pack * pack);
 extern enum snp4_status snp4_rule_pack_matches(const struct snp4_info_match match_info_specs[], unsigned int key_size_bits, const struct sn_match matches[], size_t num_matches, struct sn_pack * pack);
 extern enum snp4_status snp4_rule_pack_params(const struct snp4_info_param param_info_specs[], unsigned int table_param_size_bits, unsigned int action_param_size_bits, const struct sn_param params[], size_t num_params, struct sn_pack * pack);
+extern void snp4_rule_init(struct sn_rule * rule);
 extern void snp4_rule_clear(struct sn_rule * rule);
+extern void snp4_pack_init(struct sn_pack * pack);
 extern void snp4_pack_clear(struct sn_pack * pack);
 extern void snp4_rule_param_clear(struct sn_param *param);
 extern void snp4_rule_match_clear(struct sn_match *match);

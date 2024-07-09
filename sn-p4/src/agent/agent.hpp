@@ -28,6 +28,13 @@ public:
     Status GetPipelineInfo(
         ServerContext*, const PipelineInfoRequest*, ServerWriter<PipelineInfoResponse>*) override;
 
+    // Table configuration.
+    Status ClearTable(ServerContext*, const TableRequest*, ServerWriter<TableResponse>*) override;
+    Status InsertTableRule(
+        ServerContext*, const TableRuleRequest*, ServerWriter<TableRuleResponse>*) override;
+    Status DeleteTableRule(
+        ServerContext*, const TableRuleRequest*, ServerWriter<TableRuleResponse>*) override;
+
 private:
     vector<Device*> devices;
 
@@ -47,6 +54,15 @@ private:
     void get_pipeline_info(const PipelineInfoRequest&, function<void(const PipelineInfoResponse&)>);
     void batch_get_pipeline_info(
         const PipelineInfoRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void clear_table(const TableRequest&, function<void(const TableResponse&)>);
+    void batch_clear_table(const TableRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void insert_or_delete_table_rule(
+        const TableRuleRequest&, bool do_insert, function<void(const TableRuleResponse&)>);
+    void batch_insert_table_rule(
+        const TableRuleRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void batch_delete_table_rule(
+        const TableRuleRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 };
 
 #endif // AGENT_HPP

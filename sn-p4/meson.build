@@ -1,6 +1,7 @@
 #---------------------------------------------------------------------------------------------------
 # C++ Agent
 cpp = meson.get_compiler('cpp')
+libgmp_dep = cc.find_library('gmp')
 libgrpcpp_reflection_dep = cpp.find_library('grpc++_reflection')
 
 cli11_dep = dependency('cli11')
@@ -14,10 +15,12 @@ executable(
         'src/agent/batch.cpp',
         'src/agent/device.cpp',
         'src/agent/pipeline.cpp',
+        'src/agent/table.cpp',
     ]),
     dependencies: [
         cli11_dep,
         jsoncpp_dep,
+        libgmp_dep,
         libgrpcpp_reflection_dep,
         libopennic_dep,
         libsnp4_dep,
@@ -51,6 +54,7 @@ custom_target(
         'src/client/device.py',
         'src/client/error.py',
         'src/client/pipeline.py',
+        'src/client/table.py',
         'src/client/utils.py',
     ],
     output: [

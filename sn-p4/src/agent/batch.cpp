@@ -51,6 +51,34 @@ Status SmartnicP4Impl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kTable:
+            switch (op) {
+            case BatchOperation::BOP_CLEAR:
+                batch_clear_table(req.table(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kTableRule:
+            switch (op) {
+            case BatchOperation::BOP_INSERT:
+                batch_insert_table_rule(req.table_rule(), rdwr);
+                break;
+
+            case BatchOperation::BOP_DELETE:
+                batch_delete_table_rule(req.table_rule(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         default:
             error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST);
             break;

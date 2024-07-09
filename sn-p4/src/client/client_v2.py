@@ -15,11 +15,13 @@ from .error import error_code_str
 from . import completions
 from . import device
 from . import pipeline
+from . import table
 
 SUB_COMMAND_MODULES = (
     completions,
     device,
     pipeline,
+    table,
 )
 
 #---------------------------------------------------------------------------------------------------
@@ -189,6 +191,21 @@ def batch_callback(ctx, results):
 
 @click_main.group
 @click.pass_context
+def clear(ctx):
+    connect_client(ctx.obj)
+
+@click_main.group
+@click.pass_context
+def delete(ctx):
+    connect_client(ctx.obj)
+
+@click_main.group
+@click.pass_context
+def insert(ctx):
+    connect_client(ctx.obj)
+
+@click_main.group
+@click.pass_context
 def show(ctx):
     connect_client(ctx.obj)
 
@@ -198,6 +215,9 @@ def main():
     cmds = Commands()
     cmds.main = click_main
     cmds.batch = batch
+    cmds.clear = clear
+    cmds.delete = delete
+    cmds.insert = insert
     cmds.show = show
 
     for mod in SUB_COMMAND_MODULES:

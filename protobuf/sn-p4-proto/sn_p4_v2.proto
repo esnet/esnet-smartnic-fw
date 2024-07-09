@@ -18,6 +18,49 @@ enum ErrorCode {
 
     // Pipeline configuration error codes.
     EC_INVALID_PIPELINE_ID = 300;
+
+    // Table configuration error codes.
+    EC_INVALID_TABLE_NAME = 400;
+    EC_FAILED_CLEAR_ALL_TABLES = 401;
+    EC_FAILED_CLEAR_TABLE = 402;
+    EC_INVALID_ACTION_NAME = 403;
+    EC_TABLE_RULE_TOO_FEW_MATCHES = 404;
+    EC_TABLE_RULE_TOO_MANY_MATCHES = 405;
+    EC_TABLE_RULE_TOO_FEW_ACTION_PARAMETERS = 406;
+    EC_TABLE_RULE_TOO_MANY_ACTION_PARAMETERS = 407;
+    EC_TABLE_RULE_INVALID_ACTION_PARAMETER_FORMAT = 408;
+    EC_TABLE_RULE_MATCH_INVALID_KEY_FORMAT = 409;
+    EC_TABLE_RULE_MATCH_INVALID_MASK_FORMAT = 410;
+    EC_TABLE_RULE_MATCH_INVALID_PREFIX_LENGTH = 411;
+    EC_TABLE_RULE_MATCH_RANGE_LOWER_TOO_BIG = 412;
+    EC_TABLE_RULE_MATCH_RANGE_UPPER_TOO_BIG = 413;
+    EC_UNKNOWN_TABLE_RULE_MATCH_TYPE = 414;
+    EC_FAILED_INSERT_TABLE_RULE = 415;
+    EC_FAILED_DELETE_TABLE_RULE = 416;
+
+    EC_TABLE_RULE_FIELD_SPEC_OVERFLOW = 450;
+    EC_TABLE_RULE_FIELD_SPEC_FORMAT_INVALID = 451;
+    EC_TABLE_RULE_FIELD_SPEC_UNKNOWN_TYPE = 452;
+    EC_TABLE_RULE_FIELD_SPEC_SIZE_MISMATCH = 453;
+    EC_TABLE_RULE_PACK_KEY_TOO_BIG = 454;
+    EC_TABLE_RULE_PACK_MASK_TOO_BIG = 455;
+    EC_TABLE_RULE_PACK_PARAMS_TOO_BIG = 456;
+    EC_TABLE_RULE_MATCH_INVALID_FORMAT = 457;
+    EC_TABLE_RULE_MATCH_MASK_TOO_WIDE = 458;
+    EC_TABLE_RULE_MATCH_INVALID_BITFIELD_MASK = 459;
+    EC_TABLE_RULE_MATCH_INVALID_CONSTANT_MASK = 460;
+    EC_TABLE_RULE_MATCH_INVALID_PREFIX_MASK = 461;
+    EC_TABLE_RULE_MATCH_INVALID_RANGE_MASK = 462;
+    EC_TABLE_RULE_MATCH_INVALID_UNUSED_MASK = 463;
+    EC_TABLE_RULE_MATCH_KEY_TOO_BIG = 464;
+    EC_TABLE_RULE_MATCH_MASK_TOO_BIG = 465;
+    EC_TABLE_RULE_INVALID_TABLE_NAME = 466;
+    EC_TABLE_RULE_INVALID_TABLE_CONFIG = 467;
+    EC_TABLE_RULE_INVALID_ACTION_FOR_TABLE = 468;
+    EC_TABLE_RULE_PARAM_INVALID_FORMAT = 469;
+    EC_TABLE_RULE_PARAM_SPEC_OVERFLOW = 470;
+    EC_TABLE_RULE_PARAM_SPEC_SIZE_MISMATCH = 471;
+    EC_TABLE_RULE_PARAM_TOO_BIG = 472;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -126,11 +169,84 @@ message PipelineInfoResponse {
 }
 
 //--------------------------------------------------------------------------------------------------
+message TableRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+    string table_name = 3; // Table to operate on. Leave empty for all tables.
+}
+
+message TableResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+}
+
+message MatchKeyMask {
+    string key = 1;
+    string mask = 2;
+}
+
+message MatchKeyOnly {
+    string key = 1;
+}
+
+message MatchKeyPrefix {
+    string key = 1;
+    uint32 prefix_length = 2;
+}
+
+message MatchRange {
+    uint32 lower = 1;
+    uint32 upper = 2;
+}
+
+message Match {
+    oneof type {
+        MatchKeyMask key_mask = 1;
+        MatchKeyOnly key_only = 2;
+        MatchKeyPrefix key_prefix = 3;
+        MatchRange range = 4;
+        bool unused = 5;
+    }
+}
+
+message ActionParameter {
+    string value = 1;
+}
+
+message Action {
+    string name = 1;
+    repeated ActionParameter parameters = 2;
+}
+
+message TableRule {
+    string table_name = 1;
+    uint32 priority = 2; // Only used for insert operation.
+    bool replace = 3; // Only used for insert operation.
+    repeated Match matches = 4;
+    Action action = 5; // Leave unset for delete operation.
+}
+
+message TableRuleRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+    TableRule rule = 4;
+}
+
+message TableRuleResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+}
+
+//--------------------------------------------------------------------------------------------------
 enum BatchOperation {
     BOP_UNKNOWN = 0; // Field is unset.
     BOP_GET = 1;
     BOP_SET = 2;
     BOP_CLEAR = 3;
+    BOP_INSERT = 4;
+    BOP_DELETE = 5;
 }
 
 message BatchRequest {
@@ -144,6 +260,10 @@ message BatchRequest {
 
         // Pipeline configuration.
         PipelineInfoRequest pipeline_info = 20;
+
+        // Table configuration.
+        TableRequest table = 30;
+        TableRuleRequest table_rule = 31;
     };
 }
 
@@ -159,6 +279,10 @@ message BatchResponse {
 
         // Pipeline configuration.
         PipelineInfoResponse pipeline_info = 20;
+
+        // Table configuration.
+        TableResponse table = 30;
+        TableRuleResponse table_rule = 31;
     };
 }
 
@@ -172,4 +296,9 @@ service SmartnicP4 {
 
     // Pipeline configuration.
     rpc GetPipelineInfo(PipelineInfoRequest) returns (stream PipelineInfoResponse);
+
+    // Table configuration.
+    rpc ClearTable(TableRequest) returns (stream TableResponse);
+    rpc InsertTableRule(TableRuleRequest) returns (stream TableRuleResponse);
+    rpc DeleteTableRule(TableRuleRequest) returns (stream TableRuleResponse);
 }
