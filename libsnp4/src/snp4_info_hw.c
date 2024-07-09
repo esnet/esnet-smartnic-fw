@@ -285,6 +285,7 @@ static enum snp4_status snp4_info_get_matches(struct snp4_info_match * matches, 
       break;
     }
   }
+  free(table_fmt);
   return SNP4_STATUS_OK;
 }
 
