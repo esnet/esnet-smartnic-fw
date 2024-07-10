@@ -13,12 +13,14 @@ executable(
         'src/agent/agent.cpp',
         'src/agent/batch.cpp',
         'src/agent/device.cpp',
+        'src/agent/pipeline.cpp',
     ]),
     dependencies: [
         cli11_dep,
         jsoncpp_dep,
         libgrpcpp_reflection_dep,
         libopennic_dep,
+        libsnp4_dep,
         sn_p4_v2_proto_cpp,
         regmap_dep,
     ],
@@ -48,6 +50,7 @@ custom_target(
         'src/client/completions.py',
         'src/client/device.py',
         'src/client/error.py',
+        'src/client/pipeline.py',
         'src/client/utils.py',
     ],
     output: [

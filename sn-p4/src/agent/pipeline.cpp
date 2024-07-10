@@ -1,0 +1,292 @@
+#include "agent.hpp"
+#include "device.hpp"
+
+#include <cstdlib>
+#include <sstream>
+
+#include <grpc/grpc.h>
+#include "sn_p4_v2.grpc.pb.h"
+
+#include "snp4.h"
+
+using namespace grpc;
+using namespace sn_p4::v2;
+using namespace std;
+
+//--------------------------------------------------------------------------------------------------
+const struct snp4_info_table*
+SmartnicP4Impl::pipeline_get_table_info(const DevicePipeline* pipeline,
+                                        const string& table_name) {
+    const auto pi = &pipeline->info;
+    for (auto idx = 0; idx < pi->num_tables; ++idx) {
+        const auto ti = &pi->tables[idx];
+        if (ti->name == table_name) {
+            return ti;
+        }
+    }
+
+    return NULL;
+}
+
+bool SmartnicP4Impl::pipeline_has_table(const DevicePipeline* pipeline, const string& table_name) {
+    return pipeline_get_table_info(pipeline, table_name) != NULL;
+}
+
+//--------------------------------------------------------------------------------------------------
+const struct snp4_info_action*
+SmartnicP4Impl::pipeline_get_table_action_info(const struct snp4_info_table* ti,
+                                               const string& action_name) {
+    for (auto idx = 0; idx < ti->num_actions; ++idx) {
+        const auto ai = &ti->actions[idx];
+        if (ai->name == action_name) {
+            return ai;
+        }
+    }
+
+    return NULL;
+}
+
+bool SmartnicP4Impl::pipeline_has_table_action(const struct snp4_info_table* ti,
+                                               const string& action_name) {
+    return pipeline_get_table_action_info(ti, action_name) != NULL;
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::init_pipeline(Device* dev) {
+    for (unsigned int id = 0; id < snp4_sdnet_count(); ++id) {
+        if (!snp4_sdnet_present(id)) {
+            continue;
+        }
+
+        auto pipeline = new DevicePipeline{
+            .id = id,
+            .handle = NULL,
+            .info = {},
+        };
+
+        pipeline->handle = snp4_init(id, (uintptr_t)dev->bar2);
+        if (pipeline->handle == NULL) {
+            cerr << "ERROR: Failed to initialize snp4/vitisnetp4 library for pipeline ID "
+                 << id << " on device " << dev->bus_id << "." << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        if (!snp4_reset_all_tables(pipeline->handle)) {
+            cerr << "ERROR: Failed to reset snp4/vitisnetp4 tables for pipeline ID "
+                 << id << " on device " << dev->bus_id << "." << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        auto rc = snp4_info_get_pipeline(id, &pipeline->info);
+        if (rc != SNP4_STATUS_OK) {
+            cerr << "ERROR: Failed to load snp4 info (" << rc << ") for pipeline ID "
+                 << id << " on device " << dev->bus_id << "." << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        dev->pipelines.push_back(pipeline);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::deinit_pipeline(Device* dev) {
+    while (!dev->pipelines.empty()) {
+        auto pipeline = dev->pipelines.back();
+        if (!snp4_deinit(pipeline->handle)) {
+            cerr << "ERROR: Failed to deinit snp4/vitisnetp4 library for pipeline ID "
+                 << pipeline->id << " on device " << dev->bus_id << "." << endl;
+        }
+
+        dev->pipelines.pop_back();
+        delete pipeline;
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::get_pipeline_info(
+    const PipelineInfoRequest& req,
+    function<void(const PipelineInfoResponse&)> write_resp) {
+    int begin_dev_id = 0;
+    int end_dev_id = devices.size() - 1;
+    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
+
+    if (dev_id > end_dev_id) {
+        PipelineInfoResponse resp;
+        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
+        write_resp(resp);
+        return;
+    }
+
+    if (dev_id > -1) {
+        begin_dev_id = dev_id;
+        end_dev_id = dev_id;
+    }
+
+    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
+        int begin_pipeline_id = 0;
+        int end_pipeline_id = dev->pipelines.size() - 1;
+        int pipeline_id = req.pipeline_id(); // 0-based index. -1 means all pipelines.
+        if (pipeline_id > end_pipeline_id) {
+            PipelineInfoResponse resp;
+            resp.set_error_code(ErrorCode::EC_INVALID_PIPELINE_ID);
+            resp.set_dev_id(dev_id);
+            write_resp(resp);
+            continue;
+        }
+
+        if (pipeline_id > -1) {
+            begin_pipeline_id = pipeline_id;
+            end_pipeline_id = pipeline_id;
+        }
+
+        for (pipeline_id = begin_pipeline_id; pipeline_id <= end_pipeline_id; ++pipeline_id) {
+            const auto pi = &dev->pipelines[pipeline_id]->info;
+            PipelineInfoResponse resp;
+            auto err = ErrorCode::EC_OK;
+
+            auto info = resp.mutable_info();
+            info->set_name(pi->name);
+
+            for (auto tidx = 0; tidx < pi->num_tables; ++tidx) {
+                const auto ti = &pi->tables[tidx];
+                auto table = info->add_tables();
+                table->set_name(ti->name);
+                table->set_num_entries(ti->num_entries);
+
+                auto endian = TableEndian::TABLE_ENDIAN_UNKNOWN;
+                switch (ti->endian) {
+                case SNP4_INFO_TABLE_ENDIAN_LITTLE:
+                    endian = TableEndian::TABLE_ENDIAN_LITTLE;
+                    break;
+
+                case SNP4_INFO_TABLE_ENDIAN_BIG:
+                    endian = TableEndian::TABLE_ENDIAN_BIG;
+                    break;
+                }
+                table->set_endian(endian);
+
+                auto mode = TableMode::TABLE_MODE_UNKNOWN;
+                switch (ti->mode) {
+                case SNP4_INFO_TABLE_MODE_BCAM:
+                    mode = TableMode::TABLE_MODE_BCAM;
+                    break;
+
+                case SNP4_INFO_TABLE_MODE_STCAM:
+                    mode = TableMode::TABLE_MODE_STCAM;
+                    table->set_num_masks(ti->num_masks);
+                    break;
+
+                case SNP4_INFO_TABLE_MODE_TCAM:
+                    mode = TableMode::TABLE_MODE_TCAM;
+                    break;
+
+                case SNP4_INFO_TABLE_MODE_DCAM:
+                    mode = TableMode::TABLE_MODE_DCAM;
+                    break;
+
+                case SNP4_INFO_TABLE_MODE_TINY_BCAM:
+                    mode = TableMode::TABLE_MODE_TINY_BCAM;
+                    break;
+
+                case SNP4_INFO_TABLE_MODE_TINY_TCAM:
+                    mode = TableMode::TABLE_MODE_TINY_TCAM;
+                    break;
+                }
+                table->set_mode(mode);
+
+                table->set_priority_required(ti->priority_required);
+                table->set_key_width(ti->key_bits);
+                table->set_response_width(ti->response_bits);
+                table->set_priority_width(ti->priority_bits);
+                table->set_action_id_width(ti->actionid_bits);
+
+                for (auto midx = 0; midx < ti->num_matches; ++midx) {
+                    const auto mi = &ti->matches[midx];
+                    auto match = table->add_matches();
+                    match->set_width(mi->bits);
+
+                    auto type = MatchType::MATCH_TYPE_UNKNOWN;
+                    switch (mi->type) {
+                    case SNP4_INFO_MATCH_TYPE_INVALID:
+                        break;
+
+                    case SNP4_INFO_MATCH_TYPE_BITFIELD:
+                        type = MatchType::MATCH_TYPE_BITFIELD;
+                        break;
+
+                    case SNP4_INFO_MATCH_TYPE_CONSTANT:
+                        type = MatchType::MATCH_TYPE_CONSTANT;
+                        break;
+
+                    case SNP4_INFO_MATCH_TYPE_PREFIX:
+                        type = MatchType::MATCH_TYPE_PREFIX;
+                        break;
+
+                    case SNP4_INFO_MATCH_TYPE_RANGE:
+                        type = MatchType::MATCH_TYPE_RANGE;
+                        break;
+
+                    case SNP4_INFO_MATCH_TYPE_TERNARY:
+                        type = MatchType::MATCH_TYPE_TERNARY;
+                        break;
+
+                    case SNP4_INFO_MATCH_TYPE_UNUSED:
+                        type = MatchType::MATCH_TYPE_UNUSED;
+                        break;
+
+                    }
+                    match->set_type(type);
+                }
+
+                for (auto aidx = 0; aidx < ti->num_actions; ++aidx) {
+                    const auto ai = &ti->actions[aidx];
+                    auto action = table->add_actions();
+
+                    action->set_name(ai->name);
+                    action->set_width(ai->param_bits);
+
+                    for (auto pidx = 0; pidx < ai->num_params; ++pidx) {
+                        const auto pi = &ai->params[pidx];
+                        auto param = action->add_parameters();
+
+                        param->set_name(pi->name);
+                        param->set_width(pi->bits);
+                    }
+                }
+            }
+
+            resp.set_error_code(err);
+            resp.set_dev_id(dev_id);
+            resp.set_pipeline_id(pipeline_id);
+
+            write_resp(resp);
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::batch_get_pipeline_info(
+    const PipelineInfoRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    get_pipeline_info(req, [&rdwr](const PipelineInfoResponse& resp) -> void {
+        BatchResponse bresp;
+        auto info = bresp.mutable_pipeline_info();
+        info->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicP4Impl::GetPipelineInfo(
+    [[maybe_unused]] ServerContext* ctx,
+    const PipelineInfoRequest* req,
+    ServerWriter<PipelineInfoResponse>* writer) {
+    get_pipeline_info(*req, [&writer](const PipelineInfoResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}

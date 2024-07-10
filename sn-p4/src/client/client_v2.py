@@ -14,10 +14,12 @@ from sn_p4_proto.v2 import ErrorCode, SmartnicP4Stub
 from .error import error_code_str
 from . import completions
 from . import device
+from . import pipeline
 
 SUB_COMMAND_MODULES = (
     completions,
     device,
+    pipeline,
 )
 
 #---------------------------------------------------------------------------------------------------

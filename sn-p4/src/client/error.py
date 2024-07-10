@@ -16,6 +16,9 @@ ERROR_MAP = {
 
     # Device configuration error codes.
     ErrorCode.EC_INVALID_DEVICE_ID: 'INVALID_DEVICE_ID',
+
+    # Pipeline configuration error codes.
+    ErrorCode.EC_INVALID_PIPELINE_ID: 'INVALID_PIPELINE_ID',
 }
 
 def error_code_str(ec):

@@ -24,12 +24,29 @@ public:
     Status GetDeviceInfo(
         ServerContext*, const DeviceInfoRequest*, ServerWriter<DeviceInfoResponse>*) override;
 
+    // Pipeline configuration.
+    Status GetPipelineInfo(
+        ServerContext*, const PipelineInfoRequest*, ServerWriter<PipelineInfoResponse>*) override;
+
 private:
     vector<Device*> devices;
 
     void get_device_info(const DeviceInfoRequest&, function<void(const DeviceInfoResponse&)>);
     void batch_get_device_info(
         const DeviceInfoRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    const struct snp4_info_table* pipeline_get_table_info(
+        const DevicePipeline* pipeline, const string& table_name);
+    bool pipeline_has_table(const DevicePipeline* pipeline, const string& table_name);
+    const struct snp4_info_action* pipeline_get_table_action_info(
+        const struct snp4_info_table* ti, const string& action_name);
+    bool pipeline_has_table_action(const struct snp4_info_table* ti, const string& action_name);
+
+    void init_pipeline(Device* dev);
+    void deinit_pipeline(Device* dev);
+    void get_pipeline_info(const PipelineInfoRequest&, function<void(const PipelineInfoResponse&)>);
+    void batch_get_pipeline_info(
+        const PipelineInfoRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 };
 
 #endif // AGENT_HPP

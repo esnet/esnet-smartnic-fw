@@ -99,7 +99,10 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids) {
         auto dev = new Device{
             .bus_id = bus_id,
             .bar2 = bar2,
+            .pipelines = {},
         };
+
+        init_pipeline(dev);
 
         devices.push_back(dev);
     }
@@ -109,6 +112,8 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids) {
 SmartnicP4Impl::~SmartnicP4Impl() {
     while (!devices.empty()) {
         auto dev = devices.back();
+
+        deinit_pipeline(dev);
 
         smartnic_unmap_bar2(dev->bar2);
 

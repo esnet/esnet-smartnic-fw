@@ -15,6 +15,9 @@ enum ErrorCode {
 
     // Device configuration error codes.
     EC_INVALID_DEVICE_ID = 200;
+
+    // Pipeline configuration error codes.
+    EC_INVALID_PIPELINE_ID = 300;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -46,6 +49,83 @@ message DeviceInfoResponse {
 }
 
 //--------------------------------------------------------------------------------------------------
+enum MatchType {
+    MATCH_TYPE_UNKNOWN = 0; // Field is unset.
+    MATCH_TYPE_BITFIELD = 1;
+    MATCH_TYPE_CONSTANT = 2;
+    MATCH_TYPE_PREFIX = 3;
+    MATCH_TYPE_RANGE = 4;
+    MATCH_TYPE_TERNARY = 5;
+    MATCH_TYPE_UNUSED = 6;
+}
+
+message MatchInfo {
+    MatchType type = 1;
+    uint32 width = 2;
+}
+
+message ActionParameterInfo {
+    string name = 1;
+    uint32 width = 2;
+}
+
+message ActionInfo {
+    string name = 1;
+    uint32 width = 2;
+    repeated ActionParameterInfo parameters = 3;
+}
+
+enum TableEndian {
+    TABLE_ENDIAN_UNKNOWN = 0; // Field is unset.
+    TABLE_ENDIAN_LITTLE = 1;
+    TABLE_ENDIAN_BIG = 2;
+}
+
+enum TableMode {
+    TABLE_MODE_UNKNOWN = 0; // Field is unset.
+    TABLE_MODE_BCAM = 1;
+    TABLE_MODE_STCAM = 2;
+    TABLE_MODE_TCAM = 3;
+    TABLE_MODE_DCAM = 4;
+    TABLE_MODE_TINY_BCAM = 5;
+    TABLE_MODE_TINY_TCAM = 6;
+}
+
+message TableInfo {
+    string name = 1;
+    uint32 num_entries = 2;
+    TableEndian endian = 3;
+    TableMode mode = 4;
+    uint32 num_masks = 5; // Only valid when mode is TABLE_MODE_STCAM.
+    bool priority_required = 6;
+
+    uint32 key_width = 10;
+    uint32 response_width = 11;
+    uint32 priority_width = 12; // Special case: 255 (0xff) means width is automatically computed.
+    uint32 action_id_width = 13;
+
+    repeated MatchInfo matches = 20;
+    repeated ActionInfo actions = 21;
+}
+
+message PipelineInfo {
+    string name = 1;
+    repeated TableInfo tables = 2;
+}
+
+message PipelineInfoRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+}
+
+message PipelineInfoResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+    PipelineInfo info = 4;
+}
+
+//--------------------------------------------------------------------------------------------------
 enum BatchOperation {
     BOP_UNKNOWN = 0; // Field is unset.
     BOP_GET = 1;
@@ -61,6 +141,9 @@ message BatchRequest {
     oneof item {
         // Device configuration.
         DeviceInfoRequest device_info = 10;
+
+        // Pipeline configuration.
+        PipelineInfoRequest pipeline_info = 20;
     };
 }
 
@@ -73,6 +156,9 @@ message BatchResponse {
     oneof item {
         // Device configuration.
         DeviceInfoResponse device_info = 10;
+
+        // Pipeline configuration.
+        PipelineInfoResponse pipeline_info = 20;
     };
 }
 
@@ -83,4 +169,7 @@ service SmartnicP4 {
 
     // Device configuration.
     rpc GetDeviceInfo(DeviceInfoRequest) returns (stream DeviceInfoResponse);
+
+    // Pipeline configuration.
+    rpc GetPipelineInfo(PipelineInfoRequest) returns (stream PipelineInfoResponse);
 }

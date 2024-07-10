@@ -39,6 +39,18 @@ Status SmartnicP4Impl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kPipelineInfo:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_pipeline_info(req.pipeline_info(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         default:
             error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST);
             break;
