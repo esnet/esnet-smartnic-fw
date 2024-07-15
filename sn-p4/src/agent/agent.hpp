@@ -2,6 +2,7 @@
 #define AGENT_HPP
 
 #include "device.hpp"
+#include "prometheus.hpp"
 #include "sn_p4_v2.grpc.pb.h"
 
 #include <string>
@@ -14,7 +15,7 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 class SmartnicP4Impl final : public SmartnicP4::Service {
 public:
-    explicit SmartnicP4Impl(const vector<string>& bus_ids);
+    explicit SmartnicP4Impl(const vector<string>& bus_ids, unsigned int prometheus_port);
     ~SmartnicP4Impl();
 
     // Batching of multiple RPCs.
@@ -35,8 +36,17 @@ public:
     Status DeleteTableRule(
         ServerContext*, const TableRuleRequest*, ServerWriter<TableRuleResponse>*) override;
 
+    // Stats configuration.
+    Status GetStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
+    Status ClearStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
+
 private:
     vector<Device*> devices;
+
+    struct {
+        prom_collector_registry_t* registry;
+        struct MHD_Daemon* daemon;
+    } prometheus;
 
     void get_device_info(const DeviceInfoRequest&, function<void(const DeviceInfoResponse&)>);
     void batch_get_device_info(
@@ -66,6 +76,13 @@ private:
         const TableRuleRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_delete_table_rule(
         const TableRuleRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void get_or_clear_stats(
+        const StatsRequest&, bool do_clear, function<void(const StatsResponse&)>);
+    void batch_get_stats(
+        const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void batch_clear_stats(
+        const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 };
 
 #endif // AGENT_HPP

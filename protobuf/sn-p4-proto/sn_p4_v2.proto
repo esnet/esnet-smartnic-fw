@@ -64,6 +64,57 @@ enum ErrorCode {
 }
 
 //--------------------------------------------------------------------------------------------------
+enum StatsMetricType {
+    STATS_METRIC_TYPE_UNKNOWN = 0; // Field is unset.
+    STATS_METRIC_TYPE_COUNTER = 1;
+    STATS_METRIC_TYPE_GAUGE = 2;
+    STATS_METRIC_TYPE_FLAG = 3;
+}
+
+message StatsMetricScope {
+    string domain = 1;
+    string zone = 2;
+    string block = 3;
+}
+
+message StatsMetricValue {
+    uint64 u64 = 1;
+    double f64 = 2;
+    uint32 index = 3; // Used to distinguish values for array metrics.
+}
+
+message StatsMetric {
+    StatsMetricType type = 1;
+    StatsMetricScope scope = 2;
+    string name = 3;
+    uint32 num_elements = 4; // Indicates the metric is a singleton when 0, an array otherwise.
+    repeated StatsMetricValue values = 5; // Will contain one value for singleton metrics and be a
+                                          // list of values for array metrics.
+}
+
+message Stats {
+    repeated StatsMetric metrics = 1;
+}
+
+message StatsFilters {
+    repeated StatsMetricType metric_types = 1; // Restrict metrics to the given type(s).
+                                               // Leave unset for all types.
+    bool non_zero = 2; // Restrict metrics to those whose value is not zero.
+}
+
+message StatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    StatsFilters filters = 2; // Filters to restrict statistics on get operations.
+                              // Leave unset for all statistics.
+}
+
+message StatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    Stats stats = 3;
+}
+
+//--------------------------------------------------------------------------------------------------
 message DevicePciInfo {
     string bus_id = 1;
     uint32 vendor_id = 2; // Only low 16-bits are valid (uint16 not supported by protobuf).
@@ -280,6 +331,9 @@ message BatchRequest {
         // Table configuration.
         TableRequest table = 30;
         TableRuleRequest table_rule = 31;
+
+        // Statistics configuration.
+        StatsRequest stats = 40;
     };
 }
 
@@ -299,6 +353,9 @@ message BatchResponse {
         // Table configuration.
         TableResponse table = 30;
         TableRuleResponse table_rule = 31;
+
+        // Statistics configuration.
+        StatsResponse stats = 40;
     };
 }
 
@@ -317,4 +374,8 @@ service SmartnicP4 {
     rpc ClearTable(TableRequest) returns (stream TableResponse);
     rpc InsertTableRule(TableRuleRequest) returns (stream TableRuleResponse);
     rpc DeleteTableRule(TableRuleRequest) returns (stream TableRuleResponse);
+
+    // Statistics configuration.
+    rpc GetStats(StatsRequest) returns (stream StatsResponse);
+    rpc ClearStats(StatsRequest) returns (stream StatsResponse);
 }

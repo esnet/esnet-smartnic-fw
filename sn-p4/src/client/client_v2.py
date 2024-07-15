@@ -15,12 +15,14 @@ from .error import error_code_str
 from . import completions
 from . import device
 from . import pipeline
+from . import stats
 from . import table
 
 SUB_COMMAND_MODULES = (
     completions,
     device,
     pipeline,
+    stats,
     table,
 )
 

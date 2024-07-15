@@ -6,6 +6,8 @@ libgrpcpp_reflection_dep = cpp.find_library('grpc++_reflection')
 
 cli11_dep = dependency('cli11')
 jsoncpp_dep = dependency('jsoncpp')
+libprom_dep = dependency('prom')
+libpromhttp_dep = dependency('promhttp')
 regmap_dep = dependency('regmap')
 
 executable(
@@ -15,6 +17,7 @@ executable(
         'src/agent/batch.cpp',
         'src/agent/device.cpp',
         'src/agent/pipeline.cpp',
+        'src/agent/stats.cpp',
         'src/agent/table.cpp',
     ]),
     dependencies: [
@@ -23,6 +26,8 @@ executable(
         libgmp_dep,
         libgrpcpp_reflection_dep,
         libopennic_dep,
+        libprom_dep,
+        libpromhttp_dep,
         libsnp4_dep,
         sn_p4_v2_proto_cpp,
         regmap_dep,
@@ -54,6 +59,7 @@ custom_target(
         'src/client/device.py',
         'src/client/error.py',
         'src/client/pipeline.py',
+        'src/client/stats.py',
         'src/client/table.py',
         'src/client/utils.py',
     ],

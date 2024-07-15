@@ -7,6 +7,11 @@ __all__ = (
 
 import click
 import gettext
+import re
+
+#---------------------------------------------------------------------------------------------------
+def natural_sort_key(item):
+    return tuple((int(d) if d.isdigit() else d) for d in re.split(r'(\d+)', item))
 
 #---------------------------------------------------------------------------------------------------
 def apply_options(options, fn):
