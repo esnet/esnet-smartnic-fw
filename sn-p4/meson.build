@@ -15,6 +15,7 @@ executable(
     files([
         'src/agent/agent.cpp',
         'src/agent/batch.cpp',
+        'src/agent/counters.cpp',
         'src/agent/device.cpp',
         'src/agent/pipeline.cpp',
         'src/agent/stats.cpp',

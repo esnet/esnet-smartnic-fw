@@ -28,6 +28,10 @@ public:
     // Pipeline configuration.
     Status GetPipelineInfo(
         ServerContext*, const PipelineInfoRequest*, ServerWriter<PipelineInfoResponse>*) override;
+    Status GetPipelineStats(
+        ServerContext*, const PipelineStatsRequest*, ServerWriter<PipelineStatsResponse>*) override;
+    Status ClearPipelineStats(
+        ServerContext*, const PipelineStatsRequest*, ServerWriter<PipelineStatsResponse>*) override;
 
     // Table configuration.
     Status ClearTable(ServerContext*, const TableRequest*, ServerWriter<TableResponse>*) override;
@@ -67,6 +71,15 @@ private:
     void get_pipeline_info(const PipelineInfoRequest&, function<void(const PipelineInfoResponse&)>);
     void batch_get_pipeline_info(
         const PipelineInfoRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_or_clear_pipeline_stats(
+        const PipelineStatsRequest&, bool do_clear, function<void(const PipelineStatsResponse&)>);
+    void batch_get_pipeline_stats(
+        const PipelineStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void batch_clear_pipeline_stats(
+        const PipelineStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void init_counters(Device* dev, DevicePipeline* pipeline);
+    void deinit_counters(DevicePipeline* pipeline);
 
     void clear_table(const TableRequest&, function<void(const TableResponse&)>);
     void batch_clear_table(const TableRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);

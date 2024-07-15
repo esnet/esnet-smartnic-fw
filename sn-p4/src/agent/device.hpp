@@ -18,6 +18,8 @@ enum DeviceStatsDomain {
 
 struct DeviceStats {
     string zone_name;
+    vector<string*> strings;
+    vector<void*> io_data;
     struct stats_zone* zone;
 };
 
@@ -26,6 +28,7 @@ struct DevicePipeline {
     unsigned int id;
     void* handle;
     struct snp4_info_pipeline info;
+    DeviceStats* stats;
 };
 
 //--------------------------------------------------------------------------------------------------

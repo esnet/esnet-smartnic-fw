@@ -1,5 +1,6 @@
 #include "agent.hpp"
 #include "device.hpp"
+#include "stats.hpp"
 
 #include <cstdlib>
 #include <sstream>
@@ -82,6 +83,7 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
             .id = id,
             .handle = NULL,
             .info = {},
+            .stats = NULL,
         };
 
         pipeline->handle = snp4_init(id, (uintptr_t)dev->bar2);
@@ -104,6 +106,8 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
+        init_counters(dev, pipeline);
+
         dev->pipelines.push_back(pipeline);
     }
 }
@@ -112,6 +116,9 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
 void SmartnicP4Impl::deinit_pipeline(Device* dev) {
     while (!dev->pipelines.empty()) {
         auto pipeline = dev->pipelines.back();
+
+        deinit_counters(pipeline);
+
         if (!snp4_deinit(pipeline->handle)) {
             cerr << "ERROR: Failed to deinit snp4/vitisnetp4 library for pipeline ID "
                  << pipeline->id << " on device " << dev->bus_id << "." << endl;
@@ -335,6 +342,131 @@ Status SmartnicP4Impl::GetPipelineInfo(
     const PipelineInfoRequest* req,
     ServerWriter<PipelineInfoResponse>* writer) {
     get_pipeline_info(*req, [&writer](const PipelineInfoResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::get_or_clear_pipeline_stats(
+    const PipelineStatsRequest& req,
+    bool do_clear,
+    function<void(const PipelineStatsResponse&)> write_resp) {
+    int begin_dev_id = 0;
+    int end_dev_id = devices.size() - 1;
+    int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
+
+    if (dev_id > end_dev_id) {
+        PipelineStatsResponse resp;
+        resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
+        write_resp(resp);
+        return;
+    }
+
+    if (dev_id > -1) {
+        begin_dev_id = dev_id;
+        end_dev_id = dev_id;
+    }
+
+    GetStatsContext ctx;
+    if (!do_clear) {
+        auto filters = req.filters();
+        ctx.non_zero = filters.non_zero();
+
+        auto ntypes = filters.metric_types_size();
+        if (ntypes > 0) {
+            for (auto n = 0; n < ntypes; ++n) {
+                ctx.metric_types.set(filters.metric_types(n));
+            }
+        } else {
+            ctx.metric_types.set(StatsMetricType::STATS_METRIC_TYPE_COUNTER);
+        }
+    }
+
+    for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
+        const auto dev = devices[dev_id];
+
+        int begin_pipeline_id = 0;
+        int end_pipeline_id = dev->pipelines.size() - 1;
+        int pipeline_id = req.pipeline_id(); // 0-based index. -1 means all pipelines.
+        if (pipeline_id > end_pipeline_id) {
+            PipelineStatsResponse resp;
+            resp.set_error_code(ErrorCode::EC_INVALID_PIPELINE_ID);
+            resp.set_dev_id(dev_id);
+            write_resp(resp);
+            continue;
+        }
+
+        if (pipeline_id > -1) {
+            begin_pipeline_id = pipeline_id;
+            end_pipeline_id = pipeline_id;
+        }
+
+        for (pipeline_id = begin_pipeline_id; pipeline_id <= end_pipeline_id; ++pipeline_id) {
+            auto pipeline = dev->pipelines[pipeline_id];
+            PipelineStatsResponse resp;
+
+            if (do_clear) {
+                stats_zone_clear_metrics(pipeline->stats->zone);
+            } else {
+                ctx.stats = resp.mutable_stats();
+                stats_zone_for_each_metric(pipeline->stats->zone, get_stats_for_each_metric, &ctx);
+            }
+
+            resp.set_error_code(ErrorCode::EC_OK);
+            resp.set_dev_id(dev_id);
+            resp.set_pipeline_id(pipeline_id);
+
+            write_resp(resp);
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::batch_get_pipeline_stats(
+    const PipelineStatsRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    get_or_clear_pipeline_stats(req, false, [&rdwr](const PipelineStatsResponse& resp) -> void {
+        BatchResponse bresp;
+        auto stats = bresp.mutable_pipeline_stats();
+        stats->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicP4Impl::GetPipelineStats(
+    [[maybe_unused]] ServerContext* ctx,
+    const PipelineStatsRequest* req,
+    ServerWriter<PipelineStatsResponse>* writer) {
+    get_or_clear_pipeline_stats(*req, false, [&writer](const PipelineStatsResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::batch_clear_pipeline_stats(
+    const PipelineStatsRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    get_or_clear_pipeline_stats(req, true, [&rdwr](const PipelineStatsResponse& resp) -> void {
+        BatchResponse bresp;
+        auto stats = bresp.mutable_pipeline_stats();
+        stats->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicP4Impl::ClearPipelineStats(
+    [[maybe_unused]] ServerContext* ctx,
+    const PipelineStatsRequest* req,
+    ServerWriter<PipelineStatsResponse>* writer) {
+    get_or_clear_pipeline_stats(*req, true, [&writer](const PipelineStatsResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;

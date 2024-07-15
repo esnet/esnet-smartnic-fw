@@ -235,6 +235,20 @@ message PipelineInfoResponse {
     PipelineInfo info = 4;
 }
 
+message PipelineStatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+    StatsFilters filters = 3; // Filters to restrict statistics on get operations.
+                              // Leave unset for all counter statistics.
+}
+
+message PipelineStatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+    Stats stats = 4;
+}
+
 //--------------------------------------------------------------------------------------------------
 message TableRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
@@ -327,6 +341,7 @@ message BatchRequest {
 
         // Pipeline configuration.
         PipelineInfoRequest pipeline_info = 20;
+        PipelineStatsRequest pipeline_stats = 21;
 
         // Table configuration.
         TableRequest table = 30;
@@ -349,6 +364,7 @@ message BatchResponse {
 
         // Pipeline configuration.
         PipelineInfoResponse pipeline_info = 20;
+        PipelineStatsResponse pipeline_stats = 21;
 
         // Table configuration.
         TableResponse table = 30;
@@ -369,6 +385,8 @@ service SmartnicP4 {
 
     // Pipeline configuration.
     rpc GetPipelineInfo(PipelineInfoRequest) returns (stream PipelineInfoResponse);
+    rpc GetPipelineStats(PipelineStatsRequest) returns (stream PipelineStatsResponse);
+    rpc ClearPipelineStats(PipelineStatsRequest) returns (stream PipelineStatsResponse);
 
     // Table configuration.
     rpc ClearTable(TableRequest) returns (stream TableResponse);
