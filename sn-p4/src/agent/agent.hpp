@@ -48,6 +48,9 @@ private:
     const struct snp4_info_action* pipeline_get_table_action_info(
         const struct snp4_info_table* ti, const string& action_name);
     bool pipeline_has_table_action(const struct snp4_info_table* ti, const string& action_name);
+    const struct snp4_info_counter_block* pipeline_get_counter_block_info(
+        const DevicePipeline* pipeline, const string& block_name);
+    bool pipeline_has_counter_block(const DevicePipeline* pipeline, const string& block_name);
 
     void init_pipeline(Device* dev);
     void deinit_pipeline(Device* dev);

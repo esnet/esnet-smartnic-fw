@@ -10,6 +10,7 @@ import grpc
 from sn_p4_proto.v2 import (
     BatchOperation,
     BatchRequest,
+    CounterType,
     ErrorCode,
     MatchType,
     PipelineInfoRequest,
@@ -53,6 +54,15 @@ TABLE_MODE_MAP = {
 }
 TABLE_MODE_RMAP = dict((name, enum) for enum, name in TABLE_MODE_MAP.items())
 
+COUNTER_TYPE_MAP = {
+    CounterType.COUNTER_TYPE_UNKNOWN: 'unknown',
+    CounterType.COUNTER_TYPE_PACKETS: 'packets',
+    CounterType.COUNTER_TYPE_BYTES: 'bytes',
+    CounterType.COUNTER_TYPE_PACKETS_AND_BYTES: 'packets-and-bytes',
+    CounterType.COUNTER_TYPE_FLAG: 'flag',
+}
+COUNTER_TYPE_RMAP = dict((name, enum) for enum, name in COUNTER_TYPE_MAP.items())
+
 #---------------------------------------------------------------------------------------------------
 def pipeline_info_req(dev_id, pipeline_id, **kargs):
     return PipelineInfoRequest(dev_id=dev_id, pipeline_id=pipeline_id)
@@ -79,7 +89,7 @@ def _show_pipeline_info(dev_id, pipeline_id, info):
     rows.append(f'Pipeline ID: {pipeline_id} on device ID {dev_id}')
     rows.append(HEADER_SEP)
 
-    COL_WIDTH = 20
+    COL_WIDTH = 28
     def add_sep_row(indent):
         indent *= 4
         prefix = ' ' * indent
@@ -96,6 +106,7 @@ def _show_pipeline_info(dev_id, pipeline_id, info):
 
     add_row(0, 'Name', info.name)
     add_row(0, 'Number of Tables', len(info.tables))
+    add_row(0, 'Number of Counter Blocks', len(info.counter_blocks))
 
     add_row(0, 'Tables', None)
     for table in info.tables:
@@ -132,6 +143,15 @@ def _show_pipeline_info(dev_id, pipeline_id, info):
                     add_sep_row(4)
                     add_row(4, 'Name', param.name)
                     add_row(4, 'Bit Width', param.width)
+
+    if info.counter_blocks:
+        add_row(0, 'Counter Blocks', None)
+        for block in info.counter_blocks:
+            add_sep_row(1)
+            add_row(1, 'Name', block.name)
+            add_row(1, 'Type', COUNTER_TYPE_MAP[block.type])
+            add_row(1, 'Width', block.width)
+            add_row(1, 'Number of Counters', block.num_counters)
 
     click.echo('\n'.join(rows))
 

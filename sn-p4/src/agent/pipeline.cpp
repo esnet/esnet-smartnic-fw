@@ -52,6 +52,26 @@ bool SmartnicP4Impl::pipeline_has_table_action(const struct snp4_info_table* ti,
 }
 
 //--------------------------------------------------------------------------------------------------
+const struct snp4_info_counter_block*
+SmartnicP4Impl::pipeline_get_counter_block_info(const DevicePipeline* pipeline,
+                                                const string& block_name) {
+    const auto pi = &pipeline->info;
+    for (auto idx = 0; idx < pi->num_counter_blocks; ++idx) {
+        const auto bi = &pi->counter_blocks[idx];
+        if (bi->name == block_name) {
+            return bi;
+        }
+    }
+
+    return NULL;
+}
+
+bool SmartnicP4Impl::pipeline_has_counter_block(const DevicePipeline* pipeline,
+                                                const string& block_name) {
+    return pipeline_get_counter_block_info(pipeline, block_name) != NULL;
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::init_pipeline(Device* dev) {
     for (unsigned int id = 0; id < snp4_sdnet_count(); ++id) {
         if (!snp4_sdnet_present(id)) {
@@ -255,6 +275,35 @@ void SmartnicP4Impl::get_pipeline_info(
                         param->set_width(pi->bits);
                     }
                 }
+            }
+
+            for (auto bidx = 0; bidx < pi->num_counter_blocks; ++bidx) {
+                const auto bi = &pi->counter_blocks[bidx];
+                auto block = info->add_counter_blocks();
+
+                block->set_name(bi->name);
+                block->set_width(bi->width);
+                block->set_num_counters(bi->num_counters);
+
+                auto type = CounterType::COUNTER_TYPE_UNKNOWN;
+                switch (bi->type) {
+                case SNP4_INFO_COUNTER_TYPE_PACKETS:
+                    type = CounterType::COUNTER_TYPE_PACKETS;
+                    break;
+
+                case SNP4_INFO_COUNTER_TYPE_BYTES:
+                    type = CounterType::COUNTER_TYPE_BYTES;
+                    break;
+
+                case SNP4_INFO_COUNTER_TYPE_PACKETS_AND_BYTES:
+                    type = CounterType::COUNTER_TYPE_PACKETS_AND_BYTES;
+                    break;
+
+                case SNP4_INFO_COUNTER_TYPE_FLAG:
+                    type = CounterType::COUNTER_TYPE_FLAG;
+                    break;
+                }
+                block->set_type(type);
             }
 
             resp.set_error_code(err);

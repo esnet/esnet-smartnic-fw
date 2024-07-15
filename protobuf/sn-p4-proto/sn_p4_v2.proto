@@ -151,9 +151,25 @@ message TableInfo {
     repeated ActionInfo actions = 21;
 }
 
+enum CounterType {
+    COUNTER_TYPE_UNKNOWN = 0;
+    COUNTER_TYPE_PACKETS = 1;
+    COUNTER_TYPE_BYTES = 2;
+    COUNTER_TYPE_PACKETS_AND_BYTES = 3;
+    COUNTER_TYPE_FLAG = 4;
+}
+
+message CounterBlockInfo {
+    string name = 1;
+    CounterType type = 2;
+    uint32 width = 3;
+    uint32 num_counters = 4;
+}
+
 message PipelineInfo {
     string name = 1;
     repeated TableInfo tables = 2;
+    repeated CounterBlockInfo counter_blocks = 3;
 }
 
 message PipelineInfoRequest {
