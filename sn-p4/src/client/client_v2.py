@@ -1,11 +1,13 @@
 #---------------------------------------------------------------------------------------------------
 __all__ = (
+    'connect_client',
     'main',
 )
 
 import click
 import grpc
 import json
+import os
 import pathlib
 import types
 
@@ -35,7 +37,40 @@ HELP_CONFIG_TLS_ROOT_CERTS = '{"client":{"tls":{"root-certs":"<PATH-TO-PEM-FILE>
 HELP_CONFIG_AUTH_TOKEN     = '{"client":{"auth":{"token":"<TOKEN>"}}}'
 
 #---------------------------------------------------------------------------------------------------
-def connect_client(client):
+def connect_client(address=None, port=None, auth_token=None,
+                   tls_root_certs=None, tls_hostname_override=None):
+    if address is None:
+        address = os.environ.get('SN_P4_CLI_ADDRESS', 'localhost')
+    if port is None:
+        port = os.environ.get('SN_P4_CLI_PORT', 50050)
+    if auth_token is None:
+        auth_token = os.environ.get('SN_P4_CLI_AUTH_TOKEN')
+    if tls_root_certs is None:
+        tls_root_certs = os.environ.get('SN_P4_CLI_TLS_ROOT_CERTS')
+    if tls_root_certs is not None:
+        tls_root_certs = pathlib.Path(tls_root_certs).read_bytes()
+    if tls_hostname_override is None:
+        tls_hostname_override = os.environ.get('SN_P4_CLI_TLS_HOSTNAME_OVERRIDE')
+
+    # Setup channel option to override the hostname used during verification.
+    # https://grpc.github.io/grpc/core/group__grpc__arg__keys.html#ga218bf55b665134a11baf07ada5980825
+    options = ()
+    if tls_hostname_override is not None:
+        options += (('grpc.ssl_target_name_override', tls_hostname_override,),)
+
+    # Setup the credentials and authentication methods.
+    tls_creds = grpc.ssl_channel_credentials(root_certificates=tls_root_certs)
+    call_creds = grpc.access_token_call_credentials(auth_token)
+    channel_creds = grpc.composite_channel_credentials(tls_creds, call_creds)
+
+    # Setup the TLS encrypted channel.
+    channel = grpc.secure_channel(f'{address}:{port}', channel_creds, options)
+
+    # Create the RPC proxy.
+    return SmartnicP4Stub(channel)
+
+#---------------------------------------------------------------------------------------------------
+def __connect_client(client):
     config = {}
     if not client.args.no_config_file:
         config_file = pathlib.Path(client.args.config_file)
@@ -76,23 +111,10 @@ def connect_client(client):
         if tls_root_certs is not None:
             tls_root_certs = pathlib.Path(tls_root_certs).read_bytes()
 
-    # Setup channel option to override the hostname used during verification.
-    # https://grpc.github.io/grpc/core/group__grpc__arg__keys.html#ga218bf55b665134a11baf07ada5980825
-    options = ()
-    if client.args.tls_hostname_override is not None:
-        options += (('grpc.ssl_target_name_override', client.args.tls_hostname_override,),)
-
-    # Setup the credentials and authentication methods.
-    tls_creds = grpc.ssl_channel_credentials(root_certificates=tls_root_certs)
-    call_creds = grpc.access_token_call_credentials(auth_token)
-    channel_creds = grpc.composite_channel_credentials(tls_creds, call_creds)
-
-    # Setup the TLS encrypted channel.
-    address = f'{client.args.address}:{client.args.port}'
-    channel = grpc.secure_channel(address, channel_creds, options)
-
     # Create the RPC proxy.
-    client.stub = SmartnicP4Stub(channel)
+    client.stub = connect_client(
+        client.args.address, client.args.port, auth_token,
+        tls_root_certs, client.args.tls_hostname_override)
 
 #---------------------------------------------------------------------------------------------------
 @click.group(
@@ -165,7 +187,7 @@ def click_main(ctx, **kargs):
 @click_main.group
 @click.pass_context
 def apply(ctx):
-    connect_client(ctx.obj)
+    __connect_client(ctx.obj)
 
 @click_main.group(chain=True)
 def batch(): ...
@@ -186,7 +208,7 @@ def batch_callback(ctx, results):
         for _, proc in results:
             yield proc
 
-    connect_client(client)
+    __connect_client(client)
     try:
         for resp in client.stub.Batch(generate()):
             if resp.error_code != ErrorCode.EC_OK:
@@ -203,27 +225,27 @@ def batch_callback(ctx, results):
 @click_main.group
 @click.pass_context
 def clear(ctx):
-    connect_client(ctx.obj)
+    __connect_client(ctx.obj)
 
 @click_main.group
 @click.pass_context
 def configure(ctx):
-    connect_client(ctx.obj)
+    __connect_client(ctx.obj)
 
 @click_main.group
 @click.pass_context
 def delete(ctx):
-    connect_client(ctx.obj)
+    __connect_client(ctx.obj)
 
 @click_main.group
 @click.pass_context
 def insert(ctx):
-    connect_client(ctx.obj)
+    __connect_client(ctx.obj)
 
 @click_main.group
 @click.pass_context
 def show(ctx):
-    connect_client(ctx.obj)
+    __connect_client(ctx.obj)
 
 #---------------------------------------------------------------------------------------------------
 def main():

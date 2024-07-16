@@ -44,7 +44,7 @@ echo '==========================================================================
 
 #---------------------------------------------------------------------------------------------------
 # Build up the command line to invoke the gRPC server.
-cmd=( sn-p4-v2-agent server )
+cmd=( sn-p4-agent server )
 
 cmd+=( "--tls-cert-chain=${cert_fullchain}" )
 cmd+=( "--tls-key=${key}" )

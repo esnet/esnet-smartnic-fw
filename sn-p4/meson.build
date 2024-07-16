@@ -11,7 +11,7 @@ libpromhttp_dep = dependency('promhttp')
 regmap_dep = dependency('regmap')
 
 executable(
-    'sn-p4-v2-agent',
+    'sn-p4-agent',
     files([
         'src/agent/agent.cpp',
         'src/agent/batch.cpp',

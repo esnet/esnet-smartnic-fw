@@ -1,4 +1,4 @@
 #---------------------------------------------------------------------------------------------------
-import sn_p4_proto.v1 as proto
+import sn_p4_proto.v2 as proto
 
-from .client import *
+from .client_v2 import connect_client

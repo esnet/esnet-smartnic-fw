@@ -87,9 +87,9 @@ Inspecting registers and interacting with the firmware
 The firmware runtime environment exists inside of the `smartnic-fw` container.  Here, we exec a shell inside of that container and have a look around.
 
 ```
-docker compose exec smartnic-fw bash
-sn-cli dev version
-regio syscfg
+docker compose exec smartnic-fw bash -l # Note: the "-l" option to bash is needed for tab completion
+sn-cfg show device info
+regio-esnet-smartnic dump dev0.bar2.syscfg
 ```
 
 (OPTIONAL) Updating the flash image to a new ESnet Smartnic flash image
@@ -108,7 +108,7 @@ docker compose up -d
 Confirm that PCIe register IO is working in your stack by querying the version registers.
 
 ```
-docker compose exec smartnic-fw sn-cli dev version
+docker compose exec smartnic-fw sn-cfg show device info
 ```
 Confirm that the "DNA" register is **not** showing 0xfffff... as its contents.
 
@@ -136,7 +136,7 @@ docker compose up -d
 Confirm that PCIe register IO is working in your stack by querying the version registers.
 
 ```
-docker compose exec smartnic-fw sn-cli dev version
+docker compose exec smartnic-fw sn-cfg show device info
 ```
 Confirm that the "DNA" register is **not** showing 0xfffff... as its contents.
 
@@ -375,89 +375,90 @@ sn-cli sw app0-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
 sn-cli sw app1-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
 ```
 
-Using the sn-p4-cli tool
-------------------------
+# Using the sn-p4 tool
 
-The user's p4 application embedded within the smartnic design may have configurable lookup tables which are used during the wire-speed execution of the packet processing pipeline.  The sn-p4-cli tool provides subcommands to help you to manage the rules in all of the lookup tables defined in your p4 program.
+The user's p4 application embedded within the smartnic design may have configurable lookup tables which are used during the wire-speed execution of the packet processing pipeline.  The sn-p4 tool provides subcommands to help you to manage the rules in all of the lookup tables defined in your p4 program.
 
 All commands described below are expected to be executed within the `smartnic-fw` container environment.  Use this command to enter the appropriate environment.
 ```
-docker compose exec smartnic-fw bash
+docker compose exec smartnic-fw bash -l
 ```
 
-The `sn-p4-cli` tool will automatically look for an environment variable called `SN_P4_CLI_SERVER` which can be set to the hostname of the `sn-p4-agent` that will perform all of the requested actions on the real hardware.  In the `smartnic-fw` container, this value will already be set for you.
+The `sn-p4` tool will automatically look for an environment variable called `SN_P4_CLI_ADDRESS` which can be set to the hostname or IP address of the `sn-p4-agent` that will perform all of the requested actions on the real hardware.  In the `smartnic-fw` container, this value will already be set for you.
 
-By default, all operations performed by the `sn-p4-cli` tool will target the ingress pipeline. A different pipeline can be operated on by using the `--pipeline-id` option to select an alternate. Use the `--help` option to see which pipelines are supported.
+By default, all operations performed by the `sn-p4` tool will target the ingress pipeline. A different pipeline can be operated on by using the `--pipeline-id` option to select an alternate. Use the `--help` option to see which pipelines are supported.
 
-# Inspecting the pipeline structure with the "info" subcommand
+## Inspecting the pipeline structure with the "show pipeline info" subcommand
 
-The `info` subcommand is used to display the pipeline structure, including table names, match fields (and their types), action names and the list of parameters for each action.  This information can be used to formulate new rule definitions for the other subcommands.
-
-```
-sn-p4-cli info
-```
-
-# Inserting a new rule into a table
-
-The `table-insert` subcommand allows you to insert a new rule into a specified table.
+The `show pipeline info` subcommand is used to display the pipeline structure, including table names, match fields (and their types), action names and the list of parameters for each action, as well as all counter blocks defined by the p4 program.  This information can be used to formulate new rule definitions for the other subcommands.
 
 ```
-sn-p4-cli table-insert <table-name> <action-name> --match <match-expr> [--param <param-expr>] [--priority <prio-val>]
+sn-p4 show pipeline info
+```
+
+## Inserting a new rule into a table
+
+The `insert table rule` subcommand allows you to insert a new rule into a specified table.
+
+```
+sn-p4 insert table rule --table <table-name> --action <action-name> --match <match-expr> [--param <param-expr>] [--priority <prio-val>]
 ```
 Where:
 * `<table-name>` is the name of the table to be operated on
 * `<action-name>` is the action that you would like to activate when this rule matches
-* `<match-expr>` is one or more match expressions which collectively define when this rule should match a given packet
+* `<match-expr>` is a list of one or more space-separated match expressions which collectively define when this rule should match a given packet
   * The number and type of the match fields depends on the p4 definition of the table
-  * The `--match` option may be specified multiple times and all `match-expr`s will be concatenated
-* `<param-expr>` is one or more parameter values which will be returned as a result when this rule matches a given packet
+  * When the table supports multiple matches, the entire list must be quoted to ensure it's passed to the option as a single value
+  * The format of each match expression is one of:
+    * For a "key and mask" type match, the format is `<key>&&&<mask>`, where `<key>` is a bit pattern to match, `<mask>` is the mask to apply prior to matching and `&&&` is the separator.
+    * For a "longest prefix" type match, the format is `<key>/<prefix_length>`, where `<key>` is a bit pattern to match, `<prefix_length>` is the decimal number of upper bits (most significant) to use for building the mask to apply and `/` is the separator.
+    * For a "range" type match, the format is `<lower>-><upper>`, where `<lower>` is the decimal start of the range, `<upper>` is the decimal top of the range and `->` is the separator.
+    * Bit patterns used for specifying the key and mask fields have one of the following forms:
+      * Hexadecimal: String of hex digits in the character set `[0-9a-fA-F]` prefixed with `0x`.
+      * Binary: String of binary digits in the character set `[01]` prefixed with `0b`.
+      * Decimal: String of decimal digits in the character set `[0-9]`.
+* `<param-expr>` is a list of one or more space-separated parameter values which will be returned as a result when this rule matches a given packet
   * The number and type of the action parameters depends on the p4 definition of the action within the table
   * Some actions require zero parameters.  In this case, omit the optional `--param` option entirely.
+  * When the action supports multiple parameters, the entire list must be quoted to ensure it's passed to the option as a single value
 * `<prio-val>` is the priority to be used to resolve scenarios where multiple matches could occur
   * The `--priority` option is *required* for tables with CAM/TCAM type matches (prefix/range/ternary)
-  * The `--priority` option is *prohibited* for tables without CAM/TCAM type mathes
+    * Refer to the output of the 'show pipeline info` subcommand to determine whether the table requires a priority.
 
-**NOTE**: You can find details about your pipeline structure and valid names by running the `info` subcommand.
+**NOTE**: You can find details about your pipeline structure and valid names by running the `show pipeline info` subcommand.
 
-# Updating an existing rule within a table
+## Updating an existing rule within a table
 
-The `table-update` subcommand allows you to update the action and parameters for an existing rule within a table
-
+The `insert table rule` subcommand described above also allows you to update the action and parameters for an existing rule within a table by specifying the `--replace` option.
 ```
-sn-p4-cli table-update <table-name> <new-action-name> --match <match-expr> [--param <new-param-expr>]
+sn-p4 insert table rule --replace --table <table-name> --action <action-name> --match <match-expr> [--param <param-expr>]
 ```
-Where:
-* `<table-name>` is the table containing the rule to be updated
-* `<new-action-name>` is the new action that should be applied when this rule matches
-* `<match-expr>` is the exact original `<match-expr>` used when the original rule was inserted
-* `<new-param-expr>` is the set of new parameters to be returned when this rule matches
-  * **NOTE**: the new parameters must be consistent with the new action
 
-# Removing previously inserted rules
+## Removing previously inserted rules
 
-The `clear-all` and `table-clear` and `table-delete` subcommands allow you to remove rules from tables with varying precision.
+The `clear table` and `delete table rule` subcommands allow you to remove rules from tables with varying precision.
 
 Clear all rules from *all tables* in the pipeline.
 ```
-sn-p4-cli clear-all`
+sn-p4 clear table
 ```
 
 Clear all rules from a *single* specified table.
 ```
-sn-p4-cli table-clear <table-name>
+sn-p4 clear table --table <table-name>
 ```
 
 Remove a specific rule from a specific table.
 ```
-table-delete <table-name> --match <match-expr>
+sn-p4 delete table rule --table <table-name> --match <match-expr>
 ```
 
-# Bulk changes of rules using a p4bm simulator rules file
+## Bulk changes of rules using a p4 behaviour model (p4bm) simulator rules file
 
-Using the the `p4bm-apply` subcommand, a list of pipeline modifications can be applied from a file.  A subset of the full p4bm simulator file format is supported by the `sn-p4-cli` command.
+Using the the `apply p4bm` subcommand, a list of pipeline modifications can be applied from a file.  A subset of the full p4bm simulator file format is supported by the `sn-p4` command.
 
 ```
-sn-p4-cli p4bm-apply <filename>
+sn-p4 apply p4bm <filename>
 ```
 
 Supported actions within the p4bm file are:
@@ -469,6 +470,24 @@ Supported actions within the p4bm file are:
   * Clear all rules from a specified table
 
 All comment characters `#` and text following them up to the end of the line are ignored.
+
+## Displaying counters defined by a p4 program
+
+If a p4 program defines one or more blocks of counters, their type and number of counters within each block can be found in the output of the `show pipeline info` subcommand.  Counters are automatically accumulated by `sn-p4-agent` and made available via the `show pipeline stats` subcommand.
+```
+sn-p4 show pipeline stats
+```
+**NOTE**: By default, the `show pipeline stats` subcommand suppresses 0 values in the output. To view all counters regardless of value, include the `--zeroes` option.
+
+The accumulated value for all counters can be cleared with the `clear pipeline stats` subcommand.
+```
+sn-p4 clear pipeline stats
+```
+
+The `sn-p4-agent` server also acts as a Prometheus exporter, making all p4 counters available via HTTP on port `SN_P4_SERVER_PROMETHEUS_PORT` (default is 8000) for scraping and inclusion by a Prometheus data visualization tool such as [Grafana](https://grafana.com/oss/grafana/).
+```
+curl -s http://smartnic-p4:8000/metrics
+```
 
 Stopping the runtime environment
 --------------------------------

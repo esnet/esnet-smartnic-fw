@@ -259,7 +259,6 @@ services:
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-user
       - smartnic-mgr-vfio-unlock
-      - smartnic-mgr-vfio-unlock-p4-v2
       - smartnic-no-vfio
 
   smartnic-devunbind:
@@ -355,7 +354,6 @@ services:
       - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-vfio-unlock
-      - smartnic-mgr-vfio-unlock-p4-v2
 
   smartnic-vfio-unlock:
     <<: *smartnic-fw-service
@@ -385,7 +383,6 @@ services:
       - /scripts/vfio-unlock.py
     profiles:
       - smartnic-mgr-vfio-unlock
-      - smartnic-mgr-vfio-unlock-p4-v2
 
   smartnic-dpdk:
     <<: *smartnic-dpdk-service
@@ -496,11 +493,10 @@ services:
       - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
-      - SN_P4_CLI_SERVER=smartnic-p4
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
       - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
       - SN_CFG_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
-      - SN_P4_CLI_ADDRESS=smartnic-p4-v2
+      - SN_P4_CLI_ADDRESS=smartnic-p4
       - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
       - SN_P4_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
     volumes:
@@ -521,50 +517,11 @@ services:
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-user
       - smartnic-mgr-vfio-unlock
-      - smartnic-mgr-vfio-unlock-p4-v2
       - smartnic-no-vfio
 
   smartnic-p4:
     <<: *smartnic-fw-service
     hostname: smartnic-p4
-    depends_on:
-      smartnic-hw:
-        condition: service_healthy
-    init: true
-    user: root
-    privileged: true
-    ports:
-      - "${P4_AGENT_PORT-50050}:50051"
-    restart: unless-stopped
-    environment:
-      - REGIO_SELECT=$FPGA_PCIE_DEV.0
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
-      - SN_P4_AGENT_SLOTADDR=$FPGA_PCIE_DEV.0
-      #- SN_P4_SERVER_DEBUG=1 # enable debug logging by the server
-    volumes:
-      - /sys/bus/pci:/sys/bus/pci
-      - /dev:/dev
-      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
-    entrypoint:
-      - /bin/bash
-      - -c
-      - -e
-      - -o
-      - pipefail
-      - -x
-      - |
-        sn-p4-agent $$SN_P4_AGENT_SLOTADDR
-    profiles:
-      - smartnic-mgr-dpdk-portlink
-      - smartnic-mgr-dpdk-manual
-      - smartnic-mgr-user
-      - smartnic-mgr-vfio-unlock
-      - smartnic-no-vfio
-
-  smartnic-p4-v2:
-    <<: *smartnic-fw-service
-    hostname: smartnic-p4-v2
     depends_on:
       smartnic-hw:
         condition: service_healthy
@@ -598,12 +555,11 @@ services:
     entrypoint:
       - /usr/local/sbin/sn-p4-server-entrypoint.sh
     profiles:
-#      - smartnic-mgr-dpdk-portlink
-#      - smartnic-mgr-dpdk-manual
-#      - smartnic-mgr-user
-#      - smartnic-mgr-vfio-unlock
-      - smartnic-mgr-vfio-unlock-p4-v2
-#      - smartnic-no-vfio
+      - smartnic-mgr-dpdk-portlink
+      - smartnic-mgr-dpdk-manual
+      - smartnic-mgr-user
+      - smartnic-mgr-vfio-unlock
+      - smartnic-no-vfio
 
   smartnic-cfg:
     <<: *smartnic-fw-service
@@ -645,7 +601,6 @@ services:
       - smartnic-mgr-dpdk-manual
       - smartnic-mgr-user
       - smartnic-mgr-vfio-unlock
-      - smartnic-mgr-vfio-unlock-p4-v2
       - smartnic-no-vfio
 
   smartnic-fw-test:
@@ -660,11 +615,10 @@ services:
       - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
-      - SN_P4_CLI_SERVER=smartnic-p4
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
       - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
       - SN_CFG_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
-      - SN_P4_CLI_ADDRESS=smartnic-p4-v2
+      - SN_P4_CLI_ADDRESS=smartnic-p4
       - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
       - SN_P4_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
     volumes:
