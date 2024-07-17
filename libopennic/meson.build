@@ -30,6 +30,9 @@ libopennic = shared_library(
   include_directories : [
     ext_incdir,
   ],
+  c_args : [
+    '-D_GNU_SOURCE',
+  ],
   install : true,
   soversion : 1,
 )

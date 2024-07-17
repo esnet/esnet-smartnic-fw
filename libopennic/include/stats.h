@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,9 +15,36 @@ extern "C" {
 #include "prom.h"
 
 struct stats_domain;
+struct stats_domain_spec;
 struct stats_zone;
+struct stats_zone_spec;
 struct stats_block;
+struct stats_block_spec;
 struct stats_metric;
+struct stats_metric_spec;
+struct stats_label_spec;
+
+//--------------------------------------------------------------------------------------------------
+struct stats_label_format_spec {
+    const struct stats_domain_spec* domain;
+    const struct stats_zone_spec* zone;
+    const struct stats_block_spec* block;
+    const struct stats_metric_spec* metric;
+    const struct stats_label_spec* label;
+    unsigned int idx;
+};
+
+struct stats_label_spec {
+    const char* key;
+    const char* value; // Ignored when value_alloc is provided.
+
+    const char* (*value_alloc)(const struct stats_label_format_spec* spec);
+    void (*value_free)(const char* value);
+};
+
+static inline void stats_label_value_free(const char* value) {
+    free((void*)value);
+}
 
 //--------------------------------------------------------------------------------------------------
 struct stats_metric_value {
@@ -50,6 +78,9 @@ struct stats_metric_spec {
 
     // Defines the number of elements when the stats_metric_flag_ARRAY flag is set.
     size_t nelements;
+
+    const struct stats_label_spec* labels;
+    size_t nlabels;
 
     enum stats_metric_type type;
     unsigned int flags;

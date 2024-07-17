@@ -1,6 +1,7 @@
 #include "array_size.h"
 #include "prom.h"
 #include "stats.h"
+#include "unused.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -22,6 +23,8 @@
 struct stats_metric_element {
     struct stats_metric_value value;
     uint64_t last;
+
+    const char** label_values;
 };
 
 struct stats_metric {
@@ -92,6 +95,56 @@ static inline void stats_domain_unlock(struct stats_domain* domain) {
 }
 
 //--------------------------------------------------------------------------------------------------
+static const char* stats_label_value_domain(const struct stats_label_format_spec* spec) {
+    return spec->domain->name;
+}
+
+static const char* stats_label_value_zone(const struct stats_label_format_spec* spec) {
+    return spec->zone->name;
+}
+
+static const char* stats_label_value_block(const struct stats_label_format_spec* spec) {
+    return spec->block->name;
+}
+
+static const struct stats_label_spec default_stats_labels[] = {
+    {
+        .key = "domain",
+        .value_alloc = stats_label_value_domain,
+    },
+    {
+        .key = "zone",
+        .value_alloc = stats_label_value_zone,
+    },
+    {
+        .key = "block",
+        .value_alloc = stats_label_value_block,
+    },
+};
+#define DEFAULT_STATS_LABELS_COUNT ARRAY_SIZE(default_stats_labels)
+
+//--------------------------------------------------------------------------------------------------
+static const char* stats_label_value_index(const struct stats_label_format_spec* spec) {
+    char* value;
+    int rv = asprintf(&value, "%u", spec->idx);
+    if (rv < 0) {
+        log_panic(ENOMEM, "failed to allocate label for index %u of metric %s",
+                  spec->idx, spec->metric->name);
+    }
+
+    return value;
+}
+
+static const struct stats_label_spec array_stats_labels[] = {
+    {
+        .key = "index",
+        .value_alloc = stats_label_value_index,
+        .value_free = stats_label_value_free,
+    },
+};
+#define ARRAY_STATS_LABELS_COUNT ARRAY_SIZE(array_stats_labels)
+
+//--------------------------------------------------------------------------------------------------
 static void __stats_metric_read(struct stats_metric* metric, uint64_t* values) {
     const struct stats_metric_spec* spec = &metric->spec;
     volatile void* addr = metric->block->spec.io.base + spec->io.offset;
@@ -131,6 +184,33 @@ static void __stats_metric_attach(struct stats_metric* metric, struct stats_bloc
     metric->block = blk;
     blk->nvalues += metric->nelements;
 
+    const struct stats_metric_spec* spec = &metric->spec;
+    struct stats_label_format_spec fspec = {
+        .domain = &blk->zone->domain->spec,
+        .zone = &blk->zone->spec,
+        .block = &blk->spec,
+        .metric = spec,
+    };
+
+    for (unsigned int n = 0; n < metric->nelements; ++n) {
+        struct stats_metric_element* e = &metric->elements[n];
+
+        fspec.idx = n;
+        const char** lv = e->label_values;
+        for (const struct stats_label_spec* lspec = spec->labels;
+             lspec < &spec->labels[spec->nlabels];
+             ++lspec, ++lv) {
+            fspec.label = lspec;
+            if (lspec->value_alloc != NULL) {
+                *lv = lspec->value_alloc(&fspec);
+            } else if (lspec->value != NULL) {
+                *lv = lspec->value;
+            } else {
+                *lv = "";
+            }
+        }
+    }
+
     int rv = prom_collector_add_metric(blk->prometheus.collector, metric->prometheus.metric);
     if (rv != 0) {
         log_panic(rv, "prom_collector_add_metric failed for metric %s", metric->spec.name);
@@ -139,6 +219,21 @@ static void __stats_metric_attach(struct stats_metric* metric, struct stats_bloc
 
 //--------------------------------------------------------------------------------------------------
 static void __stats_metric_detach(struct stats_metric* metric) {
+    const struct stats_metric_spec* spec = &metric->spec;
+    for (struct stats_metric_element* e = metric->elements;
+         e < &metric->elements[metric->nelements];
+         ++e) {
+        const char** lv = e->label_values;
+        for (const struct stats_label_spec* lspec = spec->labels;
+             lspec < &spec->labels[spec->nlabels];
+             ++lspec, ++lv) {
+            if (lspec->value_free != NULL) {
+                lspec->value_free(*lv);
+                *lv = NULL;
+            }
+        }
+    }
+
     int rv = prom_collector_remove_metric(metric->block->prometheus.collector,
                                           metric->prometheus.metric);
     if (rv != 0) {
@@ -164,9 +259,11 @@ static void __stats_metric_free(struct stats_metric* metric) {
 
 //--------------------------------------------------------------------------------------------------
 static struct stats_metric* __stats_metric_alloc(const struct stats_metric_spec* spec) {
+    size_t nlabels = DEFAULT_STATS_LABELS_COUNT + spec->nlabels;
     bool is_array = STATS_METRIC_FLAG_TEST(spec->flags, ARRAY);
     size_t nelements = 1;
     if (is_array) {
+        nlabels += ARRAY_STATS_LABELS_COUNT;
         nelements = spec->nelements;
         if (nelements == 0) {
             log_panic(EINVAL, "metric %s defined as array of 0 elements", spec->name);
@@ -174,7 +271,9 @@ static struct stats_metric* __stats_metric_alloc(const struct stats_metric_spec*
     }
 
     struct stats_metric* metric = calloc(1, sizeof(*metric) +
-        nelements * sizeof(metric->elements[0]));
+        nelements * sizeof(metric->elements[0]) +
+        nlabels * sizeof(spec->labels[0]) +
+        nelements * nlabels * sizeof(metric->elements->label_values[0]));
     if (metric == NULL) {
         return NULL;
     }
@@ -186,23 +285,40 @@ static struct stats_metric* __stats_metric_alloc(const struct stats_metric_spec*
 
     metric->elements = (typeof(metric->elements))&metric[1];
     metric->nelements = nelements;
+
+    struct stats_label_spec* labels = (typeof(labels))&metric->elements[nelements];
+    metric->spec.labels = labels;
+    metric->spec.nlabels = nlabels;
+
+    for (unsigned int n = 0; n < DEFAULT_STATS_LABELS_COUNT; ++n, ++labels) {
+        *labels = default_stats_labels[n];
+    }
+
+    if (is_array) {
+        for (unsigned int n = 0; n < ARRAY_STATS_LABELS_COUNT; ++n, ++labels) {
+            *labels = array_stats_labels[n];
+        }
+    }
+
+    for (unsigned int n = 0; n < spec->nlabels; ++n, ++labels) {
+        *labels = spec->labels[n];
+    }
+
+    const char** label_values = (typeof(label_values))&metric->spec.labels[nlabels];
     for (struct stats_metric_element* e = metric->elements; e < &metric->elements[nelements]; ++e) {
         e->value.u64 = spec->init_value;
         e->last = spec->init_value;
+
+        e->label_values = label_values;
+        label_values += nlabels;
     }
 
-    const char* labels[] = {
-        "domain",
-        "zone",
-        "block",
-        "index",
-    };
-    size_t nlabels = ARRAY_SIZE(labels);
-    if (!is_array) {
-        nlabels -= 1;
+    const char* label_keys[nlabels];
+    for (unsigned int n = 0; n < nlabels; ++n) {
+        label_keys[n] = metric->spec.labels[n].key;
     }
 
-    metric->prometheus.metric = prom_gauge_new(spec->name, spec->desc, nlabels, labels);
+    metric->prometheus.metric = prom_gauge_new(spec->name, spec->desc, nlabels, label_keys);
     if (metric->prometheus.metric == NULL) {
         log_err(ENOMEM, "prom_gauge_new failed for metric %s", spec->name);
         goto free_metric;
@@ -371,16 +487,6 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
         spec->latch_metrics(spec, data);
     }
 
-    // Must match the ordering and number from __stats_metric_alloc.
-    int index_len = snprintf(NULL, 0, "%zu", blk->nvalues) + 1;
-    char index[index_len];
-    const char* labels[] = {
-        blk->zone->domain->spec.name,
-        blk->zone->spec.name,
-        spec->name,
-        index,
-    };
-
     for (struct stats_metric** m = blk->metrics; m < &blk->metrics[spec->nmetrics]; ++m) {
         struct stats_metric* metric = *m;
         const struct stats_metric_spec* mspec = &metric->spec;
@@ -433,20 +539,15 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
             }
         }
 
-        bool is_array = STATS_METRIC_FLAG_TEST(mspec->flags, ARRAY);
-        for (unsigned int n = 0; n < metric->nelements; ++n) {
-            struct stats_metric_element* e = &metric->elements[n];
-
+        for (struct stats_metric_element* e = metric->elements;
+             e < &metric->elements[metric->nelements];
+             ++e) {
             if (spec->convert_metric != NULL) {
                 e->value.f64 = spec->convert_metric(spec, mspec, e->value.u64, data);
             } else {
                 e->value.f64 = (double)e->value.u64;
             }
-
-            if (is_array) {
-                snprintf(index, index_len, "%u", n);
-            }
-            prom_gauge_set(metric->prometheus.metric, e->value.f64, labels);
+            prom_gauge_set(metric->prometheus.metric, e->value.f64, e->label_values);
         }
     }
 
