@@ -15,7 +15,7 @@ using namespace std;
 extern "C" {
     int get_stats_for_each_metric(const struct stats_for_each_spec* spec) {
         GetStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
-        if (ctx->non_zero && spec->value.u64 == 0) {
+        if (ctx->non_zero && spec->values->u64 == 0) {
             return 0;
         }
 
@@ -48,8 +48,8 @@ extern "C" {
         scope->set_block(spec->block->name);
 
         auto value = metric->mutable_value();
-        value->set_u64(spec->value.u64);
-        value->set_f64(spec->value.f64);
+        value->set_u64(spec->values->u64);
+        value->set_f64(spec->values->f64);
 
         return 0;
     }

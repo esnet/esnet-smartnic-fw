@@ -1420,32 +1420,31 @@ static void cms_module_stats_release_metrics(const struct stats_block_spec* UNUS
 }
 
 //--------------------------------------------------------------------------------------------------
-static uint64_t cms_module_stats_read_metric(const struct stats_block_spec* UNUSED(bspec),
-                                             const struct stats_metric_spec* mspec,
-                                             void* data) {
+static void cms_module_stats_read_metric(const struct stats_block_spec* UNUSED(bspec),
+                                         const struct stats_metric_spec* mspec,
+                                         uint64_t* value,
+                                         void* data) {
     struct cms_module_block_latch_data* latch = data;
     bool have_lo = latch->lo != NULL;
 
     union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
-    uint64_t value = 0;
+    *value = 0;
     switch (flags.type) {
     case cms_module_metric_type_ALARM:
         if (have_lo) {
-            value = (latch->lo->u8[mspec->io.offset] >> mspec->io.shift) & 1;
+            *value = (latch->lo->u8[mspec->io.offset] >> mspec->io.shift) & 1;
         }
         break;
 
     case cms_module_metric_type_MONITOR_MIN ... cms_module_metric_type_MONITOR_MAX - 1:
         if (have_lo) {
             union sff_8636_u16* u16 = (typeof(u16))&latch->lo->u8[mspec->io.offset];
-            value = (u16->msb << 8) | u16->lsb;
+            *value = (u16->msb << 8) | u16->lsb;
         } else {
-            value = UINT64_MAX;
+            *value = UINT64_MAX;
         }
         break;
     }
-
-    return value;
 }
 
 //--------------------------------------------------------------------------------------------------

@@ -989,11 +989,11 @@ extern "C" {
         if (cms_module_stats_is_alarm_metric(spec->metric)) {
             auto alarm = ctx->status->add_alarms();
             alarm->set_name(spec->metric->name);
-            alarm->set_active(spec->value.u64 != 0);
+            alarm->set_active(spec->values->u64 != 0);
         } else if (cms_module_stats_is_monitor_metric(spec->metric)) {
             auto mon = ctx->status->add_monitors();
             mon->set_name(spec->metric->name);
-            mon->set_value(spec->value.f64);
+            mon->set_value(spec->values->f64);
         }
 
         return 0;

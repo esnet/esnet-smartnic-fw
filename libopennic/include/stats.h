@@ -32,6 +32,7 @@ enum stats_metric_type {
 
 enum stats_metric_flag {
     stats_metric_flag_CLEAR_ON_READ,
+    stats_metric_flag_ARRAY,
 };
 
 #define STATS_METRIC_FLAG_MASK(_name) (1 << stats_metric_flag_##_name)
@@ -46,6 +47,9 @@ union stats_io_data {
 struct stats_metric_spec {
     const char* name;
     const char* desc;
+
+    // Defines the number of elements when the stats_metric_flag_ARRAY flag is set.
+    size_t nelements;
 
     enum stats_metric_type type;
     unsigned int flags;
@@ -112,15 +116,18 @@ struct stats_block_spec {
      *                release_metrics method is invoked and is also passed to the read_metric and
      *                convert_metric methods.
      * release_metrics: Called after reading all metrics in the block.
-     * read_metric: Called to read the current value of a single metric in the block.
+     * read_metric: Called to read the current value of a single metric in the block. When the
+     *              metric is an array, the "values" parameter is an array sized to the "nelements"
+     *              member of the struct stats_metric_spec. Otherwise, the value is singular.
      * convert_metric: Called to convert a raw register value to a floating point representation.
      */
     void (*attach_metrics)(const struct stats_block_spec* bspec);
     void (*detach_metrics)(const struct stats_block_spec* bspec);
     void (*latch_metrics)(const struct stats_block_spec* bspec, void* data);
     void (*release_metrics)(const struct stats_block_spec* bspec, void* data);
-    uint64_t (*read_metric)(const struct stats_block_spec* bspec,
-                            const struct stats_metric_spec* mspec, void* data);
+    void (*read_metric)(const struct stats_block_spec* bspec,
+                        const struct stats_metric_spec* mspec,
+                        uint64_t* values, void* data);
     double (*convert_metric)(const struct stats_block_spec* bspec,
                              const struct stats_metric_spec* mspec,
                              uint64_t value, void* data);
@@ -151,7 +158,8 @@ struct stats_for_each_spec {
     const struct stats_zone_spec* zone;
     const struct stats_block_spec* block;
     const struct stats_metric_spec* metric;
-    struct stats_metric_value value;
+    const struct stats_metric_value* values;
+    size_t nvalues;
     void* arg;
 };
 
@@ -159,9 +167,9 @@ struct stats_for_each_spec {
 struct stats_zone* stats_zone_alloc(struct stats_domain* domain,
                                     const struct stats_zone_spec* spec);
 void stats_zone_free(struct stats_zone* zone);
-size_t stats_zone_number_of_metrics(struct stats_zone* zone);
-size_t stats_zone_get_metrics(struct stats_zone* zone,
-                              struct stats_metric_value* values, size_t nvalues);
+size_t stats_zone_number_of_values(struct stats_zone* zone);
+size_t stats_zone_get_values(struct stats_zone* zone,
+                             struct stats_metric_value* values, size_t nvalues);
 void stats_zone_update_metrics(struct stats_zone* zone);
 void stats_zone_clear_metrics(struct stats_zone* zone);
 int stats_zone_for_each_metric(struct stats_zone* zone,
@@ -173,9 +181,9 @@ struct stats_domain* stats_domain_alloc(const struct stats_domain_spec* spec);
 void stats_domain_free(struct stats_domain* domain);
 void stats_domain_start(struct stats_domain* domain);
 void stats_domain_stop(struct stats_domain* domain);
-size_t stats_domain_number_of_metrics(struct stats_domain* domain);
-size_t stats_domain_get_metrics(struct stats_domain* domain,
-                                struct stats_metric_value* values, size_t nvalues);
+size_t stats_domain_number_of_values(struct stats_domain* domain);
+size_t stats_domain_get_values(struct stats_domain* domain,
+                               struct stats_metric_value* values, size_t nvalues);
 void stats_domain_update_metrics(struct stats_domain* domain);
 void stats_domain_clear_metrics(struct stats_domain* domain);
 int stats_domain_for_each_metric(struct stats_domain* domain,
