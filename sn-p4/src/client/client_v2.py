@@ -16,6 +16,7 @@ from . import completions
 from . import device
 from . import p4bm
 from . import pipeline
+from . import server
 from . import stats
 from . import table
 
@@ -24,6 +25,7 @@ SUB_COMMAND_MODULES = (
     device,
     p4bm,
     pipeline,
+    server,
     stats,
     table,
 )
