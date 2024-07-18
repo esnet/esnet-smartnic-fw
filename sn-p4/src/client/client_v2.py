@@ -14,6 +14,7 @@ from sn_p4_proto.v2 import ErrorCode, SmartnicP4Stub
 from .error import error_code_str
 from . import completions
 from . import device
+from . import p4bm
 from . import pipeline
 from . import stats
 from . import table
@@ -21,6 +22,7 @@ from . import table
 SUB_COMMAND_MODULES = (
     completions,
     device,
+    p4bm,
     pipeline,
     stats,
     table,
@@ -158,6 +160,11 @@ def connect_client(client):
 def click_main(ctx, **kargs):
     ctx.obj = types.SimpleNamespace(args=types.SimpleNamespace(**kargs))
 
+@click_main.group
+@click.pass_context
+def apply(ctx):
+    connect_client(ctx.obj)
+
 @click_main.group(chain=True)
 def batch(): ...
 
@@ -216,6 +223,7 @@ def main():
     class Commands: ...
     cmds = Commands()
     cmds.main = click_main
+    cmds.apply = apply
     cmds.batch = batch
     cmds.clear = clear
     cmds.delete = delete

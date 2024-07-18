@@ -59,6 +59,7 @@ custom_target(
         'src/client/completions.py',
         'src/client/device.py',
         'src/client/error.py',
+        'src/client/p4bm.py',
         'src/client/pipeline.py',
         'src/client/stats.py',
         'src/client/table.py',
