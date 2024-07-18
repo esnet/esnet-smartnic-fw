@@ -47,7 +47,8 @@ RUN <<EOT
       python3-setuptools
 
     pip3 install \
-      grpcio-tools \
+      'grpcio<1.65.0' \
+      'grpcio-tools<1.65.0' \
       meson \
       poetry \
       yq
