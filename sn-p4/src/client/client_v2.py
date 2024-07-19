@@ -207,6 +207,11 @@ def clear(ctx):
 
 @click_main.group
 @click.pass_context
+def configure(ctx):
+    connect_client(ctx.obj)
+
+@click_main.group
+@click.pass_context
 def delete(ctx):
     connect_client(ctx.obj)
 
@@ -228,6 +233,7 @@ def main():
     cmds.apply = apply
     cmds.batch = batch
     cmds.clear = clear
+    cmds.configure = configure
     cmds.delete = delete
     cmds.insert = insert
     cmds.show = show

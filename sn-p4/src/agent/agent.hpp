@@ -5,6 +5,7 @@
 #include "prometheus.hpp"
 #include "sn_p4_v2.grpc.pb.h"
 
+#include <bitset>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,10 @@ public:
         ServerContext*, const TableRuleRequest*, ServerWriter<TableRuleResponse>*) override;
 
     // Server configuration.
+    Status GetServerConfig(
+        ServerContext*, const ServerConfigRequest*, ServerWriter<ServerConfigResponse>*) override;
+    Status SetServerConfig(
+        ServerContext*, const ServerConfigRequest*, ServerWriter<ServerConfigResponse>*) override;
     Status GetServerStatus(
         ServerContext*, const ServerStatusRequest*, ServerWriter<ServerStatusResponse>*) override;
 
@@ -60,6 +65,17 @@ private:
         struct timespec start_wall;
         struct timespec start_mono;
     } timestamp;
+
+    struct {
+        bitset<ServerDebugFlag_MAX + 1> flags;
+    } debug;
+
+    const char* debug_flag_label(const ServerDebugFlag flag);
+
+#define SERVER_LOG_IF_DEBUG(_flag, _stream_statements) \
+    if (this->debug.flags.test(_flag)) { \
+        cerr << "DEBUG[" << this->debug_flag_label(_flag) << "]: " << _stream_statements << endl; \
+    }
 
     void get_device_info(const DeviceInfoRequest&, function<void(const DeviceInfoResponse&)>);
     void batch_get_device_info(
@@ -101,6 +117,12 @@ private:
 
     void init_server(void);
     void deinit_server(void);
+    void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
+    void batch_get_server_config(
+        const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void set_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
+    void batch_set_server_config(
+        const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void get_server_status(const ServerStatusRequest&, function<void(const ServerStatusResponse&)>);
     void batch_get_server_status(
         const ServerStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);

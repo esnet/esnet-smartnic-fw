@@ -123,6 +123,22 @@ Status SmartnicP4Impl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kServerConfig:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_server_config(req.server_config(), rdwr);
+                break;
+
+            case BatchOperation::BOP_SET:
+                batch_set_server_config(req.server_config(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                break;
+            }
+            break;
+
         default:
             error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST);
             break;
