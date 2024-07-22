@@ -56,7 +56,6 @@ custom_target(
     input: [
         'src/client/__init__.py',
         'src/client/client.py',
-        'src/client/client_v2.py',
         'src/client/completions.py',
         'src/client/device.py',
         'src/client/error.py',

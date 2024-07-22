@@ -38,7 +38,7 @@ python = "^3.8"
 sn_p4_proto = "^0.1.0"
 
 [tool.poetry.scripts]
-sn-p4 = "sn_p4.client_v2:main"
+sn-p4 = "sn_p4.client:main"
 
 [build-system]
 requires = ["poetry-core"]
