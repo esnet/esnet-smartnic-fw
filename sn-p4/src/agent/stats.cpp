@@ -57,6 +57,10 @@ extern "C" {
         scope->set_zone(spec->zone->name);
         scope->set_block(spec->block->name);
 
+        auto last_update = metric->mutable_last_update();
+        last_update->set_seconds(spec->last_update.tv_sec);
+        last_update->set_nanos(spec->last_update.tv_nsec);
+
         for (unsigned int idx = 0; idx < spec->nvalues; ++idx) {
             auto v = &spec->values[idx];
             if (ctx->non_zero && v->u64 == 0) {

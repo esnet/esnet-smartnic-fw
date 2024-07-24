@@ -20,7 +20,7 @@ from sn_p4_proto.v2 import (
 )
 
 from .error import error_code_str
-from .utils import apply_options
+from .utils import apply_options, format_timestamp
 
 HEADER_SEP = '-' * 40
 
@@ -148,14 +148,11 @@ def _show_server_status(status):
     rows = []
     rows.append(HEADER_SEP)
 
-    def format_ts(ts):
-        return f'{ts.seconds}s.{ts.nanos}ns'
-
     utc = time.strftime('%Y-%m-%d %H:%M:%S %z', time.gmtime(status.start_time.seconds))
-    rows.append(f'Start Time: {utc} [{format_ts(status.start_time)}]')
+    rows.append(f'Start Time: {utc} [{format_timestamp(status.start_time)}]')
 
     up = datetime.timedelta(seconds=status.up_time.seconds)
-    rows.append(f'Up Time:    {up} [{format_ts(status.up_time)}]')
+    rows.append(f'Up Time:    {up} [{format_timestamp(status.up_time)}]')
 
     click.echo('\n'.join(rows))
 

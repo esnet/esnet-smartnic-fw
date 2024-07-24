@@ -17,7 +17,7 @@ from sn_p4_proto.v2 import (
 
 from .device import device_id_option
 from .error import error_code_str
-from .utils import apply_options, natural_sort_key
+from .utils import apply_options, format_timestamp, natural_sort_key
 
 HEADER_SEP = '-' * 40
 
@@ -82,6 +82,8 @@ def _show_stats(dev_id, stats, kargs):
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
+    name_len = 0
+    value_len = 0
     metrics = {}
     for metric in stats.metrics:
         base_name = metric.scope.zone
@@ -90,6 +92,7 @@ def _show_stats(dev_id, stats, kargs):
         base_name += f'_{metric.name}'
 
         is_array = metric.num_elements > 0
+        last_update = format_timestamp(metric.last_update)
         for value in metric.values:
             if metric.type == StatsMetricType.STATS_METRIC_TYPE_FLAG:
                 svalue = 'yes' if value.u64 != 0 else 'no'
@@ -97,16 +100,26 @@ def _show_stats(dev_id, stats, kargs):
                 svalue = f'{value.f64:.4g}'
             else:
                 svalue = f'{value.u64}'
+            value_len = max(value_len, len(svalue))
 
             name = base_name
             if is_array:
                 name += f'[{value.index}]'
-            metrics[name] = svalue
+            name_len = max(name_len, len(name))
+
+            metrics[name] = {
+                'value': svalue,
+                'last_update': last_update,
+            }
 
     if metrics:
-        name_len = max(len(name) for name in metrics)
+        last_update = kargs.get('last_update', False)
         for name in sorted(metrics, key=natural_sort_key):
-            rows.append(f'{name:>{name_len}}: {metrics[name]}')
+            m = metrics[name]
+            row = f'{name:>{name_len}}: {m["value"]:<{value_len}}'
+            if last_update:
+                row += f'    [{m["last_update"]}]'
+            rows.append(row)
 
     click.echo('\n'.join(rows))
 
@@ -159,6 +172,11 @@ def show_stats_options(fn):
             '--zeroes',
             is_flag=True,
             help='Include zero valued statistic metrics in the display.',
+        ),
+        click.option(
+            '--last-update',
+            is_flag=True,
+            help='Include the metric last update timestamp in the display.',
         ),
     )
     return apply_options(options, fn)

@@ -97,6 +97,8 @@ message StatsMetric {
     uint32 num_elements = 4; // Indicates the metric is a singleton when 0, an array otherwise.
     repeated StatsMetricValue values = 5; // Will contain one value for singleton metrics and be a
                                           // list of values for array metrics.
+    google.protobuf.Timestamp last_update = 6; // Monotonic timestamp indicating when the metric was
+                                               // last updated.
 }
 
 message Stats {
