@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 //--------------------------------------------------------------------------------------------------
@@ -48,6 +49,8 @@ struct stats_block {
 
     struct stats_metric** metrics;
     size_t nvalues;
+
+    struct timespec last_update;
 
     struct {
         prom_collector_t* collector;
@@ -475,6 +478,11 @@ static size_t __stats_block_get_values(struct stats_block* blk,
 static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
     const struct stats_block_spec* spec = &blk->spec;
 
+    int rv = clock_gettime(CLOCK_MONOTONIC, &blk->last_update);
+    if (rv != 0) {
+        log_err(errno, "clock_getttime failed for last update timestamp");
+    }
+
     uint64_t* data = NULL;
     size_t nwords = (spec->latch.data_size + sizeof(*data) - 1) / sizeof(*data);
     typeof(*data) words[nwords];
@@ -565,6 +573,7 @@ static int __stats_block_for_each_metric(struct stats_block* blk,
         .zone = &blk->zone->spec,
         .block = &blk->spec,
         .arg = arg,
+        .last_update = blk->last_update,
     };
 
     int rv = 0;

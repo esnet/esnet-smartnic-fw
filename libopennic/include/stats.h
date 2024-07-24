@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -191,6 +192,7 @@ struct stats_for_each_spec {
     const struct stats_metric_spec* metric;
     const struct stats_metric_value* values;
     size_t nvalues;
+    struct timespec last_update;
     void* arg;
 };
 
