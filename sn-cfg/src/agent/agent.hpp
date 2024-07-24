@@ -16,8 +16,7 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 class SmartnicConfigImpl final : public SmartnicConfig::Service {
 public:
-    explicit SmartnicConfigImpl(const vector<string>& bus_ids, const string& debug_dir,
-                                unsigned int prometheus_port);
+    explicit SmartnicConfigImpl(const vector<string>& bus_ids, unsigned int prometheus_port);
     ~SmartnicConfigImpl();
 
     // Batching of multiple RPCs.

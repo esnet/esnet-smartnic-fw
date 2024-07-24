@@ -68,7 +68,6 @@ using namespace std;
 struct Arguments {
     struct Server {
         vector<string> bus_ids;
-        string debug_dir;
 
         string address;
         unsigned int port;
@@ -92,7 +91,6 @@ struct Command {
 
 //--------------------------------------------------------------------------------------------------
 SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
-                                       const string& debug_dir,
                                        unsigned int prometheus_port) {
     int rv = prom_collector_registry_default_init();
     if (rv != 0) {
@@ -105,15 +103,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
     for (auto bus_id : bus_ids) {
         cout << "------> " << bus_id << endl;
 
-        volatile struct esnet_smartnic_bar2* bar2;
-        if (!debug_dir.empty()) {
-            string path = debug_dir + "/" + bus_id + "-bar2.bin";
-            cout << "DEBUG: mapping bar2 as file at '" << path << "'." << endl;
-            bar2 = smartnic_map_bar2_by_path(path.c_str(), true);
-        } else {
-            bar2 = smartnic_map_bar2_by_pciaddr(bus_id.c_str());
-        }
-
+        volatile struct esnet_smartnic_bar2* bar2 = smartnic_map_bar2_by_pciaddr(bus_id.c_str());
         if (bar2 == NULL) {
             cerr << "ERROR: Failed to map PCIe BAR2 register space for device " << bus_id << endl;
             exit(EXIT_FAILURE);
@@ -382,8 +372,7 @@ static int agent_server_run(const Arguments& args) {
     builder.AddListeningPort(address, credentials);
 
     // Attach the gRPC configuration service.
-    SmartnicConfigImpl service(args.server.bus_ids, args.server.debug_dir,
-                               args.server.prometheus_port);
+    SmartnicConfigImpl service(args.server.bus_ids, args.server.prometheus_port);
     builder.RegisterService(&service);
 
     // Create the server and bind it's address.
@@ -466,10 +455,6 @@ static void agent_server_add(CLI::App& app, Arguments::Server& args, vector<Comm
         "Server JSON configuration file.")->
         default_val(args.config_file);
 
-    cmd->add_option(
-        "--debug-dir", args.debug_dir,
-        "Directory in which to place debug files.");
-
     // Setup the positional arguments.
     cmd->add_option(
         "bus-ids", args.bus_ids,
@@ -492,7 +477,6 @@ int main(int argc, char *argv[]) {
     Arguments args{
         .server = {
             .bus_ids = {},
-            .debug_dir = "",
 
             .address = "[::]",
             .port = 50100,
