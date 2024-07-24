@@ -15,6 +15,7 @@
 #include "sysmon.h"
 
 using namespace grpc;
+using namespace sn_cfg::v1;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------

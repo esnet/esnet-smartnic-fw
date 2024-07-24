@@ -9,6 +9,7 @@
 #include "sn_cfg_v1.grpc.pb.h"
 
 using namespace grpc;
+using namespace sn_cfg::v1;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
