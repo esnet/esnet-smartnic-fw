@@ -140,6 +140,7 @@ void SmartnicConfigImpl::batch_get_host_config(
         auto config = bresp.mutable_host_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -246,6 +247,7 @@ void SmartnicConfigImpl::batch_set_host_config(
         auto config = bresp.mutable_host_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
         rdwr->Write(bresp);
     });
 }
@@ -345,6 +347,7 @@ void SmartnicConfigImpl::batch_get_host_stats(
         auto stats = bresp.mutable_host_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -369,6 +372,7 @@ void SmartnicConfigImpl::batch_clear_host_stats(
         auto stats = bresp.mutable_host_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
         rdwr->Write(bresp);
     });
 }

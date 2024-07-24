@@ -121,6 +121,7 @@ void SmartnicConfigImpl::batch_set_defaults(
         auto defaults = bresp.mutable_defaults();
         defaults->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
         rdwr->Write(bresp);
     });
 }

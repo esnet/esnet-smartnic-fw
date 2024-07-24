@@ -317,6 +317,7 @@ void SmartnicConfigImpl::batch_get_switch_config(
         auto config = bresp.mutable_switch_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -481,6 +482,7 @@ void SmartnicConfigImpl::batch_set_switch_config(
         auto config = bresp.mutable_switch_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
         rdwr->Write(bresp);
     });
 }
@@ -559,6 +561,7 @@ void SmartnicConfigImpl::batch_get_switch_stats(
         auto stats = bresp.mutable_switch_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -583,6 +586,7 @@ void SmartnicConfigImpl::batch_clear_switch_stats(
         auto stats = bresp.mutable_switch_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
         rdwr->Write(bresp);
     });
 }

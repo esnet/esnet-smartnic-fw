@@ -112,14 +112,23 @@ def batch_process_port_config_resp(resp):
     if not resp.HasField('port_config'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+        BatchOperation.BOP_SET: 'Configured',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.port_config
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('config'):
+    if op == BatchOperation.BOP_GET:
         _show_port_config(resp.dev_id, resp.port_id, resp.config)
     else:
-        click.echo(f'Configured port ID {resp.port_id} on device ID {resp.dev_id}.')
+        click.echo(f'{op_label} port ID {resp.port_id} on device ID {resp.dev_id}.')
     return True
 
 def batch_port_config(op, **kargs):
@@ -193,14 +202,24 @@ def batch_process_port_stats_resp(kargs):
         if not resp.HasField('port_stats'):
             return False
 
+        supported_ops = {
+            BatchOperation.BOP_GET: 'Got',
+            BatchOperation.BOP_CLEAR: 'Cleared',
+        }
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
+
         resp = resp.port_stats
         if resp.error_code != ErrorCode.EC_OK:
             raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-        if resp.HasField('stats'):
+        if op == BatchOperation.BOP_GET:
             _show_port_stats(resp.dev_id, resp.port_id, resp.stats, kargs)
         else:
-            click.echo(f'Cleared statistics for port ID {resp.port_id} on device ID {resp.dev_id}.')
+            click.echo(f'{op_label} statistics for port ID {resp.port_id} '
+                       f'on device ID {resp.dev_id}.')
         return True
 
     return process
@@ -251,11 +270,19 @@ def batch_process_port_status_resp(resp):
     if not resp.HasField('port_status'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.port_status
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('status'):
+    if op == BatchOperation.BOP_GET:
         _show_port_status(resp.dev_id, resp.port_id, resp.status)
     return True
 

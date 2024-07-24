@@ -219,6 +219,7 @@ void SmartnicConfigImpl::batch_get_module_gpio(
         auto gpio = bresp.mutable_module_gpio();
         gpio->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -313,6 +314,7 @@ void SmartnicConfigImpl::batch_set_module_gpio(
         auto gpio = bresp.mutable_module_gpio();
         gpio->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
         rdwr->Write(bresp);
     });
 }
@@ -681,6 +683,7 @@ void SmartnicConfigImpl::batch_get_module_info(
         auto info = bresp.mutable_module_info();
         info->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -844,6 +847,7 @@ void SmartnicConfigImpl::batch_get_module_mem(
         auto mem = bresp.mutable_module_mem();
         mem->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -964,6 +968,7 @@ void SmartnicConfigImpl::batch_set_module_mem(
         auto mem = bresp.mutable_module_mem();
         mem->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
         rdwr->Write(bresp);
     });
 }
@@ -1066,6 +1071,7 @@ void SmartnicConfigImpl::batch_get_module_status(
         auto status = bresp.mutable_module_status();
         status->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }

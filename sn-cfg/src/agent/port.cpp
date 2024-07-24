@@ -138,6 +138,7 @@ void SmartnicConfigImpl::batch_get_port_config(
         auto config = bresp.mutable_port_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -283,6 +284,7 @@ void SmartnicConfigImpl::batch_set_port_config(
         auto config = bresp.mutable_port_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
         rdwr->Write(bresp);
     });
 }
@@ -376,6 +378,7 @@ void SmartnicConfigImpl::batch_get_port_status(
         auto status = bresp.mutable_port_status();
         status->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -475,6 +478,7 @@ void SmartnicConfigImpl::batch_get_port_stats(
         auto stats = bresp.mutable_port_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -499,6 +503,7 @@ void SmartnicConfigImpl::batch_clear_port_stats(
         auto stats = bresp.mutable_port_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
         rdwr->Write(bresp);
     });
 }

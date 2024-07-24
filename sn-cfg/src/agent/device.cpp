@@ -242,6 +242,7 @@ void SmartnicConfigImpl::batch_get_device_info(
         auto info = bresp.mutable_device_info();
         info->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -338,6 +339,7 @@ void SmartnicConfigImpl::batch_get_device_status(
         auto status = bresp.mutable_device_status();
         status->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }

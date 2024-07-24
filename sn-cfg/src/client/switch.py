@@ -188,14 +188,23 @@ def batch_process_switch_config_resp(resp):
     if not resp.HasField('switch_config'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+        BatchOperation.BOP_SET: 'Configured',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.switch_config
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('config'):
+    if op == BatchOperation.BOP_GET:
         _show_switch_config(resp.dev_id, resp.config)
     else:
-        click.echo(f'Configured switch for device ID {resp.dev_id}.')
+        click.echo(f'{op_label} switch for device ID {resp.dev_id}.')
     return True
 
 def batch_switch_config(op, **kargs):
@@ -269,14 +278,23 @@ def batch_process_switch_stats_resp(kargs):
         if not resp.HasField('switch_stats'):
             return False
 
+        supported_ops = {
+            BatchOperation.BOP_GET: 'Got',
+            BatchOperation.BOP_CLEAR: 'Cleared',
+        }
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
+
         resp = resp.switch_stats
         if resp.error_code != ErrorCode.EC_OK:
             raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-        if resp.HasField('stats'):
+        if op == BatchOperation.BOP_GET:
             _show_switch_stats(resp.dev_id, resp.stats, kargs)
         else:
-            click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
+            click.echo(f'{op_label} statistics for device ID {resp.dev_id}.')
         return True
 
     return process

@@ -86,14 +86,23 @@ def batch_process_host_config_resp(resp):
     if not resp.HasField('host_config'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+        BatchOperation.BOP_SET: 'Configured',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.host_config
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('config'):
+    if op == BatchOperation.BOP_GET:
         _show_host_config(resp.dev_id, resp.host_id, resp.config)
     else:
-        click.echo(f'Configured host ID {resp.host_id} on device ID {resp.dev_id}.')
+        click.echo(f'{op_label} host ID {resp.host_id} on device ID {resp.dev_id}.')
     return True
 
 def batch_host_config(op, **kargs):
@@ -167,14 +176,24 @@ def batch_process_host_stats_resp(kargs):
         if not resp.HasField('host_stats'):
             return False
 
+        supported_ops = {
+            BatchOperation.BOP_GET: 'Got',
+            BatchOperation.BOP_CLEAR: 'Cleared',
+        }
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
+
         resp = resp.host_stats
         if resp.error_code != ErrorCode.EC_OK:
             raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-        if resp.HasField('stats'):
+        if op == BatchOperation.BOP_GET:
             _show_host_stats(resp.dev_id, resp.host_id, resp.stats, kargs)
         else:
-            click.echo(f'Cleared statistics for host ID {resp.host_id} on device ID {resp.dev_id}.')
+            click.echo(f'{op_label} statistics for host ID {resp.host_id} '
+                       f'on device ID {resp.dev_id}.')
         return True
 
     return process

@@ -124,6 +124,7 @@ void SmartnicConfigImpl::batch_get_stats(
         auto stats = bresp.mutable_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -148,6 +149,7 @@ void SmartnicConfigImpl::batch_clear_stats(
         auto stats = bresp.mutable_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
         rdwr->Write(bresp);
     });
 }
