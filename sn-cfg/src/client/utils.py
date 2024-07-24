@@ -2,11 +2,16 @@
 __all__ = (
     'apply_options',
     'ChoiceFields',
+    'format_timestamp',
     'MIXED_INT',
 )
 
 import click
 import gettext
+
+#---------------------------------------------------------------------------------------------------
+def format_timestamp(ts):
+    return f'{ts.seconds}s.{ts.nanos}ns'
 
 #---------------------------------------------------------------------------------------------------
 def apply_options(options, fn):

@@ -18,6 +18,7 @@ from . import device
 from . import host
 from . import module
 from . import port
+from . import server
 from . import stats
 from . import switch
 
@@ -28,6 +29,7 @@ SUB_COMMAND_MODULES = (
     host,
     module,
     port,
+    server,
     stats,
     switch,
 )

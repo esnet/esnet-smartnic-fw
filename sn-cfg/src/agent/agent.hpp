@@ -6,6 +6,7 @@
 #include "sn_cfg_v1.grpc.pb.h"
 
 #include <string>
+#include <time.h>
 #include <vector>
 
 using namespace grpc;
@@ -68,6 +69,10 @@ public:
     Status ClearPortStats(
         ServerContext*, const PortStatsRequest*, ServerWriter<PortStatsResponse>*) override;
 
+    // Server configuration.
+    Status GetServerStatus(
+        ServerContext*, const ServerStatusRequest*, ServerWriter<ServerStatusResponse>*) override;
+
     // Statistics configuration.
     Status GetStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
     Status ClearStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
@@ -89,6 +94,11 @@ private:
         prom_collector_registry_t* registry;
         struct MHD_Daemon* daemon;
     } prometheus;
+
+    struct {
+        struct timespec start_wall;
+        struct timespec start_mono;
+    } timestamp;
 
     void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
     void batch_set_defaults(
@@ -157,6 +167,12 @@ private:
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_clear_port_stats(
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void init_server(void);
+    void deinit_server(void);
+    void get_server_status(const ServerStatusRequest&, function<void(const ServerStatusResponse&)>);
+    void batch_get_server_status(
+        const ServerStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void get_or_clear_stats(const StatsRequest&, bool, function<void(const StatsResponse&)>);
     void batch_get_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);

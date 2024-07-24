@@ -186,10 +186,14 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         cerr << "ERROR: Failed to start prometheus HTTP daemon." << endl;
         exit(EXIT_FAILURE);
     }
+
+    init_server();
 }
 
 //--------------------------------------------------------------------------------------------------
 SmartnicConfigImpl::~SmartnicConfigImpl() {
+    deinit_server();
+
     MHD_stop_daemon(prometheus.daemon);
 
     while (!devices.empty()) {
