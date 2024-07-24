@@ -83,7 +83,7 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
             .id = id,
             .handle = NULL,
             .info = {},
-            .stats = NULL,
+            .stats = {},
         };
 
         pipeline->handle = snp4_init(id, (uintptr_t)dev->bar2);
@@ -107,6 +107,7 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
         }
 
         init_counters(dev, pipeline);
+        init_table_ecc(dev, pipeline);
 
         dev->pipelines.push_back(pipeline);
     }
@@ -118,6 +119,7 @@ void SmartnicP4Impl::deinit_pipeline(Device* dev) {
         auto pipeline = dev->pipelines.back();
 
         deinit_counters(pipeline);
+        deinit_table_ecc(pipeline);
 
         if (!snp4_deinit(pipeline->handle)) {
             cerr << "ERROR: Failed to deinit snp4/vitisnetp4 library for pipeline ID "
@@ -407,10 +409,11 @@ void SmartnicP4Impl::get_or_clear_pipeline_stats(
             PipelineStatsResponse resp;
 
             if (do_clear) {
-                stats_zone_clear_metrics(pipeline->stats->zone);
+                stats_zone_clear_metrics(pipeline->stats.counters->zone);
             } else {
                 ctx.stats = resp.mutable_stats();
-                stats_zone_for_each_metric(pipeline->stats->zone, get_stats_for_each_metric, &ctx);
+                stats_zone_for_each_metric(
+                    pipeline->stats.counters->zone, get_stats_for_each_metric, &ctx);
             }
 
             resp.set_error_code(ErrorCode::EC_OK);

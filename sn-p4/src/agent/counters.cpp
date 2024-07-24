@@ -54,11 +54,14 @@ extern "C" {
                                      uint64_t* values,
                                      void* data) {
         CountersLatchData* ld = (typeof(ld))data;
-        if (ld->valid) {
-            uint64_t* lv = &ld->values[mspec->io.offset];
-            for (unsigned int n = 0; n < mspec->nelements; ++n) {
-                values[n] = lv[n];
-            }
+        if (!ld->valid) {
+            memset(values, 0, sizeof(uint64_t) * mspec->nelements);
+            return;
+        }
+
+        uint64_t* lv = &ld->values[mspec->io.offset];
+        for (unsigned int n = 0; n < mspec->nelements; ++n) {
+            values[n] = lv[n];
         }
     }
 }
@@ -113,7 +116,7 @@ static void init_counters_block_metric(InitCountersBlock* blk,
 void SmartnicP4Impl::init_counters(Device* dev, DevicePipeline* pipeline) {
     const auto pi = &pipeline->info;
     if (pi->num_counter_blocks == 0) {
-        pipeline->stats = NULL;
+        pipeline->stats.counters = NULL;
         return;
     }
 
@@ -216,19 +219,19 @@ void SmartnicP4Impl::init_counters(Device* dev, DevicePipeline* pipeline) {
 
     stats->zone = stats_zone_alloc(dev->stats.domains[DeviceStatsDomain::COUNTERS], &zspec);
     if (stats->zone == NULL) {
-        cerr << "ERROR: Failed to alloc stats zone for pipeline ID " << pipeline->id
+        cerr << "ERROR: Failed to alloc counter stats zone for pipeline ID " << pipeline->id
              << " on device " << dev->bus_id << "."  << endl;
         exit(EXIT_FAILURE);
     }
 
-    pipeline->stats = stats;
+    pipeline->stats.counters = stats;
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::deinit_counters(DevicePipeline* pipeline) {
-    if (pipeline->stats != NULL) {
-        auto stats = pipeline->stats;
-        pipeline->stats = NULL;
+    if (pipeline->stats.counters != NULL) {
+        auto stats = pipeline->stats.counters;
+        pipeline->stats.counters = NULL;
 
         stats_zone_free(stats->zone);
 

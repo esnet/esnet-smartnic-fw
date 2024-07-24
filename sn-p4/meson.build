@@ -21,6 +21,7 @@ executable(
         'src/agent/server.cpp',
         'src/agent/stats.cpp',
         'src/agent/table.cpp',
+        'src/agent/table-ecc.cpp',
     ]),
     dependencies: [
         cli11_dep,

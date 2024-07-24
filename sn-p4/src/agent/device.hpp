@@ -28,7 +28,11 @@ struct DevicePipeline {
     unsigned int id;
     void* handle;
     struct snp4_info_pipeline info;
-    DeviceStats* stats;
+
+    struct {
+        DeviceStats* counters;
+        DeviceStats* table_ecc;
+    } stats;
 };
 
 //--------------------------------------------------------------------------------------------------

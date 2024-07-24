@@ -106,6 +106,9 @@ private:
     void init_counters(Device* dev, DevicePipeline* pipeline);
     void deinit_counters(DevicePipeline* pipeline);
 
+    void init_table_ecc(Device* dev, DevicePipeline* pipeline);
+    void deinit_table_ecc(DevicePipeline* pipeline);
+
     void clear_table(const TableRequest&, function<void(const TableResponse&)>);
     void batch_clear_table(const TableRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void insert_or_delete_table_rule(
