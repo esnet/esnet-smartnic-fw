@@ -75,6 +75,11 @@ struct vitis_net_p4_drv_intf {
 
         XilVitisNetP4ReturnType (*get_mode)(
             XilVitisNetP4TableCtx *CtxPtr, XilVitisNetP4TableMode *ModePtr);
+
+        XilVitisNetP4ReturnType (*get_ecc_counters)(
+            XilVitisNetP4TableCtx *CtxPtr,
+            uint32_t *CorrectedSingleBitErrorsPtr,
+            uint32_t *DetectedDoubleBitErrorsPtr);
     } table;
 
     struct {

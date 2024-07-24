@@ -43,6 +43,10 @@ extern bool snp4_table_delete_k(void * snp4_handle,
 				size_t    key_len,
 				uint8_t * mask,
 				size_t    mask_len);
+extern bool snp4_table_ecc_counters_read(void * snp4_handle,
+                                         const char * table_name,
+                                         uint32_t * corrected_single_bit_errors,
+                                         uint32_t * detected_double_bit_errors);
 extern void snp4_print_target_config (unsigned int sdnet_idx);
 
 // Define some limits for the supported pipeline properties handled by this library

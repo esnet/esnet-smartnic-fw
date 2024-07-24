@@ -343,6 +343,29 @@ bool snp4_table_delete_k(void * snp4_handle,
   return true;
 }
 
+bool snp4_table_ecc_counters_read(void * snp4_handle,
+                                  const char * table_name,
+                                  uint32_t * corrected_single_bit_errors,
+                                  uint32_t * detected_double_bit_errors)
+{
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
+  XilVitisNetP4TableCtx * table;
+  if (snp4_user->intf->target.get_table_by_name(&snp4_user->target, (char *)table_name, &table) != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  XilVitisNetP4ReturnType rt = snp4_user->intf->table.get_ecc_counters(table, corrected_single_bit_errors, detected_double_bit_errors);
+  if (rt == XIL_VITIS_NET_P4_TABLE_ERR_FUNCTION_NOT_SUPPORTED) {
+    /* Not all CAM IPs support ECC error counters. Rather than try to figure out which do, let the driver tell us and handle it. */
+    *corrected_single_bit_errors = 0;
+    *detected_double_bit_errors = 0;
+    return true;
+  }
+
+  return rt == XIL_VITIS_NET_P4_SUCCESS;
+}
+
+
 static XilVitisNetP4CounterCtx * snp4_counter_block_by_name(struct snp4_user_context * snp4_user, const char * block_name)
 {
   const XilVitisNetP4TargetConfig * tcfg = snp4_user->intf->target.config;

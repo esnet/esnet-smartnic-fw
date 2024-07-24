@@ -38,6 +38,7 @@ const struct vitis_net_p4_drv_intf vitis_net_p4_drv_intf_{{ ip_name }} = {
         .insert = XilVitisNetP4TableInsert,
         .get_action_id = XilVitisNetP4TableGetActionId,
         .get_mode = XilVitisNetP4TableGetMode,
+        .get_ecc_counters = XilVitisNetP4TableGetEccCountersClearOnRead,
     },
 
     .target = {
