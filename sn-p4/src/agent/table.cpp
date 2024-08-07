@@ -315,170 +315,180 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
             end_pipeline_id = pipeline_id;
         }
 
-        const auto rule = req.rule();
         for (pipeline_id = begin_pipeline_id; pipeline_id <= end_pipeline_id; ++pipeline_id) {
             const auto pipeline = dev->pipelines[pipeline_id];
             TableRuleResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            const auto table_name = rule.table_name();
-            const auto ti = pipeline_get_table_info(pipeline, table_name);
-            if (ti == NULL) {
-                err = ErrorCode::EC_INVALID_TABLE_NAME;
-                SERVER_LOG_IF_DEBUG(debug_flag,
-                    "Invalid table '" << table_name <<
-                    "' in pipeline ID " << pipeline_id <<
-                    " on device ID " << dev_id);
-                goto write_response;
-            }
+            SERVER_LOG_IF_DEBUG(debug_flag,
+                "Processing " << req.rules_size() <<
+                " rules in pipeline ID " << pipeline_id <<
+                " on device ID " << dev_id);
 
-            struct sn_rule sr;
-            snp4_rule_init(&sr);
-            sr.table_name = ti->name;
-            sr.priority = rule.priority();
-
-            {
-                // Matches used for both insert and delete operations.
-                auto nmatches = rule.matches_size();
-                if (nmatches < ti->num_matches) {
-                    err = ErrorCode::EC_TABLE_RULE_TOO_FEW_MATCHES;
+            for (auto rule : req.rules()) {
+                const auto table_name = rule.table_name();
+                const auto ti = pipeline_get_table_info(pipeline, table_name);
+                if (ti == NULL) {
+                    err = ErrorCode::EC_INVALID_TABLE_NAME;
                     SERVER_LOG_IF_DEBUG(debug_flag,
-                        "Too few matches. Expected " << ti->num_matches <<
-                        " matches, but got " << nmatches <<
-                        " for table '" << table_name <<
+                        "Invalid table '" << table_name <<
                         "' in pipeline ID " << pipeline_id <<
                         " on device ID " << dev_id);
-                    goto clear_rule;
-                } else if (nmatches > ti->num_matches) {
-                    err = ErrorCode::EC_TABLE_RULE_TOO_MANY_MATCHES;
-                    SERVER_LOG_IF_DEBUG(debug_flag,
-                        "Too many matches. Expected " << ti->num_matches <<
-                        " matches, but got " << nmatches <<
-                        " for table '" << table_name <<
-                        "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
-                    goto clear_rule;
+                    goto write_response;
                 }
 
-                SERVER_LOG_IF_DEBUG(debug_flag,
-                    "Matches for table '" << table_name <<
-                    "' in pipeline ID " << pipeline_id <<
-                    " on device ID " << dev_id);
+                struct sn_rule sr;
+                snp4_rule_init(&sr);
+                sr.table_name = ti->name;
+                sr.priority = rule.priority();
 
-                for (const auto& match : rule.matches()) {
-                    SERVER_LOG_IF_DEBUG(debug_flag,
-                        "---> Load match [" << sr.num_matches << "]: " <<
-                        match.ShortDebugString());
-
-                    err = table_rule_parse_match(match, sr.matches[sr.num_matches++]);
-                    if (err != ErrorCode::EC_OK) {
-                        SERVER_LOG_IF_DEBUG(debug_flag, "======> Failed to load match");
+                {
+                    // Matches used for both insert and delete operations.
+                    auto nmatches = rule.matches_size();
+                    if (nmatches < ti->num_matches) {
+                        err = ErrorCode::EC_TABLE_RULE_TOO_FEW_MATCHES;
+                        SERVER_LOG_IF_DEBUG(debug_flag,
+                            "Too few matches. Expected " << ti->num_matches <<
+                            " matches, but got " << nmatches <<
+                            " for table '" << table_name <<
+                            "' in pipeline ID " << pipeline_id <<
+                            " on device ID " << dev_id);
+                        goto clear_rule;
+                    } else if (nmatches > ti->num_matches) {
+                        err = ErrorCode::EC_TABLE_RULE_TOO_MANY_MATCHES;
+                        SERVER_LOG_IF_DEBUG(debug_flag,
+                            "Too many matches. Expected " << ti->num_matches <<
+                            " matches, but got " << nmatches <<
+                            " for table '" << table_name <<
+                            "' in pipeline ID " << pipeline_id <<
+                            " on device ID " << dev_id);
                         goto clear_rule;
                     }
-                }
-            }
 
-            if (do_insert) {
-                // Actions used only for insert operation.
-                const auto action = rule.action();
-                const auto action_name = action.name();
-                const auto ai = pipeline_get_table_action_info(ti, action_name);
-                if (ai == NULL) {
-                    err = ErrorCode::EC_INVALID_ACTION_NAME;
                     SERVER_LOG_IF_DEBUG(debug_flag,
-                        "Invalid action name '" << action_name <<
-                        "' for table '" << table_name <<
+                        "Matches for table '" << table_name <<
                         "' in pipeline ID " << pipeline_id <<
                         " on device ID " << dev_id);
-                    goto clear_rule;
-                }
-                sr.action_name = ai->name;
 
-                auto nparams = action.parameters_size();
-                if (nparams < ai->num_params) {
-                    err = ErrorCode::EC_TABLE_RULE_TOO_FEW_ACTION_PARAMETERS;
-                    SERVER_LOG_IF_DEBUG(debug_flag,
-                        "Too few parameters. Expected " << ai->num_params <<
-                        " params, but got " << nparams <<
-                        " to action '" << action_name <<
-                        "' for table '" << table_name <<
-                        "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
-                    goto clear_rule;
-                } else if (nparams > ai->num_params) {
-                    err = ErrorCode::EC_TABLE_RULE_TOO_MANY_ACTION_PARAMETERS;
-                    SERVER_LOG_IF_DEBUG(debug_flag,
-                        "Too many parameters. Expected " << ai->num_params <<
-                        " params, but got " << nparams <<
-                        " to action '" << action_name <<
-                        "' for table '" << table_name <<
-                        "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
-                    goto clear_rule;
-                }
+                    for (const auto& match : rule.matches()) {
+                        SERVER_LOG_IF_DEBUG(debug_flag,
+                            "---> Load match [" << sr.num_matches << "]: " <<
+                            match.ShortDebugString());
 
-                SERVER_LOG_IF_DEBUG(debug_flag,
-                    "Parameters to action '" << action_name <<
-                    "' for table '" << table_name <<
-                    "' in pipeline ID " << pipeline_id <<
-                    " on device ID " << dev_id);
-
-                for (const auto& param : action.parameters()) {
-                    SERVER_LOG_IF_DEBUG(debug_flag,
-                        "---> Load parameter [" << sr.num_params << "]: " <<
-                        param.ShortDebugString());
-
-                    err = table_rule_parse_action_parameter(param, sr.params[sr.num_params++]);
-                    if (err != ErrorCode::EC_OK) {
-                        SERVER_LOG_IF_DEBUG(debug_flag, "======> Failed to load parameter");
-                        goto clear_rule;
+                        err = table_rule_parse_match(match, sr.matches[sr.num_matches++]);
+                        if (err != ErrorCode::EC_OK) {
+                            SERVER_LOG_IF_DEBUG(debug_flag, "======> Failed to load match");
+                            goto clear_rule;
+                        }
                     }
-                }
-            }
-
-            {
-                struct sn_pack pack;
-                snp4_pack_init(&pack);
-
-                err = table_rule_pack(pipeline, do_insert ? NULL : ti, &sr, &pack);
-                if (err != ErrorCode::EC_OK) {
-                    SERVER_LOG_IF_DEBUG(debug_flag,
-                        "Failed to pack rule for table '" << table_name <<
-                        "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
-                    goto clear_rule;
                 }
 
                 if (do_insert) {
-                    if (!snp4_table_insert_kma(pipeline->handle,
-                                               sr.table_name,
-                                               pack.key, pack.key_len,
-                                               pack.mask, pack.mask_len,
-                                               sr.action_name,
-                                               pack.params, pack.params_len,
-                                               sr.priority,
-                                               rule.replace())) {
-                        err = ErrorCode::EC_FAILED_INSERT_TABLE_RULE;
+                    // Actions used only for insert operation.
+                    const auto action = rule.action();
+                    const auto action_name = action.name();
+                    const auto ai = pipeline_get_table_action_info(ti, action_name);
+                    if (ai == NULL) {
+                        err = ErrorCode::EC_INVALID_ACTION_NAME;
                         SERVER_LOG_IF_DEBUG(debug_flag,
-                            "Failed to insert rule into table '" << table_name <<
+                            "Invalid action name '" << action_name <<
+                            "' for table '" << table_name <<
+                            "' in pipeline ID " << pipeline_id <<
+                            " on device ID " << dev_id);
+                        goto clear_rule;
+                    }
+                    sr.action_name = ai->name;
+
+                    auto nparams = action.parameters_size();
+                    if (nparams < ai->num_params) {
+                        err = ErrorCode::EC_TABLE_RULE_TOO_FEW_ACTION_PARAMETERS;
+                        SERVER_LOG_IF_DEBUG(debug_flag,
+                            "Too few parameters. Expected " << ai->num_params <<
+                            " params, but got " << nparams <<
+                            " to action '" << action_name <<
+                            "' for table '" << table_name <<
+                            "' in pipeline ID " << pipeline_id <<
+                            " on device ID " << dev_id);
+                        goto clear_rule;
+                    } else if (nparams > ai->num_params) {
+                        err = ErrorCode::EC_TABLE_RULE_TOO_MANY_ACTION_PARAMETERS;
+                        SERVER_LOG_IF_DEBUG(debug_flag,
+                            "Too many parameters. Expected " << ai->num_params <<
+                            " params, but got " << nparams <<
+                            " to action '" << action_name <<
+                            "' for table '" << table_name <<
+                            "' in pipeline ID " << pipeline_id <<
+                            " on device ID " << dev_id);
+                        goto clear_rule;
+                    }
+
+                    SERVER_LOG_IF_DEBUG(debug_flag,
+                        "Parameters to action '" << action_name <<
+                        "' for table '" << table_name <<
+                        "' in pipeline ID " << pipeline_id <<
+                        " on device ID " << dev_id);
+
+                    for (const auto& param : action.parameters()) {
+                        SERVER_LOG_IF_DEBUG(debug_flag,
+                            "---> Load parameter [" << sr.num_params << "]: " <<
+                            param.ShortDebugString());
+
+                        err = table_rule_parse_action_parameter(param, sr.params[sr.num_params++]);
+                        if (err != ErrorCode::EC_OK) {
+                            SERVER_LOG_IF_DEBUG(debug_flag, "======> Failed to load parameter");
+                            goto clear_rule;
+                        }
+                    }
+                }
+
+                {
+                    struct sn_pack pack;
+                    snp4_pack_init(&pack);
+
+                    err = table_rule_pack(pipeline, do_insert ? NULL : ti, &sr, &pack);
+                    if (err != ErrorCode::EC_OK) {
+                        SERVER_LOG_IF_DEBUG(debug_flag,
+                            "Failed to pack rule for table '" << table_name <<
+                            "' in pipeline ID " << pipeline_id <<
+                            " on device ID " << dev_id);
+                        goto clear_rule;
+                    }
+
+                    if (do_insert) {
+                        if (!snp4_table_insert_kma(pipeline->handle,
+                                                   sr.table_name,
+                                                   pack.key, pack.key_len,
+                                                   pack.mask, pack.mask_len,
+                                                   sr.action_name,
+                                                   pack.params, pack.params_len,
+                                                   sr.priority,
+                                                   rule.replace())) {
+                            err = ErrorCode::EC_FAILED_INSERT_TABLE_RULE;
+                            SERVER_LOG_IF_DEBUG(debug_flag,
+                                "Failed to insert rule into table '" << table_name <<
+                                "' in pipeline ID " << pipeline_id <<
+                                " on device ID " << dev_id);
+                        }
+                    } else if (!snp4_table_delete_k(pipeline->handle,
+                                                    sr.table_name,
+                                                    pack.key, pack.key_len,
+                                                    pack.mask, pack.mask_len)) {
+                        err = ErrorCode::EC_FAILED_DELETE_TABLE_RULE;
+                        SERVER_LOG_IF_DEBUG(debug_flag,
+                            "Failed to delete rule from table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
                             " on device ID " << dev_id);
                     }
-                } else if (!snp4_table_delete_k(pipeline->handle,
-                                                sr.table_name,
-                                                pack.key, pack.key_len,
-                                                pack.mask, pack.mask_len)) {
-                    err = ErrorCode::EC_FAILED_DELETE_TABLE_RULE;
-                    SERVER_LOG_IF_DEBUG(debug_flag,
-                        "Failed to delete rule from table '" << table_name <<
-                        "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
+                    snp4_pack_clear(&pack);
                 }
-                snp4_pack_clear(&pack);
+
+            clear_rule:
+                snp4_rule_clear(&sr);
+                if (err != ErrorCode::EC_OK) {
+                    break;
+                }
             }
 
-        clear_rule:
-            snp4_rule_clear(&sr);
         write_response:
             resp.set_error_code(err);
             resp.set_dev_id(dev_id);

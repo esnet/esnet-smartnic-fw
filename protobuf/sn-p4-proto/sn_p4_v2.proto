@@ -320,7 +320,7 @@ message TableRule {
 message TableRuleRequest {
     sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
     sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
-    TableRule rule = 4;
+    repeated TableRule rules = 3;
 }
 
 message TableRuleResponse {

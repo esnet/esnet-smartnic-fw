@@ -145,7 +145,7 @@ def table_rule_req(dev_id, pipeline_id, table_name, **kargs):
                 param = rule.action.parameters.add()
                 param.value = p
 
-    return TableRuleRequest(dev_id=dev_id, pipeline_id=pipeline_id, rule=rule)
+    return TableRuleRequest(dev_id=dev_id, pipeline_id=pipeline_id, rules=[rule])
 
 #---------------------------------------------------------------------------------------------------
 def rpc_table_rule(op, **kargs):
@@ -196,7 +196,7 @@ def batch_process_table_rule_resp(kargs):
             raise click.ClickException('Response for unsupported batch operation: {resp.op}')
         op_label = supported_ops[resp.op]
 
-        resp = resp.table
+        resp = resp.table_rule
         if resp.error_code != ErrorCode.EC_OK:
             raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
