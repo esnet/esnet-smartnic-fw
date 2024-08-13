@@ -72,9 +72,10 @@ private:
 
     const char* debug_flag_label(const ServerDebugFlag flag);
 
-#define SERVER_LOG_IF_DEBUG(_flag, _stream_statements) \
+#define SERVER_LOG_IF_DEBUG(_flag, _label, _stream_statements) \
     if (this->debug.flags.test(_flag)) { \
-        cerr << "DEBUG[" << this->debug_flag_label(_flag) << "]: " << _stream_statements << endl; \
+        cerr << "DEBUG_" #_label "[" << this->debug_flag_label(_flag) << "]: " \
+             << _stream_statements << endl; \
     }
 
     void get_device_info(const DeviceInfoRequest&, function<void(const DeviceInfoResponse&)>);

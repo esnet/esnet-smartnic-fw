@@ -28,7 +28,7 @@ void SmartnicP4Impl::clear_table(
         resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
         write_resp(resp);
 
-        SERVER_LOG_IF_DEBUG(debug_flag, "Invalid device ID " << dev_id);
+        SERVER_LOG_IF_DEBUG(debug_flag, ERROR, "Invalid device ID " << dev_id);
         return;
     }
 
@@ -49,7 +49,7 @@ void SmartnicP4Impl::clear_table(
             resp.set_dev_id(dev_id);
             write_resp(resp);
 
-            SERVER_LOG_IF_DEBUG(debug_flag,
+            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                 "Invalid pipeline ID " << pipeline_id << " on device ID " << dev_id);
             continue;
         }
@@ -70,24 +70,24 @@ void SmartnicP4Impl::clear_table(
                 if (!snp4_reset_all_tables(pipeline->handle)) {
                     err = ErrorCode::EC_FAILED_CLEAR_ALL_TABLES;
                 } else {
-                    SERVER_LOG_IF_DEBUG(debug_flag,
+                    SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                         "Cleared all tables in pipeline ID " << pipeline_id <<
                         " on device ID " << dev_id);
                 }
             } else if (!pipeline_has_table(pipeline, table_name)) {
                 err = ErrorCode::EC_INVALID_TABLE_NAME;
-                SERVER_LOG_IF_DEBUG(debug_flag,
+                SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                     "Invalid table '" << table_name <<
                     "' in pipeline ID " << pipeline_id <<
                     " on device ID " << dev_id);
             } else if (!snp4_reset_one_table(pipeline->handle, table_name.c_str())) {
                 err = ErrorCode::EC_FAILED_CLEAR_TABLE;
-                SERVER_LOG_IF_DEBUG(debug_flag,
+                SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                     "Failed to clear table '" << table_name <<
                     "' in pipeline ID " << pipeline_id <<
                     " on device ID " << dev_id);
             } else {
-                SERVER_LOG_IF_DEBUG(debug_flag,
+                SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                     "Cleared table '" << table_name <<
                     "' in pipeline ID " << pipeline_id <<
                     " on device ID " << dev_id);
@@ -284,7 +284,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
         resp.set_error_code(ErrorCode::EC_INVALID_DEVICE_ID);
         write_resp(resp);
 
-        SERVER_LOG_IF_DEBUG(debug_flag, "Invalid device ID " << dev_id);
+        SERVER_LOG_IF_DEBUG(debug_flag, ERROR, "Invalid device ID " << dev_id);
         return;
     }
 
@@ -305,7 +305,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
             resp.set_dev_id(dev_id);
             write_resp(resp);
 
-            SERVER_LOG_IF_DEBUG(debug_flag,
+            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                 "Invalid pipeline ID " << pipeline_id << " on device ID " << dev_id);
             continue;
         }
@@ -320,7 +320,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
             TableRuleResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            SERVER_LOG_IF_DEBUG(debug_flag,
+            SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                 "Processing " << req.rules_size() <<
                 " rules in pipeline ID " << pipeline_id <<
                 " on device ID " << dev_id);
@@ -330,7 +330,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                 const auto ti = pipeline_get_table_info(pipeline, table_name);
                 if (ti == NULL) {
                     err = ErrorCode::EC_INVALID_TABLE_NAME;
-                    SERVER_LOG_IF_DEBUG(debug_flag,
+                    SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                         "Invalid table '" << table_name <<
                         "' in pipeline ID " << pipeline_id <<
                         " on device ID " << dev_id);
@@ -347,7 +347,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                     auto nmatches = rule.matches_size();
                     if (nmatches < ti->num_matches) {
                         err = ErrorCode::EC_TABLE_RULE_TOO_FEW_MATCHES;
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                             "Too few matches. Expected " << ti->num_matches <<
                             " matches, but got " << nmatches <<
                             " for table '" << table_name <<
@@ -356,7 +356,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                         goto clear_rule;
                     } else if (nmatches > ti->num_matches) {
                         err = ErrorCode::EC_TABLE_RULE_TOO_MANY_MATCHES;
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                             "Too many matches. Expected " << ti->num_matches <<
                             " matches, but got " << nmatches <<
                             " for table '" << table_name <<
@@ -365,19 +365,20 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                         goto clear_rule;
                     }
 
-                    SERVER_LOG_IF_DEBUG(debug_flag,
+                    SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                         "Matches for table '" << table_name <<
                         "' in pipeline ID " << pipeline_id <<
                         " on device ID " << dev_id);
 
                     for (const auto& match : rule.matches()) {
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                             "---> Load match [" << sr.num_matches << "]: " <<
                             match.ShortDebugString());
 
                         err = table_rule_parse_match(match, sr.matches[sr.num_matches++]);
                         if (err != ErrorCode::EC_OK) {
-                            SERVER_LOG_IF_DEBUG(debug_flag, "======> Failed to load match");
+                            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                                "======> Failed to load match (" << ErrorCode_Name(err) << ")");
                             goto clear_rule;
                         }
                     }
@@ -390,7 +391,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                     const auto ai = pipeline_get_table_action_info(ti, action_name);
                     if (ai == NULL) {
                         err = ErrorCode::EC_INVALID_ACTION_NAME;
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                             "Invalid action name '" << action_name <<
                             "' for table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
@@ -402,7 +403,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                     auto nparams = action.parameters_size();
                     if (nparams < ai->num_params) {
                         err = ErrorCode::EC_TABLE_RULE_TOO_FEW_ACTION_PARAMETERS;
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                             "Too few parameters. Expected " << ai->num_params <<
                             " params, but got " << nparams <<
                             " to action '" << action_name <<
@@ -412,7 +413,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                         goto clear_rule;
                     } else if (nparams > ai->num_params) {
                         err = ErrorCode::EC_TABLE_RULE_TOO_MANY_ACTION_PARAMETERS;
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                             "Too many parameters. Expected " << ai->num_params <<
                             " params, but got " << nparams <<
                             " to action '" << action_name <<
@@ -422,20 +423,21 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                         goto clear_rule;
                     }
 
-                    SERVER_LOG_IF_DEBUG(debug_flag,
+                    SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                         "Parameters to action '" << action_name <<
                         "' for table '" << table_name <<
                         "' in pipeline ID " << pipeline_id <<
                         " on device ID " << dev_id);
 
                     for (const auto& param : action.parameters()) {
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                             "---> Load parameter [" << sr.num_params << "]: " <<
                             param.ShortDebugString());
 
                         err = table_rule_parse_action_parameter(param, sr.params[sr.num_params++]);
                         if (err != ErrorCode::EC_OK) {
-                            SERVER_LOG_IF_DEBUG(debug_flag, "======> Failed to load parameter");
+                            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                                "======> Failed to load parameter (" << ErrorCode_Name(err) << ")");
                             goto clear_rule;
                         }
                     }
@@ -447,10 +449,11 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
 
                     err = table_rule_pack(pipeline, do_insert ? NULL : ti, &sr, &pack);
                     if (err != ErrorCode::EC_OK) {
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                             "Failed to pack rule for table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id);
+                            " on device ID " << dev_id <<
+                            " (" << ErrorCode_Name(err) << ")");
                         goto clear_rule;
                     }
 
@@ -464,7 +467,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                                                    sr.priority,
                                                    rule.replace())) {
                             err = ErrorCode::EC_FAILED_INSERT_TABLE_RULE;
-                            SERVER_LOG_IF_DEBUG(debug_flag,
+                            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                                 "Failed to insert rule into table '" << table_name <<
                                 "' in pipeline ID " << pipeline_id <<
                                 " on device ID " << dev_id);
@@ -474,7 +477,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                                                     pack.key, pack.key_len,
                                                     pack.mask, pack.mask_len)) {
                         err = ErrorCode::EC_FAILED_DELETE_TABLE_RULE;
-                        SERVER_LOG_IF_DEBUG(debug_flag,
+                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                             "Failed to delete rule from table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
                             " on device ID " << dev_id);
