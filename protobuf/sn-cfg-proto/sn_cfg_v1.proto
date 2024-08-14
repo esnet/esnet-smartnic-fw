@@ -110,6 +110,8 @@ message StatsMetric {
     StatsMetricScope scope = 2;
     string name = 3;
     StatsMetricValue value = 4;
+    google.protobuf.Timestamp last_update = 5; // Monotonic timestamp indicating when the metric was
+                                               // last updated.
 }
 
 message Stats {

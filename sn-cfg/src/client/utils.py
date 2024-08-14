@@ -4,10 +4,16 @@ __all__ = (
     'ChoiceFields',
     'format_timestamp',
     'MIXED_INT',
+    'natural_sort_key',
 )
 
 import click
 import gettext
+import re
+
+#---------------------------------------------------------------------------------------------------
+def natural_sort_key(item):
+    return tuple((int(d) if d.isdigit() else d) for d in re.split(r'(\d+)', item))
 
 #---------------------------------------------------------------------------------------------------
 def format_timestamp(ts):
