@@ -1,0 +1,463 @@
+//--------------------------------------------------------------------------------------------------
+syntax = "proto3";
+
+package sn_p4.v2;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+//--------------------------------------------------------------------------------------------------
+enum ErrorCode {
+    // General error codes.
+    EC_UNKNOWN = 0; // Field is unset.
+    EC_OK = 1;
+
+    // Batch error codes.
+    EC_UNKNOWN_BATCH_REQUEST = 100;
+    EC_UNKNOWN_BATCH_OP = 101;
+
+    // Device configuration error codes.
+    EC_INVALID_DEVICE_ID = 200;
+
+    // Pipeline configuration error codes.
+    EC_INVALID_PIPELINE_ID = 300;
+
+    // Table configuration error codes.
+    EC_INVALID_TABLE_NAME = 400;
+    EC_FAILED_CLEAR_ALL_TABLES = 401;
+    EC_FAILED_CLEAR_TABLE = 402;
+    EC_INVALID_ACTION_NAME = 403;
+    EC_TABLE_RULE_TOO_FEW_MATCHES = 404;
+    EC_TABLE_RULE_TOO_MANY_MATCHES = 405;
+    EC_TABLE_RULE_TOO_FEW_ACTION_PARAMETERS = 406;
+    EC_TABLE_RULE_TOO_MANY_ACTION_PARAMETERS = 407;
+    EC_TABLE_RULE_INVALID_ACTION_PARAMETER_FORMAT = 408;
+    EC_TABLE_RULE_MATCH_INVALID_KEY_FORMAT = 409;
+    EC_TABLE_RULE_MATCH_INVALID_MASK_FORMAT = 410;
+    EC_TABLE_RULE_MATCH_INVALID_PREFIX_LENGTH = 411;
+    EC_TABLE_RULE_MATCH_RANGE_LOWER_TOO_BIG = 412;
+    EC_TABLE_RULE_MATCH_RANGE_UPPER_TOO_BIG = 413;
+    EC_UNKNOWN_TABLE_RULE_MATCH_TYPE = 414;
+    EC_FAILED_INSERT_TABLE_RULE = 415;
+    EC_FAILED_DELETE_TABLE_RULE = 416;
+
+    EC_TABLE_RULE_FIELD_SPEC_OVERFLOW = 450;
+    EC_TABLE_RULE_FIELD_SPEC_FORMAT_INVALID = 451;
+    EC_TABLE_RULE_FIELD_SPEC_UNKNOWN_TYPE = 452;
+    EC_TABLE_RULE_FIELD_SPEC_SIZE_MISMATCH = 453;
+    EC_TABLE_RULE_PACK_KEY_TOO_BIG = 454;
+    EC_TABLE_RULE_PACK_MASK_TOO_BIG = 455;
+    EC_TABLE_RULE_PACK_PARAMS_TOO_BIG = 456;
+    EC_TABLE_RULE_MATCH_INVALID_FORMAT = 457;
+    EC_TABLE_RULE_MATCH_MASK_TOO_WIDE = 458;
+    EC_TABLE_RULE_MATCH_INVALID_BITFIELD_MASK = 459;
+    EC_TABLE_RULE_MATCH_INVALID_CONSTANT_MASK = 460;
+    EC_TABLE_RULE_MATCH_INVALID_PREFIX_MASK = 461;
+    EC_TABLE_RULE_MATCH_INVALID_RANGE_MASK = 462;
+    EC_TABLE_RULE_MATCH_INVALID_UNUSED_MASK = 463;
+    EC_TABLE_RULE_MATCH_KEY_TOO_BIG = 464;
+    EC_TABLE_RULE_MATCH_MASK_TOO_BIG = 465;
+    EC_TABLE_RULE_INVALID_TABLE_NAME = 466;
+    EC_TABLE_RULE_INVALID_TABLE_CONFIG = 467;
+    EC_TABLE_RULE_INVALID_ACTION_FOR_TABLE = 468;
+    EC_TABLE_RULE_PARAM_INVALID_FORMAT = 469;
+    EC_TABLE_RULE_PARAM_SPEC_OVERFLOW = 470;
+    EC_TABLE_RULE_PARAM_SPEC_SIZE_MISMATCH = 471;
+    EC_TABLE_RULE_PARAM_TOO_BIG = 472;
+
+    // Server configuration error codes.
+    EC_SERVER_FAILED_GET_TIME = 500;
+    EC_SERVER_INVALID_DEBUG_FLAG = 501;
+}
+
+//--------------------------------------------------------------------------------------------------
+enum StatsMetricType {
+    STATS_METRIC_TYPE_UNKNOWN = 0; // Field is unset.
+    STATS_METRIC_TYPE_COUNTER = 1;
+    STATS_METRIC_TYPE_GAUGE = 2;
+    STATS_METRIC_TYPE_FLAG = 3;
+}
+
+message StatsMetricScope {
+    string domain = 1;
+    string zone = 2;
+    string block = 3;
+}
+
+message StatsMetricValue {
+    uint64 u64 = 1;
+    double f64 = 2;
+    uint32 index = 3; // Used to distinguish values for array metrics.
+}
+
+message StatsMetric {
+    StatsMetricType type = 1;
+    StatsMetricScope scope = 2;
+    string name = 3;
+    uint32 num_elements = 4; // Indicates the metric is a singleton when 0, an array otherwise.
+    repeated StatsMetricValue values = 5; // Will contain one value for singleton metrics and be a
+                                          // list of values for array metrics.
+    google.protobuf.Timestamp last_update = 6; // Monotonic timestamp indicating when the metric was
+                                               // last updated.
+}
+
+message Stats {
+    repeated StatsMetric metrics = 1;
+}
+
+message StatsFilters {
+    repeated StatsMetricType metric_types = 1; // Restrict metrics to the given type(s).
+                                               // Leave unset for all types.
+    bool non_zero = 2; // Restrict metrics to those whose value is not zero.
+}
+
+message StatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    StatsFilters filters = 2; // Filters to restrict statistics on get operations.
+                              // Leave unset for all statistics.
+}
+
+message StatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    Stats stats = 3;
+}
+
+//--------------------------------------------------------------------------------------------------
+message DevicePciInfo {
+    string bus_id = 1;
+    uint32 vendor_id = 2; // Only low 16-bits are valid (uint16 not supported by protobuf).
+    uint32 device_id = 3; // Only low 16-bits are valid (uint16 not supported by protobuf).
+}
+
+message DeviceBuildInfo {
+    uint32 number = 1; // Value from syscfg.usr_access.
+    uint32 status = 2; // Value from syscfg.build_status.
+    repeated uint32 dna = 3; // Array of length 3, value from syscfg.dna[3] (same ordering).
+}
+
+message DeviceInfo {
+    DevicePciInfo pci = 1;
+    DeviceBuildInfo build = 2;
+}
+
+message DeviceInfoRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+}
+
+message DeviceInfoResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    DeviceInfo info = 3;
+}
+
+//--------------------------------------------------------------------------------------------------
+enum MatchType {
+    MATCH_TYPE_UNKNOWN = 0; // Field is unset.
+    MATCH_TYPE_BITFIELD = 1;
+    MATCH_TYPE_CONSTANT = 2;
+    MATCH_TYPE_PREFIX = 3;
+    MATCH_TYPE_RANGE = 4;
+    MATCH_TYPE_TERNARY = 5;
+    MATCH_TYPE_UNUSED = 6;
+}
+
+message MatchInfo {
+    MatchType type = 1;
+    uint32 width = 2;
+}
+
+message ActionParameterInfo {
+    string name = 1;
+    uint32 width = 2;
+}
+
+message ActionInfo {
+    string name = 1;
+    uint32 width = 2;
+    repeated ActionParameterInfo parameters = 3;
+}
+
+enum TableEndian {
+    TABLE_ENDIAN_UNKNOWN = 0; // Field is unset.
+    TABLE_ENDIAN_LITTLE = 1;
+    TABLE_ENDIAN_BIG = 2;
+}
+
+enum TableMode {
+    TABLE_MODE_UNKNOWN = 0; // Field is unset.
+    TABLE_MODE_BCAM = 1;
+    TABLE_MODE_STCAM = 2;
+    TABLE_MODE_TCAM = 3;
+    TABLE_MODE_DCAM = 4;
+    TABLE_MODE_TINY_BCAM = 5;
+    TABLE_MODE_TINY_TCAM = 6;
+}
+
+message TableInfo {
+    string name = 1;
+    uint32 num_entries = 2;
+    TableEndian endian = 3;
+    TableMode mode = 4;
+    uint32 num_masks = 5; // Only valid when mode is TABLE_MODE_STCAM.
+    bool priority_required = 6;
+
+    uint32 key_width = 10;
+    uint32 response_width = 11;
+    uint32 priority_width = 12; // Special case: 255 (0xff) means width is automatically computed.
+    uint32 action_id_width = 13;
+
+    repeated MatchInfo matches = 20;
+    repeated ActionInfo actions = 21;
+}
+
+enum CounterType {
+    COUNTER_TYPE_UNKNOWN = 0;
+    COUNTER_TYPE_PACKETS = 1;
+    COUNTER_TYPE_BYTES = 2;
+    COUNTER_TYPE_PACKETS_AND_BYTES = 3;
+    COUNTER_TYPE_FLAG = 4;
+}
+
+message CounterBlockInfo {
+    string name = 1;
+    CounterType type = 2;
+    uint32 width = 3;
+    uint32 num_counters = 4;
+}
+
+message PipelineInfo {
+    string name = 1;
+    repeated TableInfo tables = 2;
+    repeated CounterBlockInfo counter_blocks = 3;
+}
+
+message PipelineInfoRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+}
+
+message PipelineInfoResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+    PipelineInfo info = 4;
+}
+
+message PipelineStatsRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+    StatsFilters filters = 3; // Filters to restrict statistics on get operations.
+                              // Leave unset for all counter statistics.
+}
+
+message PipelineStatsResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+    Stats stats = 4;
+}
+
+//--------------------------------------------------------------------------------------------------
+message TableRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+    string table_name = 3; // Table to operate on. Leave empty for all tables.
+}
+
+message TableResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+}
+
+message MatchKeyMask {
+    string key = 1;
+    string mask = 2;
+}
+
+message MatchKeyOnly {
+    string key = 1;
+}
+
+message MatchKeyPrefix {
+    string key = 1;
+    uint32 prefix_length = 2;
+}
+
+message MatchRange {
+    uint32 lower = 1;
+    uint32 upper = 2;
+}
+
+message Match {
+    oneof type {
+        MatchKeyMask key_mask = 1;
+        MatchKeyOnly key_only = 2;
+        MatchKeyPrefix key_prefix = 3;
+        MatchRange range = 4;
+        bool unused = 5;
+    }
+}
+
+message ActionParameter {
+    string value = 1;
+}
+
+message Action {
+    string name = 1;
+    repeated ActionParameter parameters = 2;
+}
+
+message TableRule {
+    string table_name = 1;
+    uint32 priority = 2; // Only used for insert operation.
+    bool replace = 3; // Only used for insert operation.
+    repeated Match matches = 4;
+    Action action = 5; // Leave unset for delete operation.
+}
+
+message TableRuleRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+    repeated TableRule rules = 3;
+}
+
+message TableRuleResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+}
+
+//--------------------------------------------------------------------------------------------------
+message ServerStatus {
+    google.protobuf.Timestamp start_time = 1; // UTC wall clock.
+    google.protobuf.Duration up_time = 2; // Diff of monotonic system clock.
+}
+
+message ServerStatusRequest {
+}
+
+message ServerStatusResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    ServerStatus status = 2;
+}
+
+enum ServerDebugFlag {
+    DEBUG_FLAG_UNKNOWN = 0;
+    DEBUG_FLAG_TABLE_CLEAR = 1;
+    DEBUG_FLAG_TABLE_RULE_INSERT = 2;
+    DEBUG_FLAG_TABLE_RULE_DELETE = 3;
+}
+
+message ServerDebug {
+    repeated ServerDebugFlag enables = 1;
+    repeated ServerDebugFlag disables = 2;
+}
+
+message ServerConfig {
+    ServerDebug debug = 1;
+}
+
+message ServerConfigRequest {
+    // Configuration data used for set operations. Leave unset for get operations.
+    ServerConfig config = 1;
+}
+
+message ServerConfigResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+
+    // Configuration data returned on get operations. Will be unset for set operations.
+    ServerConfig config = 2;
+}
+
+//--------------------------------------------------------------------------------------------------
+enum BatchOperation {
+    BOP_UNKNOWN = 0; // Field is unset.
+    BOP_GET = 1;
+    BOP_SET = 2;
+    BOP_CLEAR = 3;
+    BOP_INSERT = 4;
+    BOP_DELETE = 5;
+}
+
+message BatchRequest {
+    BatchOperation op = 1;
+
+    // Field IDs 2-9 are reserved for future use.
+
+    oneof item {
+        // Device configuration.
+        DeviceInfoRequest device_info = 10;
+
+        // Pipeline configuration.
+        PipelineInfoRequest pipeline_info = 20;
+        PipelineStatsRequest pipeline_stats = 21;
+
+        // Table configuration.
+        TableRequest table = 30;
+        TableRuleRequest table_rule = 31;
+
+        // Statistics configuration.
+        StatsRequest stats = 40;
+
+        // Server configuration.
+        ServerStatusRequest server_status = 50;
+        ServerConfigRequest server_config = 51;
+    };
+}
+
+message BatchResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    BatchOperation op = 2;
+
+    // Field IDs 2-9 are reserved for future use.
+
+    oneof item {
+        // Device configuration.
+        DeviceInfoResponse device_info = 10;
+
+        // Pipeline configuration.
+        PipelineInfoResponse pipeline_info = 20;
+        PipelineStatsResponse pipeline_stats = 21;
+
+        // Table configuration.
+        TableResponse table = 30;
+        TableRuleResponse table_rule = 31;
+
+        // Statistics configuration.
+        StatsResponse stats = 40;
+
+        // Server configuration.
+        ServerStatusResponse server_status = 50;
+        ServerConfigResponse server_config = 51;
+    };
+}
+
+//--------------------------------------------------------------------------------------------------
+service SmartnicP4 {
+    // Batching of multiple RPCs.
+    rpc Batch(stream BatchRequest) returns (stream BatchResponse);
+
+    // Device configuration.
+    rpc GetDeviceInfo(DeviceInfoRequest) returns (stream DeviceInfoResponse);
+
+    // Pipeline configuration.
+    rpc GetPipelineInfo(PipelineInfoRequest) returns (stream PipelineInfoResponse);
+    rpc GetPipelineStats(PipelineStatsRequest) returns (stream PipelineStatsResponse);
+    rpc ClearPipelineStats(PipelineStatsRequest) returns (stream PipelineStatsResponse);
+
+    // Table configuration.
+    rpc ClearTable(TableRequest) returns (stream TableResponse);
+    rpc InsertTableRule(TableRuleRequest) returns (stream TableRuleResponse);
+    rpc DeleteTableRule(TableRuleRequest) returns (stream TableRuleResponse);
+
+    // Statistics configuration.
+    rpc GetStats(StatsRequest) returns (stream StatsResponse);
+    rpc ClearStats(StatsRequest) returns (stream StatsResponse);
+
+    // Server configuration.
+    rpc GetServerConfig(ServerConfigRequest) returns (stream ServerConfigResponse);
+    rpc SetServerConfig(ServerConfigRequest) returns (stream ServerConfigResponse);
+    rpc GetServerStatus(ServerStatusRequest) returns (stream ServerStatusResponse);
+}

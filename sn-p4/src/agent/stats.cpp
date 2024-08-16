@@ -6,17 +6,26 @@
 #include <cstdlib>
 
 #include <grpc/grpc.h>
-#include "sn_cfg_v1.grpc.pb.h"
+#include "sn_p4_v2.grpc.pb.h"
 
 using namespace grpc;
+using namespace sn_p4::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
 extern "C" {
     int get_stats_for_each_metric(const struct stats_for_each_spec* spec) {
         GetStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
-        if (ctx->non_zero && spec->values->u64 == 0) {
-            return 0;
+
+        if (ctx->non_zero) {
+            bool non_zero = false;
+            for (auto v = spec->values; !non_zero && v < &spec->values[spec->nvalues]; ++v) {
+                non_zero = v->u64 != 0;
+            }
+
+            if (!non_zero) {
+                return 0;
+            }
         }
 
         StatsMetricType type;
@@ -41,22 +50,35 @@ extern "C" {
         auto metric = ctx->stats->add_metrics();
         metric->set_type(type);
         metric->set_name(spec->metric->name);
+        metric->set_num_elements(spec->metric->nelements);
 
         auto scope = metric->mutable_scope();
         scope->set_domain(spec->domain->name);
         scope->set_zone(spec->zone->name);
         scope->set_block(spec->block->name);
 
-        auto value = metric->mutable_value();
-        value->set_u64(spec->values->u64);
-        value->set_f64(spec->values->f64);
+        auto last_update = metric->mutable_last_update();
+        last_update->set_seconds(spec->last_update.tv_sec);
+        last_update->set_nanos(spec->last_update.tv_nsec);
+
+        for (unsigned int idx = 0; idx < spec->nvalues; ++idx) {
+            auto v = &spec->values[idx];
+            if (ctx->non_zero && v->u64 == 0) {
+                continue;
+            }
+
+            auto value = metric->add_values();
+            value->set_index(idx);
+            value->set_u64(v->u64);
+            value->set_f64(v->f64);
+        }
 
         return 0;
     }
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::get_or_clear_stats(
+void SmartnicP4Impl::get_or_clear_stats(
     const StatsRequest& req,
     bool do_clear,
     function<void(const StatsResponse&)> write_resp) {
@@ -115,7 +137,7 @@ void SmartnicConfigImpl::get_or_clear_stats(
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::batch_get_stats(
+void SmartnicP4Impl::batch_get_stats(
     const StatsRequest& req,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
     get_or_clear_stats(req, false, [&rdwr](const StatsResponse& resp) -> void {
@@ -123,12 +145,13 @@ void SmartnicConfigImpl::batch_get_stats(
         auto stats = bresp.mutable_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
 
 //--------------------------------------------------------------------------------------------------
-Status SmartnicConfigImpl::GetStats(
+Status SmartnicP4Impl::GetStats(
     [[maybe_unused]] ServerContext* ctx,
     const StatsRequest* req,
     ServerWriter<StatsResponse>* writer) {
@@ -139,7 +162,7 @@ Status SmartnicConfigImpl::GetStats(
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::batch_clear_stats(
+void SmartnicP4Impl::batch_clear_stats(
     const StatsRequest& req,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
     get_or_clear_stats(req, true, [&rdwr](const StatsResponse& resp) -> void {
@@ -147,12 +170,13 @@ void SmartnicConfigImpl::batch_clear_stats(
         auto stats = bresp.mutable_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
         rdwr->Write(bresp);
     });
 }
 
 //--------------------------------------------------------------------------------------------------
-Status SmartnicConfigImpl::ClearStats(
+Status SmartnicP4Impl::ClearStats(
     [[maybe_unused]] ServerContext* ctx,
     const StatsRequest* req,
     ServerWriter<StatsResponse>* writer) {

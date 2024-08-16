@@ -43,11 +43,16 @@ extern bool snp4_table_delete_k(void * snp4_handle,
 				size_t    key_len,
 				uint8_t * mask,
 				size_t    mask_len);
+extern bool snp4_table_ecc_counters_read(void * snp4_handle,
+                                         const char * table_name,
+                                         uint32_t * corrected_single_bit_errors,
+                                         uint32_t * detected_double_bit_errors);
 extern void snp4_print_target_config (unsigned int sdnet_idx);
 
 // Define some limits for the supported pipeline properties handled by this library
 // NOTE: These are not necessarily related to the limits of the underlying hardware
 #define SNP4_MAX_PIPELINE_TABLES 64
+#define SNP4_MAX_PIPELINE_COUNTER_BLOCKS 64
 #define SNP4_MAX_TABLE_MATCHES 64
 #define SNP4_MAX_TABLE_ACTIONS 64
 #define SNP4_MAX_ACTION_PARAMS 64
@@ -77,8 +82,6 @@ enum snp4_info_match_type {
 };
 
 struct snp4_info_match {
-  const char * name;
-
   enum snp4_info_match_type type;
   uint16_t bits;
 };
@@ -88,10 +91,22 @@ enum snp4_info_table_endian {
   SNP4_INFO_TABLE_ENDIAN_BIG = 1,
 };
 
+enum snp4_info_table_mode {
+  SNP4_INFO_TABLE_MODE_BCAM,
+  SNP4_INFO_TABLE_MODE_STCAM,
+  SNP4_INFO_TABLE_MODE_TCAM,
+  SNP4_INFO_TABLE_MODE_DCAM,
+  SNP4_INFO_TABLE_MODE_TINY_BCAM,
+  SNP4_INFO_TABLE_MODE_TINY_TCAM,
+};
+
 struct snp4_info_table {
   const char * name;
+  uint32_t num_entries;
 
   enum snp4_info_table_endian endian;
+  enum snp4_info_table_mode mode;
+  uint32_t num_masks; // Only valid when mode is SNP4_INFO_TABLE_MODE_STCAM.
 
   uint16_t key_bits;
   struct snp4_info_match matches[SNP4_MAX_TABLE_MATCHES];
@@ -106,9 +121,26 @@ struct snp4_info_table {
   uint16_t priority_bits;
 };
 
+enum snp4_info_counter_type {
+  SNP4_INFO_COUNTER_TYPE_PACKETS,
+  SNP4_INFO_COUNTER_TYPE_BYTES,
+  SNP4_INFO_COUNTER_TYPE_PACKETS_AND_BYTES,
+  SNP4_INFO_COUNTER_TYPE_FLAG,
+};
+
+struct snp4_info_counter_block {
+  const char * name;
+  enum snp4_info_counter_type type;
+  uint32_t width;
+  uint32_t num_counters;
+};
+
 struct snp4_info_pipeline {
+  const char * name;
   struct snp4_info_table tables[SNP4_MAX_PIPELINE_TABLES];
   uint16_t num_tables;
+  struct snp4_info_counter_block counter_blocks[SNP4_MAX_PIPELINE_COUNTER_BLOCKS];
+  uint16_t num_counter_blocks;
 };
 
 enum snp4_status {
@@ -151,6 +183,10 @@ enum snp4_status {
   SNP4_STATUS_INFO_TOO_MANY_ACTIONS,
   SNP4_STATUS_INFO_TOO_MANY_PARAMS,
   SNP4_STATUS_INFO_INVALID_ENDIAN,
+  SNP4_STATUS_INFO_INVALID_MODE,
+
+  SNP4_STATUS_INFO_TOO_MANY_COUNTER_BLOCKS,
+  SNP4_STATUS_INFO_INVALID_COUNTER_TYPE,
 };
 
 extern enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info_pipeline * pipeline);
@@ -158,6 +194,7 @@ extern const struct snp4_info_table * snp4_info_get_table_by_name(const struct s
 extern const struct snp4_info_action * snp4_info_get_action_by_name(const struct snp4_info_table * table, const char * action_name);
 
 enum sn_match_format {
+  SN_MATCH_FORMAT_UNSET,
   SN_MATCH_FORMAT_KEY_MASK,
   SN_MATCH_FORMAT_KEY_ONLY,
   SN_MATCH_FORMAT_PREFIX,
@@ -194,6 +231,7 @@ struct sn_match {
 };
 
 enum sn_param_format {
+  SN_PARAM_FORMAT_UNSET,
   SN_PARAM_FORMAT_UI,	/* unsigned long */
   SN_PARAM_FORMAT_MPZ,	/* mpz_t */
 };
@@ -207,12 +245,12 @@ struct sn_param {
 };
 
 struct sn_rule {
-  char * table_name;
-  
+  const char * table_name;
+
   struct sn_match matches[SNP4_MAX_TABLE_MATCHES];
   size_t num_matches;
 
-  char * action_name;
+  const char * action_name;
   struct sn_param params[SNP4_MAX_ACTION_PARAMS];
   size_t num_params;
 
@@ -233,7 +271,9 @@ struct sn_pack {
 extern enum snp4_status snp4_rule_pack(const struct snp4_info_pipeline * pipeline, const struct sn_rule * rule, struct sn_pack * pack);
 extern enum snp4_status snp4_rule_pack_matches(const struct snp4_info_match match_info_specs[], unsigned int key_size_bits, const struct sn_match matches[], size_t num_matches, struct sn_pack * pack);
 extern enum snp4_status snp4_rule_pack_params(const struct snp4_info_param param_info_specs[], unsigned int table_param_size_bits, unsigned int action_param_size_bits, const struct sn_param params[], size_t num_params, struct sn_pack * pack);
+extern void snp4_rule_init(struct sn_rule * rule);
 extern void snp4_rule_clear(struct sn_rule * rule);
+extern void snp4_pack_init(struct sn_pack * pack);
 extern void snp4_pack_clear(struct sn_pack * pack);
 extern void snp4_rule_param_clear(struct sn_param *param);
 extern void snp4_rule_match_clear(struct sn_match *match);
@@ -262,6 +302,16 @@ struct sn_cfg_set {
 
 extern struct sn_cfg_set *snp4_cfg_set_load_p4bm(FILE * f);
 extern void snp4_cfg_set_free(struct sn_cfg_set *cfg_set);
+
+// NOTE: Counters are cleared on read by the underlying vitisnetp4 driver.
+extern bool snp4_counter_simple_read(void * snp4_handle, const char * block_name, uint32_t index, uint64_t * count);
+extern bool snp4_counter_simple_write(void * snp4_handle, const char * block_name, uint32_t index, uint64_t value);
+extern bool snp4_counter_combo_read(void * snp4_handle, const char * block_name, uint32_t index, uint64_t * packets, uint64_t * bytes);
+extern bool snp4_counter_combo_write(void * snp4_handle, const char * block_name, uint32_t index, uint64_t packets, uint64_t bytes);
+extern bool snp4_counter_block_simple_read(void * snp4_handle, const char * block_name, uint64_t * counts, size_t ncounts); // counts is array of size ncounts
+extern bool snp4_counter_block_combo_read(void * snp4_handle, const char * block_name, uint64_t * packets, uint64_t * bytes, size_t ncounts); // packets/bytes are arrays of size ncounts
+extern bool snp4_counter_block_reset(void * snp4_handle, const char * block_name);
+extern bool snp4_counter_block_reset_all(void * snp4_handle);
 
 #ifdef __cplusplus
 }

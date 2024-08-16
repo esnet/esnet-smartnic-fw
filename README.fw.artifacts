@@ -70,9 +70,28 @@ $ tree /usr/local/bin/
 ├── regio-elaborate         <------------ regio tools used for regmap parsing during firmware build
 ├── regio-generate
 ├── regio-info
-├── sn-cli                  <------------ smartnic cli tool for interacting with the esnet-smartnic platform blocks in the FPGA
-├── sn-p4-agent             <------------ smartnic p4 gRPC server which is automatically started and listens for p4 table commands
-└── sn-p4-cli               <------------ smartnic p4 gRPC client which can send commands to the p4 agent for table inserts/deletes
+├── sn-cfg                  <------------ smartnic platform configuration gRPC client which can send commands to the agent for operating on the esnet-smartnic FPGA
+├── sn-cfg-agent            <------------ smartnic platform configuration gRPC server which is automatically started and listens for commands for operating on the esnet-smartnic FPGA
+├── sn-p4                   <------------ smartnic p4 gRPC client which can send commands to the p4 agent for table inserts/deletes
+└── sn-p4-agent             <------------ smartnic p4 gRPC server which is automatically started and listens for p4 table commands
+```
+
+Python packages
+```
+$ tree -L 1 /usr/local/lib/python3.8/dist-packages
+/usr/local/lib/python3.8/dist-packages
+...
+├── regio                   <------------ library for programmatic register accesses
+├── regmap_esnet_smartnic   <------------ auto-generated programmatic register map for the esnet-smartnic FPGA
+├── sn_cfg                  <------------ library for the sn-cfg gRPC client tool
+├── sn_cfg_proto            <------------ library wrapper for the sn-cfg auto-generated protobuf and gRPC code
+├── sn_cfg_v1_pb2.py        <------------ auto-generated protobuf code for the messages supported by sn-cfg-agent
+├── sn_cfg_v1_pb2_grpc.py   <------------ auto-generated gRPC code for use by clients of sn-cfg-agent
+├── sn_p4                   <------------ library for the sn-p4 gRPC client tool
+├── sn_p4_proto             <------------ library wrapper for the sn-p4 auto-generated probotbuf and gRPC code
+├── sn_p4_v2_pb2.py         <------------ auto-generated protobuf code for the messages supported by sn-p4-agent
+├── sn_p4_v2_pb2_grpc.py    <------------ auto-generated gRPC code for use by clients of sn-p4-agent
+...
 ```
 
 C language header files used during builds

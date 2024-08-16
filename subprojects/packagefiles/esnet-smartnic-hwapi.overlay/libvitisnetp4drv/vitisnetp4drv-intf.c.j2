@@ -19,6 +19,18 @@ const struct vitis_net_p4_drv_intf vitis_net_p4_drv_intf_{{ ip_name }} = {
         .stub_env_if = XilVitisNetP4StubEnvIf,
     },
 
+    .counter = {
+        .init = XilVitisNetP4CounterInit,
+        .exit = XilVitisNetP4CounterExit,
+        .reset = XilVitisNetP4CounterReset,
+        .simple_read = XilVitisNetP4CounterSimpleRead,
+        .simple_write = XilVitisNetP4CounterSimpleWrite,
+        .combo_read = XilVitisNetP4CounterComboRead,
+        .combo_write = XilVitisNetP4CounterComboWrite,
+        .collect_simple_read = XilVitisNetP4CounterCollectRead,
+        .collect_combo_read = XilVitisNetP4CounterCollectComboRead,
+    },
+
     .table = {
         .reset = XilVitisNetP4TableReset,
         .update = XilVitisNetP4TableUpdate,
@@ -26,6 +38,7 @@ const struct vitis_net_p4_drv_intf vitis_net_p4_drv_intf_{{ ip_name }} = {
         .insert = XilVitisNetP4TableInsert,
         .get_action_id = XilVitisNetP4TableGetActionId,
         .get_mode = XilVitisNetP4TableGetMode,
+        .get_ecc_counters = XilVitisNetP4TableGetEccCountersClearOnRead,
     },
 
     .target = {

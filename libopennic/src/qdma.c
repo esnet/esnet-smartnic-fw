@@ -71,11 +71,12 @@ static const struct stats_metric_spec cmac_adapter_stats_metrics[] = {
 };
 
 //--------------------------------------------------------------------------------------------------
-static uint64_t cmac_adapter_stats_read_metric(const struct stats_block_spec* bspec,
-                                               const struct stats_metric_spec* mspec,
-                                               void* UNUSED(data)) {
+static void cmac_adapter_stats_read_metric(const struct stats_block_spec* bspec,
+                                           const struct stats_metric_spec* mspec,
+                                           uint64_t* value,
+                                           void* UNUSED(data)) {
     volatile uint32_t* pair = (typeof(pair))(bspec->io.base + mspec->io.offset);
-    return ((uint64_t)pair[1] << 32) | (uint64_t)pair[0];
+    *value = ((uint64_t)pair[1] << 32) | (uint64_t)pair[0];
 }
 
 //--------------------------------------------------------------------------------------------------

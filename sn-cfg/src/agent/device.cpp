@@ -269,7 +269,7 @@ extern "C" {
             auto alarm = ctx->status->add_alarms();
             alarm->set_source(spec->zone->name);
             alarm->set_name(spec->metric->name);
-            alarm->set_active(spec->value.u64 != 0);
+            alarm->set_active(spec->values->u64 != 0);
             break;
         }
 
@@ -277,7 +277,7 @@ extern "C" {
             auto mon = ctx->status->add_monitors();
             mon->set_source(spec->zone->name);
             mon->set_name(spec->metric->name);
-            mon->set_value(spec->value.f64);
+            mon->set_value(spec->values->f64);
             break;
         }
 

@@ -32,9 +32,13 @@ description = "Python interface to the SmartNIC P4 agent."
 authors = []
 
 [tool.poetry.dependencies]
+click = "^8.1.7"
 grpcio = "^1.60.0"
 python = "^3.8"
 sn_p4_proto = "^0.1.0"
+
+[tool.poetry.scripts]
+sn-p4 = "sn_p4.client:main"
 
 [build-system]
 requires = ["poetry-core"]

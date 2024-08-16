@@ -1,6 +1,6 @@
 #---------------------------------------------------------------------------------------------------
 base_name = 'sn_p4'
-proto_file = base_name + '_v1.proto'
+v2_proto_file = base_name + '_v2.proto'
 py_pkg_name = base_name + '_proto'
 py_pkg_ver = '0.1.0'
 py_pkg_stem = py_pkg_name + '-' + py_pkg_ver
@@ -8,8 +8,8 @@ py_pkg_desc = 'SmartNIC P4'
 
 #---------------------------------------------------------------------------------------------------
 # C++ generetor.
-sn_p4_proto_cpp = declare_dependency(
-    sources: protoc_cpp_gen.process(proto_file),
+sn_p4_v2_proto_cpp = declare_dependency(
+    sources: protoc_cpp_gen.process(v2_proto_file),
     dependencies: [
         libgrpcpp,
         libprotobuf,
@@ -18,11 +18,13 @@ sn_p4_proto_cpp = declare_dependency(
 
 #---------------------------------------------------------------------------------------------------
 # Python generator.
+src_dir = 'python/'
 custom_target(
     py_pkg_name,
     input: [
-        'python/__init__.py',
-        protoc_py_gen.process(proto_file),
+        src_dir + '__init__.py',
+        src_dir + 'v2/__init__.py',
+        protoc_py_gen.process(v2_proto_file),
     ],
     output: [
         py_pkg_stem + '-py3-none-any.whl',
@@ -35,6 +37,7 @@ custom_target(
         py_pkg_desc,
         '@PRIVATE_DIR@',
         '@OUTDIR@',
+        '@CURRENT_SOURCE_DIR@/' + src_dir,
         '@INPUT@',
     ],
     install: true,

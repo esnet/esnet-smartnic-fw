@@ -2,7 +2,9 @@
 #include <stdint.h> /* uint32_t */
 #include <gmp.h>    /* mpz_* */
 #include <stdio.h>  /* stderr, NULL */
+#include <string.h> /* memset */
 
+#include "array_size.h"
 #include "snp4.h"		/* API */
 
 static enum snp4_status pack_partial_key_mask(mpz_t *key_part, mpz_t *mask_part, const struct sn_match *match, const struct snp4_info_match *match_info_spec) {
@@ -376,6 +378,7 @@ enum snp4_status snp4_rule_pack_params(const struct snp4_info_param param_info_s
 void snp4_rule_param_clear(struct sn_param *param)
 {
     switch (param->t) {
+    case SN_PARAM_FORMAT_UNSET:
     case SN_PARAM_FORMAT_UI:
       // Nothing to free
       break;
@@ -386,6 +389,7 @@ void snp4_rule_param_clear(struct sn_param *param)
       // Unknown encoding
       break;
     }
+    param->t = SN_PARAM_FORMAT_UNSET;
 }
 
 void snp4_rule_match_clear(struct sn_match *match)
@@ -405,34 +409,45 @@ void snp4_rule_match_clear(struct sn_match *match)
     // Nothing to free
     break;
   case SN_MATCH_FORMAT_UNUSED:
+  case SN_MATCH_FORMAT_UNSET:
     // Nothing to free
     break;
   default:
     // Unknown encoding
     break;
   }
+  match->t = SN_MATCH_FORMAT_UNSET;
+}
+
+void snp4_rule_init(struct sn_rule * rule)
+{
+  memset(rule, 0, sizeof(*rule));
+
+  for (unsigned int i = 0; i < ARRAY_SIZE(rule->matches); i++) {
+    rule->matches[i].t = SN_MATCH_FORMAT_UNSET;
+  }
+
+  for (unsigned int i = 0; i < ARRAY_SIZE(rule->params); i++) {
+    rule->params[i].t = SN_PARAM_FORMAT_UNSET;
+  }
 }
 
 void snp4_rule_clear(struct sn_rule * rule)
 {
-  if (rule->table_name) {
-    free(rule->table_name);
-    rule->table_name = NULL;
-  }
-  if (rule->action_name) {
-    free(rule->action_name);
-    rule->action_name = NULL;
-  }
-
   for (unsigned int i = 0; i < rule->num_matches; i++) {
     snp4_rule_match_clear(&rule->matches[i]);
-    rule->matches[i].t = SN_MATCH_FORMAT_UNUSED;
+    rule->matches[i].t = SN_MATCH_FORMAT_UNSET;
   }
 
   for (unsigned int i = 0; i < rule->num_params; i++) {
     snp4_rule_param_clear(&rule->params[i]);
-    rule->params[i].t = SN_PARAM_FORMAT_UI;
+    rule->params[i].t = SN_PARAM_FORMAT_UNSET;
   }
+}
+
+void snp4_pack_init(struct sn_pack * pack)
+{
+  memset(pack, 0, sizeof(*pack));
 }
 
 void snp4_pack_clear(struct sn_pack * pack)
@@ -469,9 +484,7 @@ enum snp4_status snp4_rule_pack(const struct snp4_info_pipeline * pipeline, cons
 
   // Ensure that the pointers in the pack struct are initialized to NULL so cleanup
   // is well defined.
-  pack->key    = NULL;
-  pack->mask   = NULL;
-  pack->params = NULL;
+  snp4_pack_init(pack);
 
   // Load the table and action info required for packing
   const struct snp4_info_table * table_info = snp4_info_get_table_by_name(pipeline, rule->table_name);

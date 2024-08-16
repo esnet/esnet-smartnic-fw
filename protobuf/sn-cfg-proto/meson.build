@@ -18,10 +18,11 @@ sn_cfg_proto_cpp = declare_dependency(
 
 #---------------------------------------------------------------------------------------------------
 # Python generator.
+src_dir = 'python/'
 custom_target(
     py_pkg_name,
     input: [
-        'python/__init__.py',
+        src_dir + '__init__.py',
         protoc_py_gen.process(proto_file),
     ],
     output: [
@@ -35,6 +36,7 @@ custom_target(
         py_pkg_desc,
         '@PRIVATE_DIR@',
         '@OUTDIR@',
+        '@CURRENT_SOURCE_DIR@/' + src_dir,
         '@INPUT@',
     ],
     install: true,

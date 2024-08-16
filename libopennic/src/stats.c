@@ -1,6 +1,7 @@
 #include "array_size.h"
 #include "prom.h"
 #include "stats.h"
+#include "unused.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -10,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 //--------------------------------------------------------------------------------------------------
@@ -19,12 +21,20 @@
     {log_err(_rv, _format,## _args); exit(EXIT_FAILURE);}
 
 //--------------------------------------------------------------------------------------------------
+struct stats_metric_element {
+    struct stats_metric_value value;
+    uint64_t last;
+
+    const char** label_values;
+};
+
 struct stats_metric {
     struct stats_metric_spec spec;
     struct stats_block* block;
 
-    struct stats_metric_value value;
-    uint64_t last;
+    struct stats_metric_element* elements;
+    size_t nelements;
+
     uint64_t mask;
 
     struct {
@@ -38,6 +48,9 @@ struct stats_block {
     struct stats_zone* zone;
 
     struct stats_metric** metrics;
+    size_t nvalues;
+
+    struct timespec last_update;
 
     struct {
         prom_collector_t* collector;
@@ -51,7 +64,7 @@ struct stats_zone {
     struct stats_zone* next;
 
     struct stats_block** blocks;
-    size_t nmetrics;
+    size_t nvalues;
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -59,7 +72,7 @@ struct stats_domain {
     struct stats_domain_spec spec;
 
     struct stats_zone* zones;
-    size_t nmetrics;
+    size_t nvalues;
 
     struct {
         bool running;
@@ -85,40 +98,121 @@ static inline void stats_domain_unlock(struct stats_domain* domain) {
 }
 
 //--------------------------------------------------------------------------------------------------
-static uint64_t __stats_metric_read(struct stats_metric* metric) {
-    const struct stats_metric_spec* spec = &metric->spec;
-    volatile void* addr = metric->block->spec.io.base + spec->io.offset;
-    uint64_t value = 0;
+static const char* stats_label_value_domain(const struct stats_label_format_spec* spec) {
+    return spec->domain->name;
+}
 
-    switch (spec->io.size) {
-#define METRIC_READ(_width, _addr) (uint64_t)(*((volatile uint##_width##_t*)addr))
-    case 1: value = METRIC_READ(8, addr); break;
-    case 2: value = METRIC_READ(16, addr); break;
-    case 4: value = METRIC_READ(32, addr); break;
-    case 8: value = METRIC_READ(64, addr); break;
-#undef METRIC_READ
+static const char* stats_label_value_zone(const struct stats_label_format_spec* spec) {
+    return spec->zone->name;
+}
 
-    default:
-        log_panic(EINVAL, "Invalid size %zu bytes for metric %s at offset 0x%" PRIxPTR,
-                  spec->io.size, spec->name, spec->io.offset);
-        break;
-    }
+static const char* stats_label_value_block(const struct stats_label_format_spec* spec) {
+    return spec->block->name;
+}
 
-    if (spec->io.invert) {
-        value = ~value;
-    }
+static const struct stats_label_spec default_stats_labels[] = {
+    {
+        .key = "domain",
+        .value_alloc = stats_label_value_domain,
+    },
+    {
+        .key = "zone",
+        .value_alloc = stats_label_value_zone,
+    },
+    {
+        .key = "block",
+        .value_alloc = stats_label_value_block,
+    },
+};
+#define DEFAULT_STATS_LABELS_COUNT ARRAY_SIZE(default_stats_labels)
 
-    if (spec->io.width > 0) {
-        value >>= spec->io.shift;
-        value &= metric->mask;
+//--------------------------------------------------------------------------------------------------
+static const char* stats_label_value_index(const struct stats_label_format_spec* spec) {
+    char* value;
+    int rv = asprintf(&value, "%u", spec->idx);
+    if (rv < 0) {
+        log_panic(ENOMEM, "failed to allocate label for index %u of metric %s",
+                  spec->idx, spec->metric->name);
     }
 
     return value;
 }
 
+static const struct stats_label_spec array_stats_labels[] = {
+    {
+        .key = "index",
+        .value_alloc = stats_label_value_index,
+        .value_free = stats_label_value_free,
+    },
+};
+#define ARRAY_STATS_LABELS_COUNT ARRAY_SIZE(array_stats_labels)
+
+//--------------------------------------------------------------------------------------------------
+static void __stats_metric_read(struct stats_metric* metric, uint64_t* values) {
+    const struct stats_metric_spec* spec = &metric->spec;
+    volatile void* addr = metric->block->spec.io.base + spec->io.offset;
+
+    for (unsigned int n = 0; n < metric->nelements; ++n) {
+        uint64_t value = 0;
+        switch (spec->io.size) {
+#define METRIC_READ(_width, _addr) (uint64_t)(*((volatile uint##_width##_t*)addr))
+        case 1: value = METRIC_READ(8, addr); break;
+        case 2: value = METRIC_READ(16, addr); break;
+        case 4: value = METRIC_READ(32, addr); break;
+        case 8: value = METRIC_READ(64, addr); break;
+#undef METRIC_READ
+
+        default:
+            log_panic(EINVAL, "Invalid size %zu bytes for metric %s at offset 0x%" PRIxPTR,
+                      spec->io.size, spec->name, spec->io.offset);
+            break;
+        }
+
+        if (spec->io.invert) {
+            value = ~value;
+        }
+
+        if (spec->io.width > 0) {
+            value >>= spec->io.shift;
+            value &= metric->mask;
+        }
+
+        values[n] = value;
+        addr += spec->io.size;
+    }
+}
+
 //--------------------------------------------------------------------------------------------------
 static void __stats_metric_attach(struct stats_metric* metric, struct stats_block* blk) {
     metric->block = blk;
+    blk->nvalues += metric->nelements;
+
+    const struct stats_metric_spec* spec = &metric->spec;
+    struct stats_label_format_spec fspec = {
+        .domain = &blk->zone->domain->spec,
+        .zone = &blk->zone->spec,
+        .block = &blk->spec,
+        .metric = spec,
+    };
+
+    for (unsigned int n = 0; n < metric->nelements; ++n) {
+        struct stats_metric_element* e = &metric->elements[n];
+
+        fspec.idx = n;
+        const char** lv = e->label_values;
+        for (const struct stats_label_spec* lspec = spec->labels;
+             lspec < &spec->labels[spec->nlabels];
+             ++lspec, ++lv) {
+            fspec.label = lspec;
+            if (lspec->value_alloc != NULL) {
+                *lv = lspec->value_alloc(&fspec);
+            } else if (lspec->value != NULL) {
+                *lv = lspec->value;
+            } else {
+                *lv = "";
+            }
+        }
+    }
 
     int rv = prom_collector_add_metric(blk->prometheus.collector, metric->prometheus.metric);
     if (rv != 0) {
@@ -128,6 +222,21 @@ static void __stats_metric_attach(struct stats_metric* metric, struct stats_bloc
 
 //--------------------------------------------------------------------------------------------------
 static void __stats_metric_detach(struct stats_metric* metric) {
+    const struct stats_metric_spec* spec = &metric->spec;
+    for (struct stats_metric_element* e = metric->elements;
+         e < &metric->elements[metric->nelements];
+         ++e) {
+        const char** lv = e->label_values;
+        for (const struct stats_label_spec* lspec = spec->labels;
+             lspec < &spec->labels[spec->nlabels];
+             ++lspec, ++lv) {
+            if (lspec->value_free != NULL) {
+                lspec->value_free(*lv);
+                *lv = NULL;
+            }
+        }
+    }
+
     int rv = prom_collector_remove_metric(metric->block->prometheus.collector,
                                           metric->prometheus.metric);
     if (rv != 0) {
@@ -135,6 +244,7 @@ static void __stats_metric_detach(struct stats_metric* metric) {
     }
     metric->prometheus.metric = NULL; // Automatic free when metric is removed.
 
+    metric->block->nvalues -= metric->nelements;
     metric->block = NULL;
 }
 
@@ -152,24 +262,66 @@ static void __stats_metric_free(struct stats_metric* metric) {
 
 //--------------------------------------------------------------------------------------------------
 static struct stats_metric* __stats_metric_alloc(const struct stats_metric_spec* spec) {
-    struct stats_metric* metric = calloc(1, sizeof(*metric));
+    size_t nlabels = DEFAULT_STATS_LABELS_COUNT + spec->nlabels;
+    bool is_array = STATS_METRIC_FLAG_TEST(spec->flags, ARRAY);
+    size_t nelements = 1;
+    if (is_array) {
+        nlabels += ARRAY_STATS_LABELS_COUNT;
+        nelements = spec->nelements;
+        if (nelements == 0) {
+            log_panic(EINVAL, "metric %s defined as array of 0 elements", spec->name);
+        }
+    }
+
+    struct stats_metric* metric = calloc(1, sizeof(*metric) +
+        nelements * sizeof(metric->elements[0]) +
+        nlabels * sizeof(spec->labels[0]) +
+        nelements * nlabels * sizeof(metric->elements->label_values[0]));
     if (metric == NULL) {
         return NULL;
     }
-    metric->spec = *spec;
-    metric->value.u64 = spec->init_value;
-    metric->last = spec->init_value;
 
+    metric->spec = *spec;
     if (spec->io.width > 0) {
         metric->mask = (1 << spec->io.width) - 1;
     }
 
-    const char* labels[] = {
-        "domain",
-        "zone",
-        "block",
-    };
-    metric->prometheus.metric = prom_gauge_new(spec->name, spec->desc, ARRAY_SIZE(labels), labels);
+    metric->elements = (typeof(metric->elements))&metric[1];
+    metric->nelements = nelements;
+
+    struct stats_label_spec* labels = (typeof(labels))&metric->elements[nelements];
+    metric->spec.labels = labels;
+    metric->spec.nlabels = nlabels;
+
+    for (unsigned int n = 0; n < DEFAULT_STATS_LABELS_COUNT; ++n, ++labels) {
+        *labels = default_stats_labels[n];
+    }
+
+    if (is_array) {
+        for (unsigned int n = 0; n < ARRAY_STATS_LABELS_COUNT; ++n, ++labels) {
+            *labels = array_stats_labels[n];
+        }
+    }
+
+    for (unsigned int n = 0; n < spec->nlabels; ++n, ++labels) {
+        *labels = spec->labels[n];
+    }
+
+    const char** label_values = (typeof(label_values))&metric->spec.labels[nlabels];
+    for (struct stats_metric_element* e = metric->elements; e < &metric->elements[nelements]; ++e) {
+        e->value.u64 = spec->init_value;
+        e->last = spec->init_value;
+
+        e->label_values = label_values;
+        label_values += nlabels;
+    }
+
+    const char* label_keys[nlabels];
+    for (unsigned int n = 0; n < nlabels; ++n) {
+        label_keys[n] = metric->spec.labels[n].key;
+    }
+
+    metric->prometheus.metric = prom_gauge_new(spec->name, spec->desc, nlabels, label_keys);
     if (metric->prometheus.metric == NULL) {
         log_err(ENOMEM, "prom_gauge_new failed for metric %s", spec->name);
         goto free_metric;
@@ -184,6 +336,23 @@ free_metric:
 }
 
 //--------------------------------------------------------------------------------------------------
+static size_t __stats_metric_get_values(struct stats_metric* metric,
+                                        struct stats_metric_value* values,
+                                        size_t nvalues) {
+    if (nvalues > metric->nelements) {
+        nvalues = metric->nelements;
+    }
+
+    for (struct stats_metric_element* e = metric->elements;
+         e < &metric->elements[nvalues];
+         ++e, ++values) {
+        *values = e->value;
+    }
+
+    return nvalues;
+}
+
+//--------------------------------------------------------------------------------------------------
 static void __stats_block_attach(struct stats_block* blk, struct stats_zone* zone) {
     blk->zone = zone;
 
@@ -191,7 +360,7 @@ static void __stats_block_attach(struct stats_block* blk, struct stats_zone* zon
     for (struct stats_metric** m = blk->metrics; m < &blk->metrics[spec->nmetrics]; ++m) {
         __stats_metric_attach(*m, blk);
     }
-    zone->nmetrics += spec->nmetrics;
+    zone->nvalues += blk->nvalues;
 
     int rv = prom_collector_registry_register_collector(
         zone->domain->spec.prometheus.registry, blk->prometheus.collector);
@@ -211,7 +380,7 @@ static void __stats_block_detach(struct stats_block* blk) {
         spec->detach_metrics(spec);
     }
 
-    blk->zone->nmetrics -= spec->nmetrics;
+    blk->zone->nvalues -= blk->nvalues;
     for (struct stats_metric** m = blk->metrics; m < &blk->metrics[spec->nmetrics]; ++m) {
         __stats_metric_detach(*m);
     }
@@ -292,24 +461,27 @@ free_block:
 }
 
 //--------------------------------------------------------------------------------------------------
-static size_t __stats_block_get_metrics(struct stats_block* blk,
-                                        struct stats_metric_value* values,
-                                        size_t nvalues) {
-    const struct stats_block_spec* spec = &blk->spec;
-    if (nvalues > spec->nmetrics) {
-        nvalues = spec->nmetrics;
+static size_t __stats_block_get_values(struct stats_block* blk,
+                                       struct stats_metric_value* values,
+                                       size_t nvalues) {
+    size_t n = 0;
+    for (struct stats_metric** m = blk->metrics;
+         n < nvalues && m < &blk->metrics[blk->spec.nmetrics];
+         ++m) {
+        n += __stats_metric_get_values(*m, &values[n], nvalues - n);
     }
 
-    for (struct stats_metric** m = blk->metrics; m < &blk->metrics[nvalues]; ++m, ++values) {
-        *values = (*m)->value;
-    }
-
-    return nvalues;
+    return n;
 }
 
 //--------------------------------------------------------------------------------------------------
 static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
     const struct stats_block_spec* spec = &blk->spec;
+
+    int rv = clock_gettime(CLOCK_MONOTONIC, &blk->last_update);
+    if (rv != 0) {
+        log_err(errno, "clock_getttime failed for last update timestamp");
+    }
 
     uint64_t* data = NULL;
     size_t nwords = (spec->latch.data_size + sizeof(*data) - 1) / sizeof(*data);
@@ -323,56 +495,68 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
         spec->latch_metrics(spec, data);
     }
 
-    // Must match the ordering and number from __stats_metric_alloc.
-    const char* labels[] = {
-        blk->zone->domain->spec.name,
-        blk->zone->spec.name,
-        spec->name,
-    };
-
     for (struct stats_metric** m = blk->metrics; m < &blk->metrics[spec->nmetrics]; ++m) {
         struct stats_metric* metric = *m;
+        const struct stats_metric_spec* mspec = &metric->spec;
 
-        uint64_t current;
+        uint64_t values[metric->nelements];
         if (spec->read_metric != NULL) {
-            current = spec->read_metric(spec, &metric->spec, data);
+            spec->read_metric(spec, mspec, values, data);
         } else {
-            current = __stats_metric_read(metric);
+            __stats_metric_read(metric, values);
         }
 
         if (clear) {
-            metric->value.u64 = metric->spec.init_value;
-            metric->last = metric->spec.init_value;
+            for (struct stats_metric_element* e = metric->elements;
+                 e < &metric->elements[metric->nelements];
+                 ++e) {
+                e->value.u64 = mspec->init_value;
+                e->last = mspec->init_value;
+            }
         } else {
-            switch (metric->spec.type) {
+            switch (mspec->type) {
             case stats_metric_type_COUNTER: {
-                uint64_t diff = current;
-                if (!STATS_METRIC_FLAG_TEST(metric->spec.flags, CLEAR_ON_READ)) {
-                    diff -= metric->last;
-                    metric->last = current;
-                }
+                bool is_clear_on_read = STATS_METRIC_FLAG_TEST(mspec->flags, CLEAR_ON_READ);
+                for (unsigned int n = 0; n < metric->nelements; ++n) {
+                    struct stats_metric_element* e = &metric->elements[n];
+                    uint64_t value = values[n];
 
-                metric->value.u64 += diff;
+                    uint64_t diff = value;
+                    if (!is_clear_on_read) {
+                        diff -= e->last;
+                        e->last = value;
+                    }
+
+                    e->value.u64 += diff;
+                }
                 break;
             }
 
             case stats_metric_type_FLAG:
-                metric->value.u64 = current ? 1 : 0;
+                for (unsigned int n = 0; n < metric->nelements; ++n) {
+                    metric->elements[n].value.u64 = values[n] ? 1 : 0;
+                }
                 break;
 
             case stats_metric_type_GAUGE:
             default:
-                metric->value.u64 = current;
+                for (unsigned int n = 0; n < metric->nelements; ++n) {
+                    metric->elements[n].value.u64 = values[n];
+                }
                 break;
             }
         }
 
-        if (spec->convert_metric != NULL) {
-            metric->value.f64 = spec->convert_metric(spec, &metric->spec, metric->value.u64, data);
-        } else {
-            metric->value.f64 = (double)metric->value.u64;
+        for (struct stats_metric_element* e = metric->elements;
+             e < &metric->elements[metric->nelements];
+             ++e) {
+            if (spec->convert_metric != NULL) {
+                e->value.f64 = spec->convert_metric(spec, mspec, e->value.u64, data);
+            } else {
+                e->value.f64 = (double)e->value.u64;
+            }
+            prom_gauge_set(metric->prometheus.metric, e->value.f64, e->label_values);
         }
-        prom_gauge_set(metric->prometheus.metric, metric->value.f64, labels);
     }
 
     if (spec->release_metrics != NULL) {
@@ -389,14 +573,20 @@ static int __stats_block_for_each_metric(struct stats_block* blk,
         .zone = &blk->zone->spec,
         .block = &blk->spec,
         .arg = arg,
+        .last_update = blk->last_update,
     };
 
     int rv = 0;
     for (struct stats_metric** m = blk->metrics;
          rv == 0 && m < &blk->metrics[blk->spec.nmetrics];
          ++m) {
-        spec.metric = &(*m)->spec;
-        spec.value = (*m)->value;
+        struct stats_metric* metric = *m;
+        struct stats_metric_value values[metric->nelements];
+        __stats_metric_get_values(metric, values, metric->nelements);
+
+        spec.metric = &metric->spec;
+        spec.values = values;
+        spec.nvalues = metric->nelements;
         rv = callback(&spec);
     }
 
@@ -417,7 +607,7 @@ static void __stats_zone_attach(struct stats_zone* zone, struct stats_domain* do
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
         __stats_block_attach(*blk, zone);
     }
-    domain->nmetrics += zone->nmetrics;
+    domain->nvalues += zone->nvalues;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -432,7 +622,7 @@ static void __stats_zone_detach(struct stats_zone* zone) {
         log_panic(ENOENT, "zone %s not attached to domain %s", zone->spec.name, domain->spec.name);
     }
 
-    domain->nmetrics -= zone->nmetrics;
+    domain->nvalues -= zone->nvalues;
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
         __stats_block_detach(*blk);
     }
@@ -508,37 +698,37 @@ void stats_zone_free(struct stats_zone* zone) {
 }
 
 //--------------------------------------------------------------------------------------------------
-size_t stats_zone_number_of_metrics(struct stats_zone* zone) {
+size_t stats_zone_number_of_values(struct stats_zone* zone) {
     stats_domain_lock(zone->domain);
-    size_t nmetrics = zone->nmetrics;
+    size_t n = zone->nvalues;
     stats_domain_unlock(zone->domain);
 
-    return nmetrics;
+    return n;
 }
 
 //--------------------------------------------------------------------------------------------------
-static size_t __stats_zone_get_metrics(struct stats_zone* zone,
-                                       struct stats_metric_value* values,
-                                       size_t nvalues) {
-    size_t nmetrics = 0;
+static size_t __stats_zone_get_values(struct stats_zone* zone,
+                                      struct stats_metric_value* values,
+                                      size_t nvalues) {
+    size_t n = 0;
     for (struct stats_block** blk = zone->blocks;
-         nmetrics < nvalues && blk < &zone->blocks[zone->spec.nblocks];
+         n < nvalues && blk < &zone->blocks[zone->spec.nblocks];
          ++blk) {
-        nmetrics += __stats_block_get_metrics(*blk, &values[nmetrics], nvalues - nmetrics);
+        n += __stats_block_get_values(*blk, &values[n], nvalues - n);
     }
 
-    return nmetrics;
+    return n;
 }
 
 //--------------------------------------------------------------------------------------------------
-size_t stats_zone_get_metrics(struct stats_zone* zone,
-                              struct stats_metric_value* values,
-                              size_t nvalues) {
+size_t stats_zone_get_values(struct stats_zone* zone,
+                             struct stats_metric_value* values,
+                             size_t nvalues) {
     stats_domain_lock(zone->domain);
-    size_t nmetrics = __stats_zone_get_metrics(zone, values, nvalues);
+    size_t n = __stats_zone_get_values(zone, values, nvalues);
     stats_domain_unlock(zone->domain);
 
-    return nmetrics;
+    return n;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -646,37 +836,35 @@ free_domain:
 }
 
 //--------------------------------------------------------------------------------------------------
-size_t stats_domain_number_of_metrics(struct stats_domain* domain) {
+size_t stats_domain_number_of_values(struct stats_domain* domain) {
     stats_domain_lock(domain);
-    size_t nmetrics = domain->nmetrics;
+    size_t n = domain->nvalues;
     stats_domain_unlock(domain);
 
-    return nmetrics;
+    return n;
 }
 
 //--------------------------------------------------------------------------------------------------
-static size_t __stats_domain_get_metrics(struct stats_domain* domain,
-                                         struct stats_metric_value* values,
-                                         size_t nvalues) {
-    size_t nmetrics = 0;
-    for (struct stats_zone* zone = domain->zones;
-         nmetrics < nvalues && zone != NULL;
-         zone = zone->next) {
-        nmetrics += __stats_zone_get_metrics(zone, &values[nmetrics], nvalues - nmetrics);
+static size_t __stats_domain_get_values(struct stats_domain* domain,
+                                        struct stats_metric_value* values,
+                                        size_t nvalues) {
+    size_t n = 0;
+    for (struct stats_zone* zone = domain->zones; n < nvalues && zone != NULL; zone = zone->next) {
+        n += __stats_zone_get_values(zone, &values[n], nvalues - n);
     }
 
-    return nmetrics;
+    return n;
 }
 
 //--------------------------------------------------------------------------------------------------
-size_t stats_domain_get_metrics(struct stats_domain* domain,
-                                struct stats_metric_value* values,
-                                size_t nvalues) {
+size_t stats_domain_get_values(struct stats_domain* domain,
+                               struct stats_metric_value* values,
+                               size_t nvalues) {
     stats_domain_lock(domain);
-    size_t nmetrics = __stats_domain_get_metrics(domain, values, nvalues);
+    size_t n = __stats_domain_get_values(domain, values, nvalues);
     stats_domain_unlock(domain);
 
-    return nmetrics;
+    return n;
 }
 
 //--------------------------------------------------------------------------------------------------
