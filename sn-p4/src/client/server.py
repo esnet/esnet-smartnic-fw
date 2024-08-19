@@ -108,7 +108,7 @@ def batch_process_server_config_resp(resp):
     }
     op = resp.op
     if op not in supported_ops:
-        raise click.ClickException('Response for unsupported batch operation: {resp.op}')
+        raise click.ClickException('Response for unsupported batch operation: {op}')
     op_label = supported_ops[op]
 
     resp = resp.server_config
@@ -169,12 +169,13 @@ def batch_process_server_status_resp(resp):
     if not resp.HasField('server_status'):
         return False
 
-    supported_ops = (
-        BatchOperation.BOP_GET,
-    )
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+    }
     op = resp.op
     if op not in supported_ops:
-        raise click.ClickException('Response for unsupported batch operation: {resp.op}')
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
 
     resp = resp.server_status
     if resp.error_code != ErrorCode.EC_OK:

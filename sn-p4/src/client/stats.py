@@ -136,14 +136,23 @@ def batch_process_stats_resp(kargs):
         if not resp.HasField('stats'):
             return False
 
+        supported_ops = {
+            BatchOperation.BOP_GET: 'Got',
+            BatchOperation.BOP_CLEAR: 'Cleared',
+        }
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
+
         resp = resp.stats
         if resp.error_code != ErrorCode.EC_OK:
             raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-        if resp.HasField('stats'):
+        if op == BatchOperation.BOP_GET:
             _show_stats(resp.dev_id, resp.stats, kargs)
         else:
-            click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
+            click.echo(f'{op_label} statistics for device ID {resp.dev_id}.')
         return True
 
     return process
