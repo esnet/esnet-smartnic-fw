@@ -76,6 +76,7 @@ enum ErrorCode {
 
     // Server configuration error codes.
     EC_SERVER_FAILED_GET_TIME = 800;
+    EC_SERVER_INVALID_DEBUG_FLAG = 801;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -601,6 +602,32 @@ message ServerStatusResponse {
     ServerStatus status = 2;
 }
 
+enum ServerDebugFlag {
+    DEBUG_FLAG_UNKNOWN = 0;
+    DEBUG_FLAG_BATCH = 1;
+}
+
+message ServerDebug {
+    repeated ServerDebugFlag enables = 1;
+    repeated ServerDebugFlag disables = 2;
+}
+
+message ServerConfig {
+    ServerDebug debug = 1;
+}
+
+message ServerConfigRequest {
+    // Configuration data used for set operations. Leave unset for get operations.
+    ServerConfig config = 1;
+}
+
+message ServerConfigResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+
+    // Configuration data returned on get operations. Will be unset for set operations.
+    ServerConfig config = 2;
+}
+
 //--------------------------------------------------------------------------------------------------
 enum BatchOperation {
     BOP_UNKNOWN = 0; // Field is unset.
@@ -646,6 +673,7 @@ message BatchRequest {
 
         // Server configuration.
         ServerStatusRequest server_status = 80;
+        ServerConfigRequest server_config = 81;
     };
 }
 
@@ -687,6 +715,7 @@ message BatchResponse {
 
         // Server configuration.
         ServerStatusResponse server_status = 80;
+        ServerConfigResponse server_config = 81;
     };
 }
 
@@ -734,6 +763,8 @@ service SmartnicConfig {
     rpc ClearSwitchStats(SwitchStatsRequest) returns (stream SwitchStatsResponse);
 
     // Server configuration.
+    rpc GetServerConfig(ServerConfigRequest) returns (stream ServerConfigResponse);
+    rpc SetServerConfig(ServerConfigRequest) returns (stream ServerConfigResponse);
     rpc GetServerStatus(ServerStatusRequest) returns (stream ServerStatusResponse);
 }
 

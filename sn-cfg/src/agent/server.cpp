@@ -13,6 +13,18 @@ using namespace sn_cfg::v1;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
+const char* SmartnicConfigImpl::debug_flag_label(const ServerDebugFlag flag) {
+    switch (flag) {
+    case ServerDebugFlag::DEBUG_FLAG_BATCH: return "BATCH";
+
+    case ServerDebugFlag::DEBUG_FLAG_UNKNOWN:
+    default:
+        break;
+    }
+    return "UNKNOWN";
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::init_server(void) {
     auto rv = timespec_get(&timestamp.start_wall, TIME_UTC);
     if (rv != TIME_UTC) {
@@ -93,6 +105,109 @@ Status SmartnicConfigImpl::GetServerStatus(
     const ServerStatusRequest* req,
     ServerWriter<ServerStatusResponse>* writer) {
     get_server_status(*req, [&writer](const ServerStatusResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::get_server_config(
+    [[maybe_unused]] const ServerConfigRequest& req,
+    function<void(const ServerConfigResponse&)> write_resp) {
+    ServerConfigResponse resp;
+    auto config = resp.mutable_config();
+
+    auto dbg = config->mutable_debug();
+    for (auto flag = ServerDebugFlag_MIN + 1; flag <= ServerDebugFlag_MAX; ++flag) {
+        if (debug.flags.test(flag)) {
+            dbg->add_enables((ServerDebugFlag)flag);
+        } else {
+            dbg->add_disables((ServerDebugFlag)flag);
+        }
+    }
+
+    resp.set_error_code(ErrorCode::EC_OK);
+    write_resp(resp);
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::batch_get_server_config(
+    const ServerConfigRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    get_server_config(req, [&rdwr](const ServerConfigResponse& resp) -> void {
+        BatchResponse bresp;
+        auto config = bresp.mutable_server_config();
+        config->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicConfigImpl::GetServerConfig(
+    [[maybe_unused]] ServerContext* ctx,
+    const ServerConfigRequest* req,
+    ServerWriter<ServerConfigResponse>* writer) {
+    get_server_config(*req, [&writer](const ServerConfigResponse& resp) -> void {
+        writer->Write(resp);
+    });
+    return Status::OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::set_server_config(
+    const ServerConfigRequest& req,
+    function<void(const ServerConfigResponse&)> write_resp) {
+    ServerConfigResponse resp;
+    auto err = ErrorCode::EC_OK;
+
+    auto config = req.config();
+    if (config.has_debug()) {
+        auto dbg = config.debug();
+
+        for (auto flag : dbg.enables()) {
+            if (flag <= ServerDebugFlag_MIN || flag > ServerDebugFlag_MAX) {
+                err = ErrorCode::EC_SERVER_INVALID_DEBUG_FLAG;
+                goto write_response;
+            }
+            debug.flags.set(flag);
+        }
+
+        for (auto flag : dbg.disables()) {
+            if (flag <= ServerDebugFlag_MIN || flag > ServerDebugFlag_MAX) {
+                err = ErrorCode::EC_SERVER_INVALID_DEBUG_FLAG;
+                goto write_response;
+            }
+            debug.flags.reset(flag);
+        }
+    }
+
+ write_response:
+    resp.set_error_code(err);
+    write_resp(resp);
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::batch_set_server_config(
+    const ServerConfigRequest& req,
+    ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    set_server_config(req, [&rdwr](const ServerConfigResponse& resp) -> void {
+        BatchResponse bresp;
+        auto config = bresp.mutable_server_config();
+        config->CopyFrom(resp);
+        bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
+        rdwr->Write(bresp);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+Status SmartnicConfigImpl::SetServerConfig(
+    [[maybe_unused]] ServerContext* ctx,
+    const ServerConfigRequest* req,
+    ServerWriter<ServerConfigResponse>* writer) {
+    set_server_config(*req, [&writer](const ServerConfigResponse& resp) -> void {
         writer->Write(resp);
     });
     return Status::OK;

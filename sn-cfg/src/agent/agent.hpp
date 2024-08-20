@@ -5,6 +5,7 @@
 #include "prometheus.hpp"
 #include "sn_cfg_v1.grpc.pb.h"
 
+#include <bitset>
 #include <string>
 #include <time.h>
 #include <vector>
@@ -69,6 +70,10 @@ public:
         ServerContext*, const PortStatsRequest*, ServerWriter<PortStatsResponse>*) override;
 
     // Server configuration.
+    Status GetServerConfig(
+        ServerContext*, const ServerConfigRequest*, ServerWriter<ServerConfigResponse>*) override;
+    Status SetServerConfig(
+        ServerContext*, const ServerConfigRequest*, ServerWriter<ServerConfigResponse>*) override;
     Status GetServerStatus(
         ServerContext*, const ServerStatusRequest*, ServerWriter<ServerStatusResponse>*) override;
 
@@ -98,6 +103,18 @@ private:
         struct timespec start_wall;
         struct timespec start_mono;
     } timestamp;
+
+    struct {
+        bitset<ServerDebugFlag_MAX + 1> flags;
+    } debug;
+
+    const char* debug_flag_label(const ServerDebugFlag flag);
+
+#define SERVER_LOG_IF_DEBUG(_flag, _label, _stream_statements) \
+    if (this->debug.flags.test(_flag)) { \
+        cerr << "DEBUG_" #_label "[" << this->debug_flag_label(_flag) << "]: " \
+             << _stream_statements << endl; \
+    }
 
     void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
     void batch_set_defaults(
@@ -169,6 +186,12 @@ private:
 
     void init_server(void);
     void deinit_server(void);
+    void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
+    void batch_get_server_config(
+        const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void set_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
+    void batch_set_server_config(
+        const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void get_server_status(const ServerStatusRequest&, function<void(const ServerStatusResponse&)>);
     void batch_get_server_status(
         const ServerStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
