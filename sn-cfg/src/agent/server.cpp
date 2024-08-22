@@ -45,6 +45,13 @@ void SmartnicConfigImpl::init_server(void) {
          << timestamp.start_wall.tv_nsec << "ns"
          << "]"
          << endl;
+
+    // All stats domains are enabled by default.
+    for (auto flag = ServerControlStatsFlag_MIN + 1; flag <= ServerControlStatsFlag_MAX; ++flag) {
+        if (ServerControlStatsFlag_IsValid(flag)) {
+            control.stats_flags.set(flag);
+        }
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -119,10 +126,28 @@ void SmartnicConfigImpl::get_server_config(
 
     auto dbg = config->mutable_debug();
     for (auto flag = ServerDebugFlag_MIN + 1; flag <= ServerDebugFlag_MAX; ++flag) {
+        if (!ServerDebugFlag_IsValid(flag)) {
+            continue;
+        }
+
         if (debug.flags.test(flag)) {
             dbg->add_enables((ServerDebugFlag)flag);
         } else {
             dbg->add_disables((ServerDebugFlag)flag);
+        }
+    }
+
+    auto ctrl = config->mutable_control();
+    auto stats = ctrl->mutable_stats();
+    for (auto flag = ServerControlStatsFlag_MIN + 1; flag <= ServerControlStatsFlag_MAX; ++flag) {
+        if (!ServerControlStatsFlag_IsValid(flag)) {
+            continue;
+        }
+
+        if (control.stats_flags.test(flag)) {
+            stats->add_enables((ServerControlStatsFlag)flag);
+        } else {
+            stats->add_disables((ServerControlStatsFlag)flag);
         }
     }
 
@@ -156,6 +181,76 @@ Status SmartnicConfigImpl::GetServerConfig(
 }
 
 //--------------------------------------------------------------------------------------------------
+ErrorCode SmartnicConfigImpl::apply_server_control_stats_flag(
+   ServerControlStatsFlag flag,
+   bool enable) {
+    auto domain = DeviceStatsDomain::NDOMAINS;
+    auto zone = DeviceStatsZone::NZONES;
+    switch (flag) {
+#define CASE_DOMAIN_FLAG(_flag) \
+    case ServerControlStatsFlag::CTRL_STATS_FLAG_DOMAIN_##_flag: \
+        domain = DeviceStatsDomain::_flag; \
+        break
+#define CASE_ZONE_FLAG(_flag) \
+    case ServerControlStatsFlag::CTRL_STATS_FLAG_ZONE_##_flag: \
+        zone = DeviceStatsZone::_flag; \
+        break
+
+    CASE_DOMAIN_FLAG(COUNTERS);
+    CASE_DOMAIN_FLAG(MONITORS);
+    CASE_DOMAIN_FLAG(MODULES);
+
+    CASE_ZONE_FLAG(CARD_MONITORS);
+    CASE_ZONE_FLAG(SYSMON_MONITORS);
+    CASE_ZONE_FLAG(HOST_COUNTERS);
+    CASE_ZONE_FLAG(PORT_COUNTERS);
+    CASE_ZONE_FLAG(SWITCH_COUNTERS);
+    CASE_ZONE_FLAG(MODULE_MONITORS);
+
+    default:
+        return ErrorCode::EC_SERVER_INVALID_CONTROL_STATS_FLAG;
+
+#undef CASE_DOMAIN_FLAG
+#undef CASE_ZONE_FLAG
+    }
+
+    if (enable) {
+        control.stats_flags.set(flag);
+    } else {
+        control.stats_flags.reset(flag);
+    }
+
+    cout << (enable ? "En" : "Dis")
+         << "abling collection for statistics '"
+         << ServerControlStatsFlag_Name(flag)
+         << "' (" << flag << ")."
+         << endl;
+
+    if (domain != DeviceStatsDomain::NDOMAINS) {
+        for (auto dev : devices) {
+            auto dom = dev->stats.domains[domain];
+            if (enable) {
+                stats_domain_start(dom);
+            } else {
+                stats_domain_stop(dom);
+            }
+        }
+    } else {
+        for (auto dev : devices) {
+            for (auto zn : dev->stats.zones[zone]) {
+                if (enable) {
+                    stats_zone_enable(zn->zone);
+                } else {
+                    stats_zone_disable(zn->zone);
+                }
+            }
+        }
+    }
+
+    return ErrorCode::EC_OK;
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::set_server_config(
     const ServerConfigRequest& req,
     function<void(const ServerConfigResponse&)> write_resp) {
@@ -167,7 +262,7 @@ void SmartnicConfigImpl::set_server_config(
         auto dbg = config.debug();
 
         for (auto flag : dbg.enables()) {
-            if (flag <= ServerDebugFlag_MIN || flag > ServerDebugFlag_MAX) {
+            if (!ServerDebugFlag_IsValid(flag)) {
                 err = ErrorCode::EC_SERVER_INVALID_DEBUG_FLAG;
                 goto write_response;
             }
@@ -175,11 +270,31 @@ void SmartnicConfigImpl::set_server_config(
         }
 
         for (auto flag : dbg.disables()) {
-            if (flag <= ServerDebugFlag_MIN || flag > ServerDebugFlag_MAX) {
+            if (!ServerDebugFlag_IsValid(flag)) {
                 err = ErrorCode::EC_SERVER_INVALID_DEBUG_FLAG;
                 goto write_response;
             }
             debug.flags.reset(flag);
+        }
+    }
+
+    if (config.has_control()) {
+        auto ctrl = config.control();
+        if (ctrl.has_stats()) {
+            auto stats = ctrl.stats();
+            for (auto flag : stats.enables()) {
+                err = apply_server_control_stats_flag((ServerControlStatsFlag)flag, true);
+                if (err != ErrorCode::EC_OK) {
+                    goto write_response;
+                }
+            }
+
+            for (auto flag : stats.disables()) {
+                err = apply_server_control_stats_flag((ServerControlStatsFlag)flag, false);
+                if (err != ErrorCode::EC_OK) {
+                    goto write_response;
+                }
+            }
         }
     }
 

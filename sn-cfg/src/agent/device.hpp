@@ -18,6 +18,16 @@ enum DeviceStatsDomain {
     NDOMAINS
 };
 
+enum DeviceStatsZone {
+    CARD_MONITORS,
+    SYSMON_MONITORS,
+    HOST_COUNTERS,
+    PORT_COUNTERS,
+    SWITCH_COUNTERS,
+    MODULE_MONITORS,
+    NZONES
+};
+
 struct DeviceStats {
     string name;
     struct stats_zone* zone;
@@ -35,12 +45,7 @@ struct Device {
 
     struct {
         struct stats_domain* domains[DeviceStatsDomain::NDOMAINS];
-        DeviceStats* card;
-        vector<DeviceStats*> hosts;
-        vector<DeviceStats*> modules;
-        vector<DeviceStats*> ports;
-        DeviceStats* sw;
-        vector<DeviceStats*> sysmons;
+        vector<DeviceStats*> zones[DeviceStatsZone::NZONES];
     } stats;
 };
 

@@ -25,16 +25,19 @@ void SmartnicConfigImpl::init_switch(Device* dev) {
         exit(EXIT_FAILURE);
     }
 
-    dev->stats.sw = stats;
+    dev->stats.zones[DeviceStatsZone::SWITCH_COUNTERS].push_back(stats);
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::deinit_switch(Device* dev) {
-    auto stats = dev->stats.sw;
-    dev->stats.sw = NULL;
+    auto zones = &dev->stats.zones[DeviceStatsZone::SWITCH_COUNTERS];
+    while (!zones->empty()) {
+        auto stats = zones->back();
+        switch_stats_zone_free(stats->zone);
 
-    switch_stats_zone_free(stats->zone);
-    delete stats;
+        zones->pop_back();
+        delete stats;
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -536,13 +539,14 @@ void SmartnicConfigImpl::get_or_clear_switch_stats(
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
+        auto& zones = dev->stats.zones[DeviceStatsZone::SWITCH_COUNTERS];
         SwitchStatsResponse resp;
 
         if (do_clear) {
-            stats_zone_clear_metrics(dev->stats.sw->zone);
+            stats_zone_clear_metrics(zones[0]->zone);
         } else {
             ctx.stats = resp.mutable_stats();
-            stats_zone_for_each_metric(dev->stats.sw->zone, get_stats_for_each_metric, &ctx);
+            stats_zone_for_each_metric(zones[0]->zone, get_stats_for_each_metric, &ctx);
         }
 
         resp.set_error_code(ErrorCode::EC_OK);

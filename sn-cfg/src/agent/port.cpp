@@ -39,17 +39,18 @@ void SmartnicConfigImpl::init_port(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
-        dev->stats.ports.push_back(stats);
+        dev->stats.zones[DeviceStatsZone::PORT_COUNTERS].push_back(stats);
     }
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::deinit_port(Device* dev) {
-    while (!dev->stats.ports.empty()) {
-        auto stats = dev->stats.ports.back();
+    auto zones = &dev->stats.zones[DeviceStatsZone::PORT_COUNTERS];
+    while (!zones->empty()) {
+        auto stats = zones->back();
         cmac_stats_zone_free(stats->zone);
 
-        dev->stats.ports.pop_back();
+        zones->pop_back();
         delete stats;
     }
 }
@@ -449,15 +450,15 @@ void SmartnicConfigImpl::get_or_clear_port_stats(
             end_port_id = port_id;
         }
 
+        auto& zones = dev->stats.zones[DeviceStatsZone::PORT_COUNTERS];
         for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
             PortStatsResponse resp;
 
             if (do_clear) {
-                stats_zone_clear_metrics(dev->stats.ports[port_id]->zone);
+                stats_zone_clear_metrics(zones[port_id]->zone);
             } else {
                 ctx.stats = resp.mutable_stats();
-                stats_zone_for_each_metric(
-                    dev->stats.ports[port_id]->zone, get_stats_for_each_metric, &ctx);
+                stats_zone_for_each_metric(zones[port_id]->zone, get_stats_for_each_metric, &ctx);
             }
 
             resp.set_error_code(ErrorCode::EC_OK);

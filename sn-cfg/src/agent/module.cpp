@@ -113,17 +113,18 @@ void SmartnicConfigImpl::init_module(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
-        dev->stats.modules.push_back(stats);
+        dev->stats.zones[DeviceStatsZone::MODULE_MONITORS].push_back(stats);
     }
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::deinit_module(Device* dev) {
-    while (!dev->stats.modules.empty()) {
-        auto stats = dev->stats.modules.back();
+    auto zones = &dev->stats.zones[DeviceStatsZone::MODULE_MONITORS];
+    while (!zones->empty()) {
+        auto stats = zones->back();
         cms_module_stats_zone_free(stats->zone);
 
-        dev->stats.modules.pop_back();
+        zones->pop_back();
         delete stats;
     }
 }
@@ -1045,13 +1046,14 @@ void SmartnicConfigImpl::get_module_status(
             end_mod_id = mod_id;
         }
 
+        auto& zones = dev->stats.zones[DeviceStatsZone::MODULE_MONITORS];
         for (mod_id = begin_mod_id; mod_id <= end_mod_id; ++mod_id) {
             ModuleStatusResponse resp;
             GetModuleStatsContext ctx = {
                 .status = resp.mutable_status(),
             };
 
-            stats_zone_for_each_metric(dev->stats.modules[mod_id]->zone, __get_module_stats, &ctx);
+            stats_zone_for_each_metric(zones[mod_id]->zone, __get_module_stats, &ctx);
 
             resp.set_error_code(ErrorCode::EC_OK);
             resp.set_dev_id(dev_id);

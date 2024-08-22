@@ -116,6 +116,10 @@ private:
              << _stream_statements << endl; \
     }
 
+    struct {
+        bitset<ServerControlStatsFlag_MAX + 1> stats_flags;
+    } control;
+
     void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
     void batch_set_defaults(
         const DefaultsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
@@ -189,6 +193,7 @@ private:
     void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
     void batch_get_server_config(
         const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    ErrorCode apply_server_control_stats_flag(ServerControlStatsFlag flag, bool enable);
     void set_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
     void batch_set_server_config(
         const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);

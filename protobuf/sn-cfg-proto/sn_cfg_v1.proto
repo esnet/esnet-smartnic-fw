@@ -77,6 +77,7 @@ enum ErrorCode {
     // Server configuration error codes.
     EC_SERVER_FAILED_GET_TIME = 800;
     EC_SERVER_INVALID_DEBUG_FLAG = 801;
+    EC_SERVER_INVALID_CONTROL_STATS_FLAG = 802;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -612,8 +613,33 @@ message ServerDebug {
     repeated ServerDebugFlag disables = 2;
 }
 
+enum ServerControlStatsFlag {
+    CTRL_STATS_FLAG_UNKNOWN = 0;
+
+    CTRL_STATS_FLAG_DOMAIN_COUNTERS = 1;
+    CTRL_STATS_FLAG_DOMAIN_MONITORS = 2;
+    CTRL_STATS_FLAG_DOMAIN_MODULES = 3;
+
+    CTRL_STATS_FLAG_ZONE_CARD_MONITORS = 10;
+    CTRL_STATS_FLAG_ZONE_SYSMON_MONITORS = 20;
+    CTRL_STATS_FLAG_ZONE_HOST_COUNTERS = 30;
+    CTRL_STATS_FLAG_ZONE_PORT_COUNTERS = 40;
+    CTRL_STATS_FLAG_ZONE_SWITCH_COUNTERS = 50;
+    CTRL_STATS_FLAG_ZONE_MODULE_MONITORS = 60;
+}
+
+message ServerControlStats {
+    repeated ServerControlStatsFlag enables = 1;
+    repeated ServerControlStatsFlag disables = 2;
+}
+
+message ServerControl {
+    ServerControlStats stats = 1;
+}
+
 message ServerConfig {
     ServerDebug debug = 1;
+    ServerControl control = 2;
 }
 
 message ServerConfigRequest {

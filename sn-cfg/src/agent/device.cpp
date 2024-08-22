@@ -92,7 +92,7 @@ void SmartnicConfigImpl::init_device(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
-        dev->stats.sysmons.push_back(stats);
+        dev->stats.zones[DeviceStatsZone::SYSMON_MONITORS].push_back(stats);
     }
 
     dev->cms.blk = &dev->bar2->cms;
@@ -110,24 +110,28 @@ void SmartnicConfigImpl::init_device(Device* dev) {
         cerr << "ERROR: Failed to alloc CMS stats zone for device " << dev->bus_id << "."  << endl;
         exit(EXIT_FAILURE);
     }
-    dev->stats.card = stats;
+    dev->stats.zones[DeviceStatsZone::CARD_MONITORS].push_back(stats);
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::deinit_device(Device* dev) {
-    while (!dev->stats.sysmons.empty()) {
-        auto stats = dev->stats.sysmons.back();
+    auto zones = &dev->stats.zones[DeviceStatsZone::SYSMON_MONITORS];
+    while (!zones->empty()) {
+        auto stats = zones->back();
         sysmon_stats_zone_free(stats->zone);
 
-        dev->stats.sysmons.pop_back();
+        zones->pop_back();
         delete stats;
     }
 
-    auto stats = dev->stats.card;
-    dev->stats.card = NULL;
+    zones = &dev->stats.zones[DeviceStatsZone::CARD_MONITORS];
+    while (!zones->empty()) {
+        auto stats = zones->back();
+        cms_card_stats_zone_free(stats->zone);
 
-    cms_card_stats_zone_free(stats->zone);
-    delete stats;
+        zones->pop_back();
+        delete stats;
+    }
 
     cms_destroy(&dev->cms);
 }
@@ -318,10 +322,11 @@ void SmartnicConfigImpl::get_device_status(
             .status = resp.mutable_status(),
         };
 
-        for (auto sysmon : dev->stats.sysmons) {
+        for (auto sysmon : dev->stats.zones[DeviceStatsZone::SYSMON_MONITORS]) {
             stats_zone_for_each_metric(sysmon->zone, __get_device_stats, &ctx);
         }
-        stats_zone_for_each_metric(dev->stats.card->zone, __get_device_stats, &ctx);
+        stats_zone_for_each_metric(
+            dev->stats.zones[DeviceStatsZone::CARD_MONITORS][0]->zone, __get_device_stats, &ctx);
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);
