@@ -506,45 +506,47 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
             __stats_metric_read(metric, values);
         }
 
-        if (clear) {
-            for (struct stats_metric_element* e = metric->elements;
-                 e < &metric->elements[metric->nelements];
-                 ++e) {
-                e->value.u64 = mspec->init_value;
-                e->last = mspec->init_value;
-            }
-        } else {
-            switch (mspec->type) {
-            case stats_metric_type_COUNTER: {
-                bool is_clear_on_read = STATS_METRIC_FLAG_TEST(mspec->flags, CLEAR_ON_READ);
-                for (unsigned int n = 0; n < metric->nelements; ++n) {
-                    struct stats_metric_element* e = &metric->elements[n];
-                    uint64_t value = values[n];
+        bool is_clear_on_read = STATS_METRIC_FLAG_TEST(mspec->flags, CLEAR_ON_READ);
+        switch (mspec->type) {
+        case stats_metric_type_COUNTER: {
+            for (unsigned int n = 0; n < metric->nelements; ++n) {
+                struct stats_metric_element* e = &metric->elements[n];
+                uint64_t value = values[n];
+                uint64_t diff = value;
+                if (!is_clear_on_read) {
+                    diff -= e->last;
+                    e->last = value;
+                }
 
-                    uint64_t diff = value;
-                    if (!is_clear_on_read) {
-                        diff -= e->last;
-                        e->last = value;
-                    }
-
+                if (clear) {
+                    e->value.u64 = mspec->init_value;
+                } else {
                     e->value.u64 += diff;
                 }
-                break;
             }
+            break;
+        }
 
-            case stats_metric_type_FLAG:
-                for (unsigned int n = 0; n < metric->nelements; ++n) {
+        case stats_metric_type_FLAG:
+            for (unsigned int n = 0; n < metric->nelements; ++n) {
+                if (clear) {
+                    metric->elements[n].value.u64 = mspec->init_value;
+                } else {
                     metric->elements[n].value.u64 = values[n] ? 1 : 0;
                 }
-                break;
+            }
+            break;
 
-            case stats_metric_type_GAUGE:
-            default:
-                for (unsigned int n = 0; n < metric->nelements; ++n) {
+        case stats_metric_type_GAUGE:
+        default:
+            for (unsigned int n = 0; n < metric->nelements; ++n) {
+                if (clear) {
+                    metric->elements[n].value.u64 = mspec->init_value;
+                } else {
                     metric->elements[n].value.u64 = values[n];
                 }
-                break;
             }
+            break;
         }
 
         for (struct stats_metric_element* e = metric->elements;
