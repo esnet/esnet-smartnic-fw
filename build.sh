@@ -36,11 +36,13 @@ unset SN_HW_BRANCH
 unset SN_HW_BOARD
 unset SN_HW_APP_NAME
 unset SN_HW_VER
+unset SN_HW_COMMIT
 unset SN_FW_GROUP
 unset SN_FW_REPO
 unset SN_FW_BRANCH
 unset SN_FW_APP_NAME
 unset SN_FW_VER
+unset SN_FW_COMMIT
 
 # Read build-time arguments from .env
 source .env
@@ -66,12 +68,14 @@ if [ ! -v SN_HW_VER ] ; then
 	echo "ERROR: Missing environment variable 'SN_HW_VER' which is required"
 	exit 1
 fi
+SN_HW_COMMIT="${SN_HW_COMMIT:-unset}"
 
 SN_FW_GROUP="${SN_FW_GROUP:-unset}"
 SN_FW_REPO="${SN_FW_REPO:-unset}"
 SN_FW_BRANCH="${SN_FW_BRANCH:-unset}"
 SN_FW_APP_NAME="${SN_FW_APP_NAME:-unset}"
 SN_FW_VER="${SN_FW_VER:-unset}"
+SN_FW_COMMIT="${SN_FW_COMMIT:-unset}"
 
 # Build the image
 export DOCKER_BUILDKIT=1
@@ -84,11 +88,13 @@ docker build \
 	--build-arg SN_HW_BOARD=${SN_HW_BOARD} \
 	--build-arg SN_HW_APP_NAME=${SN_HW_APP_NAME} \
 	--build-arg SN_HW_VER=${SN_HW_VER} \
+	--build-arg SN_HW_COMMIT=${SN_HW_COMMIT} \
 	--build-arg SN_FW_GROUP=${SN_FW_GROUP} \
 	--build-arg SN_FW_REPO=${SN_FW_REPO} \
 	--build-arg SN_FW_BRANCH=${SN_FW_BRANCH} \
 	--build-arg SN_FW_APP_NAME=${SN_FW_APP_NAME} \
 	--build-arg SN_FW_VER=${SN_FW_VER} \
+	--build-arg SN_FW_COMMIT=${SN_FW_COMMIT} \
 	-t ${IMAGE_URI} .
 if [ $? -ne 0 ] ; then
     echo "ERROR: Failed to build container"
@@ -110,12 +116,14 @@ SN_FW_REPO=${SN_FW_REPO}
 SN_FW_BRANCH=${SN_FW_BRANCH}
 SN_FW_APP_NAME=${SN_FW_APP_NAME}
 SN_FW_VER=${SN_FW_VER}
+SN_FW_COMMIT=${SN_FW_COMMIT}
 SN_HW_GROUP=${SN_HW_GROUP}
 SN_HW_REPO=${SN_HW_REPO}
 SN_HW_BRANCH=${SN_HW_BRANCH}
 SN_HW_BOARD=${SN_HW_BOARD}
 SN_HW_APP_NAME=${SN_HW_APP_NAME}
 SN_HW_VER=${SN_HW_VER}
+SN_HW_COMMIT=${SN_HW_COMMIT}
 _EOF
 
 # Update or create the user's sn-stack/.env file to refer to the container image URLs used during this build
