@@ -200,6 +200,8 @@ struct stats_for_each_spec {
 struct stats_zone* stats_zone_alloc(struct stats_domain* domain,
                                     const struct stats_zone_spec* spec);
 void stats_zone_free(struct stats_zone* zone);
+void stats_zone_enable(struct stats_zone* zone);
+void stats_zone_disable(struct stats_zone* zone);
 size_t stats_zone_number_of_values(struct stats_zone* zone);
 size_t stats_zone_get_values(struct stats_zone* zone,
                              struct stats_metric_value* values, size_t nvalues);

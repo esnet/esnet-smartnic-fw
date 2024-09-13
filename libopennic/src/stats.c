@@ -65,6 +65,8 @@ struct stats_zone {
 
     struct stats_block** blocks;
     size_t nvalues;
+
+    bool enabled;
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -605,6 +607,7 @@ static void __stats_zone_attach(struct stats_zone* zone, struct stats_domain* do
     *link = zone;
     zone->next = NULL;
     zone->domain = domain;
+    zone->enabled = true;
 
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
         __stats_block_attach(*blk, zone);
@@ -632,6 +635,7 @@ static void __stats_zone_detach(struct stats_zone* zone) {
     *link = zone->next;
     zone->next = NULL;
     zone->domain = NULL;
+    zone->enabled = false;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -700,6 +704,20 @@ void stats_zone_free(struct stats_zone* zone) {
 }
 
 //--------------------------------------------------------------------------------------------------
+void stats_zone_enable(struct stats_zone* zone) {
+    stats_domain_lock(zone->domain);
+    zone->enabled = true;
+    stats_domain_unlock(zone->domain);
+}
+
+//--------------------------------------------------------------------------------------------------
+void stats_zone_disable(struct stats_zone* zone) {
+    stats_domain_lock(zone->domain);
+    zone->enabled = false;
+    stats_domain_unlock(zone->domain);
+}
+
+//--------------------------------------------------------------------------------------------------
 size_t stats_zone_number_of_values(struct stats_zone* zone) {
     stats_domain_lock(zone->domain);
     size_t n = zone->nvalues;
@@ -735,6 +753,10 @@ size_t stats_zone_get_values(struct stats_zone* zone,
 
 //--------------------------------------------------------------------------------------------------
 static void __stats_zone_update_metrics(struct stats_zone* zone) {
+    if (!zone->enabled) {
+        return;
+    }
+
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
         __stats_block_update_metrics(*blk, false);
     }
