@@ -54,7 +54,7 @@ def connect_client(address=None, port=None, auth_token=None,
         auth_token = os.environ.get('SN_CFG_CLI_AUTH_TOKEN')
     if tls_root_certs is None:
         tls_root_certs = os.environ.get('SN_CFG_CLI_TLS_ROOT_CERTS')
-    if tls_root_certs is not None:
+    if tls_root_certs is not None and not isinstance(tls_root_certs, bytes):
         tls_root_certs = pathlib.Path(tls_root_certs).read_bytes()
     if tls_hostname_override is None:
         tls_hostname_override = os.environ.get('SN_CFG_CLI_TLS_HOSTNAME_OVERRIDE')
