@@ -544,8 +544,8 @@ services:
     init: true
     user: root
     privileged: true
-    ports:
-      - "${SN_P4_SERVER_PORT-50050}:50050"
+    expose:
+      - 50050
     environment:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_P4_SERVER_HOST=${SN_HOST}
@@ -568,6 +568,16 @@ services:
           create_host_path: false
     entrypoint:
       - /usr/local/sbin/sn-p4-server-entrypoint.sh
+    labels:
+      # Enable auto-discovery for traefik
+      - 'traefik.enable=true'
+
+      # Expose SmartnicP4 grpc API via traefik
+      - 'traefik.http.routers.smartnic-p4.rule=PathPrefix(`/sn_p4.v2.SmartnicP4`)'
+      - 'traefik.http.routers.smartnic-p4.service=smartnic-p4'
+
+      # Define the internal service endpoint
+      - 'traefik.http.services.smartnic-p4.loadbalancer.server.scheme=https'
     profiles:
       - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
