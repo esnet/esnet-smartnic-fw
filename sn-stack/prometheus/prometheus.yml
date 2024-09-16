@@ -1,0 +1,30 @@
+global:
+  scrape_interval:     10s
+  evaluation_interval: 10s
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+  external_labels:
+      monitor: 'hightouch'
+
+# Load and evaluate rules in this file every 'evaluation_interval' seconds.
+rule_files:
+  # - "alert.rules"
+  # - "first.rules"
+  # - "second.rules"
+
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'smartnic-cfg'
+    static_configs:
+      - targets:
+          - 'smartnic-cfg:8000'
+  - job_name: 'smartnic-p4'
+    static_configs:
+      - targets:
+          - 'smartnic-p4:8000'
+  - job_name: 'traefik'
+    static_configs:
+      - targets:
+          - 'traefik:8080'
+

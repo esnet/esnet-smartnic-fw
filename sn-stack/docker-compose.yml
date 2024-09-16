@@ -17,6 +17,11 @@ x-traefik-service: &traefik-service
   image: '${DOCKERHUB_PROXY-}library/traefik:3.1.4'
   restart: unless-stopped
 
+# https://github.com/prometheus/prometheus/releases
+x-prometheus-service: &prometheus-service
+  image: '${DOCKERHUB_PROXY-}prom/prometheus:v2.54.1'
+  restart: unless-stopped
+
 services:
   xilinx-hwserver:
     <<: *labtools-service
@@ -726,6 +731,32 @@ services:
       - --ping=true
     profiles:
       - smartnic-ingress
+
+  prometheus:
+    <<: *prometheus-service
+    hostname: prometheus
+    expose:
+      - 9090
+    networks:
+      - default
+    volumes:
+      - ./prometheus:/etc/prometheus/
+    command:
+      - '--web.listen-address=0.0.0.0:9090'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.external-url=/prometheus'
+    labels:
+      # Enable auto-discovery for traefik
+      - 'traefik.enable=true'
+
+      # Expose prometheus API via traefik
+      - 'traefik.http.routers.prometheus-router.rule=PathPrefix(`/prometheus`)'
+      - 'traefik.http.routers.prometheus-router.service=prometheus-service'
+
+      # Define the internal service endpoint
+      - 'traefik.http.services.prometheus-service.loadbalancer.server.scheme=http'
+    profiles:
+      - smartnic-metrics
 
 volumes:
   # NOTE: If you're about to add a bind mount here and give it a name so that you don't repeat it
