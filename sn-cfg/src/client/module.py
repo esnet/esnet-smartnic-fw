@@ -102,14 +102,23 @@ def batch_process_module_gpio_resp(resp):
     if not resp.HasField('module_gpio'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+        BatchOperation.BOP_SET: 'Configured',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.module_gpio
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('gpio'):
+    if op == BatchOperation.BOP_GET:
         _show_module_gpio(resp.dev_id, resp.mod_id, resp.gpio)
     else:
-        click.echo(f'Configured GPIOs for module ID {resp.mod_id} on device ID {resp.dev_id}.')
+        click.echo(f'{op_label} GPIOs for module ID {resp.mod_id} on device ID {resp.dev_id}.')
     return True
 
 def batch_module_gpio(op, **kargs):
@@ -218,11 +227,19 @@ def batch_process_module_info_resp(resp):
     if not resp.HasField('module_info'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.module_info
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('info'):
+    if op == BatchOperation.BOP_GET:
         _show_module_info(resp.dev_id, resp.mod_id, resp.info)
     return True
 
@@ -318,14 +335,23 @@ def batch_process_module_mem_resp(resp):
     if not resp.HasField('module_mem'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+        BatchOperation.BOP_SET: 'Configured',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.module_mem
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('mem'):
+    if op == BatchOperation.BOP_GET:
         _show_module_mem(resp.dev_id, resp.mod_id, resp.mem)
     else:
-        click.echo(f'Configured memory of module ID {resp.mod_id} on device ID {resp.dev_id}.')
+        click.echo(f'{op_label} memory of module ID {resp.mod_id} on device ID {resp.dev_id}.')
     return True
 
 def batch_module_mem(op, **kargs):
@@ -396,11 +422,19 @@ def batch_process_module_status_resp(kargs):
         if not resp.HasField('module_status'):
             return False
 
+        supported_ops = {
+            BatchOperation.BOP_GET: 'Got',
+        }
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
+
         resp = resp.module_status
         if resp.error_code != ErrorCode.EC_OK:
             raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-        if resp.HasField('status'):
+        if op == BatchOperation.BOP_GET:
             _show_module_status(resp.dev_id, resp.mod_id, resp.status, kargs)
         return True
 

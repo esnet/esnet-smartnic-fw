@@ -22,7 +22,7 @@ from sn_cfg_proto import (
 
 from .device import device_id_option
 from .error import error_code_str
-from .utils import apply_options, ChoiceFields
+from .utils import apply_options, ChoiceFields, format_timestamp, natural_sort_key
 
 HEADER_SEP = '-' * 40
 
@@ -188,14 +188,23 @@ def batch_process_switch_config_resp(resp):
     if not resp.HasField('switch_config'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+        BatchOperation.BOP_SET: 'Configured',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.switch_config
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('config'):
+    if op == BatchOperation.BOP_GET:
         _show_switch_config(resp.dev_id, resp.config)
     else:
-        click.echo(f'Configured switch for device ID {resp.dev_id}.')
+        click.echo(f'{op_label} switch for device ID {resp.dev_id}.')
     return True
 
 def batch_switch_config(op, **kargs):
@@ -245,14 +254,29 @@ def _show_switch_stats(dev_id, stats, kargs):
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
+    name_len = 0
+    value_len = 0
     metrics = {}
     for metric in stats.metrics:
-        metrics[f'{metric.scope.block}_{metric.name}'] = metric.value.u64
+        name = f'{metric.scope.block}_{metric.name}'
+        name_len = max(name_len, len(name))
+
+        svalue = f'{metric.value.u64}'
+        value_len = max(value_len, len(svalue))
+
+        metrics[name] = {
+            'value': svalue,
+            'last_update': format_timestamp(metric.last_update),
+        }
 
     if metrics:
-        name_len = max(len(name) for name in metrics)
-        for name in sorted(metrics):
-            rows.append(f'{name:>{name_len}}: {metrics[name]}')
+        last_update = kargs.get('last_update', False)
+        for name in sorted(metrics, key=natural_sort_key):
+            m = metrics[name]
+            row = f'{name:>{name_len}}: {m["value"]:<{value_len}}'
+            if last_update:
+                row += f'    [{m["last_update"]}]'
+            rows.append(row)
 
     click.echo('\n'.join(rows))
 
@@ -269,14 +293,23 @@ def batch_process_switch_stats_resp(kargs):
         if not resp.HasField('switch_stats'):
             return False
 
+        supported_ops = {
+            BatchOperation.BOP_GET: 'Got',
+            BatchOperation.BOP_CLEAR: 'Cleared',
+        }
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
+
         resp = resp.switch_stats
         if resp.error_code != ErrorCode.EC_OK:
             raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-        if resp.HasField('stats'):
+        if op == BatchOperation.BOP_GET:
             _show_switch_stats(resp.dev_id, resp.stats, kargs)
         else:
-            click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
+            click.echo(f'{op_label} statistics for device ID {resp.dev_id}.')
         return True
 
     return process
@@ -353,6 +386,11 @@ def show_switch_stats_options(fn):
             '--zeroes',
             is_flag=True,
             help='Include zero valued counters in the display.',
+        ),
+        click.option(
+            '--last-update',
+            is_flag=True,
+            help='Include the counter last update timestamp in the display.',
         ),
     )
     return apply_options(options, fn)

@@ -59,9 +59,10 @@ def batch_process_table_resp(kargs):
         supported_ops = {
             BatchOperation.BOP_CLEAR: 'Cleared',
         }
-        if resp.op not in supported_ops:
-            raise click.ClickException('Response for unsupported batch operation: {resp.op}')
-        op_label = supported_ops[resp.op]
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
 
         resp = resp.table
         if resp.error_code != ErrorCode.EC_OK:
@@ -192,9 +193,10 @@ def batch_process_table_rule_resp(kargs):
             BatchOperation.BOP_INSERT: 'Inserted rule into',
             BatchOperation.BOP_DELETE: 'Deleted rule from',
         }
-        if resp.op not in supported_ops:
-            raise click.ClickException('Response for unsupported batch operation: {resp.op}')
-        op_label = supported_ops[resp.op]
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
 
         resp = resp.table_rule
         if resp.error_code != ErrorCode.EC_OK:

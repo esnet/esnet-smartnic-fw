@@ -17,7 +17,7 @@ from sn_cfg_proto import (
 
 from .device import device_id_option
 from .error import error_code_str
-from .utils import apply_options
+from .utils import apply_options, format_timestamp, natural_sort_key
 
 HEADER_SEP = '-' * 40
 
@@ -82,20 +82,37 @@ def _show_stats(dev_id, stats, kargs):
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
+    name_len = 0
+    value_len = 0
     metrics = {}
     for metric in stats.metrics:
+        name = metric.scope.zone
+        if not metric.name.startswith(metric.scope.block):
+            name += f'_{metric.scope.block}'
+        name += f'_{metric.name}'
+        name_len = max(name_len, len(name))
+
         if metric.type == StatsMetricType.STATS_METRIC_TYPE_FLAG:
-            value = 'yes' if metric.value.u64 != 0 else 'no'
+            svalue = 'yes' if metric.value.u64 != 0 else 'no'
         elif metric.type == StatsMetricType.STATS_METRIC_TYPE_GAUGE:
-            value = metric.value.f64
+            svalue = f'{metric.value.f64:.4g}'
         else:
-            value = metric.value.u64
-        metrics[f'{metric.scope.zone}_{metric.scope.block}_{metric.name}'] = value
+            svalue = f'{metric.value.u64}'
+        value_len = max(value_len, len(svalue))
+
+        metrics[name] = {
+            'value': svalue,
+            'last_update': format_timestamp(metric.last_update),
+        }
 
     if metrics:
-        name_len = max(len(name) for name in metrics)
-        for name in sorted(metrics):
-            rows.append(f'{name:>{name_len}}: {metrics[name]}')
+        last_update = kargs.get('last_update', False)
+        for name in sorted(metrics, key=natural_sort_key):
+            m = metrics[name]
+            row = f'{name:>{name_len}}: {m["value"]:<{value_len}}'
+            if last_update:
+                row += f'    [{m["last_update"]}]'
+            rows.append(row)
 
     click.echo('\n'.join(rows))
 
@@ -112,14 +129,23 @@ def batch_process_stats_resp(kargs):
         if not resp.HasField('stats'):
             return False
 
+        supported_ops = {
+            BatchOperation.BOP_GET: 'Got',
+            BatchOperation.BOP_CLEAR: 'Cleared',
+        }
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
+
         resp = resp.stats
         if resp.error_code != ErrorCode.EC_OK:
             raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-        if resp.HasField('stats'):
+        if op == BatchOperation.BOP_GET:
             _show_stats(resp.dev_id, resp.stats, kargs)
         else:
-            click.echo(f'Cleared statistics for device ID {resp.dev_id}.')
+            click.echo(f'{op_label} statistics for device ID {resp.dev_id}.')
         return True
 
     return process
@@ -148,6 +174,11 @@ def show_stats_options(fn):
             '--zeroes',
             is_flag=True,
             help='Include zero valued statistic metrics in the display.',
+        ),
+        click.option(
+            '--last-update',
+            is_flag=True,
+            help='Include the metric last update timestamp in the display.',
         ),
     )
     return apply_options(options, fn)

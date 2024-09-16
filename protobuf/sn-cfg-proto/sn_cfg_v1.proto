@@ -1,6 +1,11 @@
 //--------------------------------------------------------------------------------------------------
 syntax = "proto3";
 
+package sn_cfg.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
 //--------------------------------------------------------------------------------------------------
 enum ErrorCode {
     // General error codes.
@@ -68,6 +73,11 @@ enum ErrorCode {
     EC_UNKNOWN_MODULE_GPIO_TYPE = 707;
     EC_MODULE_GPIO_READ_FAILED = 708;
     EC_MODULE_GPIO_WRITE_FAILED = 709;
+
+    // Server configuration error codes.
+    EC_SERVER_FAILED_GET_TIME = 800;
+    EC_SERVER_INVALID_DEBUG_FLAG = 801;
+    EC_SERVER_INVALID_CONTROL_STATS_FLAG = 802;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -102,6 +112,8 @@ message StatsMetric {
     StatsMetricScope scope = 2;
     string name = 3;
     StatsMetricValue value = 4;
+    google.protobuf.Timestamp last_update = 5; // Monotonic timestamp indicating when the metric was
+                                               // last updated.
 }
 
 message Stats {
@@ -578,6 +590,71 @@ message SwitchStatsResponse {
 }
 
 //--------------------------------------------------------------------------------------------------
+message ServerStatus {
+    google.protobuf.Timestamp start_time = 1; // UTC wall clock.
+    google.protobuf.Duration up_time = 2; // Diff of monotonic system clock.
+}
+
+message ServerStatusRequest {
+}
+
+message ServerStatusResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    ServerStatus status = 2;
+}
+
+enum ServerDebugFlag {
+    DEBUG_FLAG_UNKNOWN = 0;
+    DEBUG_FLAG_BATCH = 1;
+}
+
+message ServerDebug {
+    repeated ServerDebugFlag enables = 1;
+    repeated ServerDebugFlag disables = 2;
+}
+
+enum ServerControlStatsFlag {
+    CTRL_STATS_FLAG_UNKNOWN = 0;
+
+    CTRL_STATS_FLAG_DOMAIN_COUNTERS = 1;
+    CTRL_STATS_FLAG_DOMAIN_MONITORS = 2;
+    CTRL_STATS_FLAG_DOMAIN_MODULES = 3;
+
+    CTRL_STATS_FLAG_ZONE_CARD_MONITORS = 10;
+    CTRL_STATS_FLAG_ZONE_SYSMON_MONITORS = 20;
+    CTRL_STATS_FLAG_ZONE_HOST_COUNTERS = 30;
+    CTRL_STATS_FLAG_ZONE_PORT_COUNTERS = 40;
+    CTRL_STATS_FLAG_ZONE_SWITCH_COUNTERS = 50;
+    CTRL_STATS_FLAG_ZONE_MODULE_MONITORS = 60;
+}
+
+message ServerControlStats {
+    repeated ServerControlStatsFlag enables = 1;
+    repeated ServerControlStatsFlag disables = 2;
+}
+
+message ServerControl {
+    ServerControlStats stats = 1;
+}
+
+message ServerConfig {
+    ServerDebug debug = 1;
+    ServerControl control = 2;
+}
+
+message ServerConfigRequest {
+    // Configuration data used for set operations. Leave unset for get operations.
+    ServerConfig config = 1;
+}
+
+message ServerConfigResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+
+    // Configuration data returned on get operations. Will be unset for set operations.
+    ServerConfig config = 2;
+}
+
+//--------------------------------------------------------------------------------------------------
 enum BatchOperation {
     BOP_UNKNOWN = 0; // Field is unset.
     BOP_GET = 1;
@@ -619,11 +696,16 @@ message BatchRequest {
         ModuleStatusRequest module_status = 71;
         ModuleMemRequest module_mem = 72;
         ModuleGpioRequest module_gpio = 73;
+
+        // Server configuration.
+        ServerStatusRequest server_status = 80;
+        ServerConfigRequest server_config = 81;
     };
 }
 
 message BatchResponse {
     ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    BatchOperation op = 2;
 
     // Field IDs 2-9 are reserved for future use.
 
@@ -656,6 +738,10 @@ message BatchResponse {
         ModuleStatusResponse module_status = 71;
         ModuleMemResponse module_mem = 72;
         ModuleGpioResponse module_gpio = 73;
+
+        // Server configuration.
+        ServerStatusResponse server_status = 80;
+        ServerConfigResponse server_config = 81;
     };
 }
 
@@ -701,4 +787,10 @@ service SmartnicConfig {
     rpc SetSwitchConfig(SwitchConfigRequest) returns (stream SwitchConfigResponse);
     rpc GetSwitchStats(SwitchStatsRequest) returns (stream SwitchStatsResponse);
     rpc ClearSwitchStats(SwitchStatsRequest) returns (stream SwitchStatsResponse);
+
+    // Server configuration.
+    rpc GetServerConfig(ServerConfigRequest) returns (stream ServerConfigResponse);
+    rpc SetServerConfig(ServerConfigRequest) returns (stream ServerConfigResponse);
+    rpc GetServerStatus(ServerStatusRequest) returns (stream ServerStatusResponse);
 }
+

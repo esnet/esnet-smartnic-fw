@@ -4,20 +4,48 @@
 #include "sn_cfg_v1.grpc.pb.h"
 
 using namespace grpc;
+using namespace sn_cfg::v1;
 
 //--------------------------------------------------------------------------------------------------
 static void error_resp(
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr,
-    ErrorCode err) {
+    ErrorCode err,
+    BatchOperation op) {
     BatchResponse resp;
     resp.set_error_code(err);
+    resp.set_op(op);
     rdwr->Write(resp);
 }
 
 //--------------------------------------------------------------------------------------------------
+static const char* item_case_name(const BatchRequest::ItemCase item_case) {
+    switch (item_case) {
+    case BatchRequest::ItemCase::kDeviceInfo: return "DeviceInfo";
+    case BatchRequest::ItemCase::kDeviceStatus: return "DeviceStatus";
+    case BatchRequest::ItemCase::kHostConfig: return "HostConfig";
+    case BatchRequest::ItemCase::kHostStats: return "HostStats";
+    case BatchRequest::ItemCase::kPortConfig: return "PortConfig";
+    case BatchRequest::ItemCase::kPortStatus: return "PortStatus";
+    case BatchRequest::ItemCase::kPortStats: return "PortStats";
+    case BatchRequest::ItemCase::kSwitchConfig: return "SwitchConfig";
+    case BatchRequest::ItemCase::kSwitchStats: return "SwitchStats";
+    case BatchRequest::ItemCase::kDefaults: return "Defaults";
+    case BatchRequest::ItemCase::kStats: return "Stats";
+    case BatchRequest::ItemCase::kModuleInfo: return "ModuleInfo";
+    case BatchRequest::ItemCase::kModuleStatus: return "ModuleStatus";
+    case BatchRequest::ItemCase::kModuleMem: return "ModuleMem";
+    case BatchRequest::ItemCase::kModuleGpio: return "ModuleGpio";
+    case BatchRequest::ItemCase::kServerStatus: return "ServerStatus";
+    case BatchRequest::ItemCase::kServerConfig: return "ServerConfig";
+    case BatchRequest::ItemCase::ITEM_NOT_SET: return "ITEM_NOT_SET";
+    }
+    return "UNKNOWN";
+}
+//--------------------------------------------------------------------------------------------------
 Status SmartnicConfigImpl::Batch(
     [[maybe_unused]] ServerContext* ctx,
     ServerReaderWriter<BatchResponse, BatchRequest>* rdwr) {
+    ServerDebugFlag debug_flag = ServerDebugFlag::DEBUG_FLAG_BATCH;
     while (true) {
         BatchRequest req;
         if (!rdwr->Read(&req)) {
@@ -25,7 +53,12 @@ Status SmartnicConfigImpl::Batch(
         }
 
         auto op = req.op();
-        switch (req.item_case()) {
+        auto item_case = req.item_case();
+        SERVER_LOG_IF_DEBUG(debug_flag, INFO,
+            "op=" << BatchOperation_Name(op) << " (" << op << "), "
+            "item_case=" << item_case_name(item_case) << " (" << item_case << ")");
+
+        switch (item_case) {
         case BatchRequest::ItemCase::kDefaults:
             switch (op) {
             case BatchOperation::BOP_SET:
@@ -33,7 +66,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -45,7 +78,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -57,7 +90,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -73,7 +106,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -89,7 +122,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -105,7 +138,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -117,7 +150,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -133,7 +166,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -145,7 +178,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -161,7 +194,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -173,7 +206,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -189,7 +222,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -205,7 +238,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -221,7 +254,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
@@ -237,13 +270,41 @@ Status SmartnicConfigImpl::Batch(
                 break;
 
             default:
-                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP);
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kServerStatus:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_server_status(req.server_status(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
+                break;
+            }
+            break;
+
+        case BatchRequest::ItemCase::kServerConfig:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_server_config(req.server_config(), rdwr);
+                break;
+
+            case BatchOperation::BOP_SET:
+                batch_set_server_config(req.server_config(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
                 break;
             }
             break;
 
         default:
-            error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST);
+            error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST, op);
             break;
         }
     }

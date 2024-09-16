@@ -5,17 +5,19 @@
 #include "prometheus.hpp"
 #include "sn_cfg_v1.grpc.pb.h"
 
+#include <bitset>
 #include <string>
+#include <time.h>
 #include <vector>
 
 using namespace grpc;
+using namespace sn_cfg::v1;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
 class SmartnicConfigImpl final : public SmartnicConfig::Service {
 public:
-    explicit SmartnicConfigImpl(const vector<string>& bus_ids, const string& debug_dir,
-                                unsigned int prometheus_port);
+    explicit SmartnicConfigImpl(const vector<string>& bus_ids, unsigned int prometheus_port);
     ~SmartnicConfigImpl();
 
     // Batching of multiple RPCs.
@@ -67,6 +69,14 @@ public:
     Status ClearPortStats(
         ServerContext*, const PortStatsRequest*, ServerWriter<PortStatsResponse>*) override;
 
+    // Server configuration.
+    Status GetServerConfig(
+        ServerContext*, const ServerConfigRequest*, ServerWriter<ServerConfigResponse>*) override;
+    Status SetServerConfig(
+        ServerContext*, const ServerConfigRequest*, ServerWriter<ServerConfigResponse>*) override;
+    Status GetServerStatus(
+        ServerContext*, const ServerStatusRequest*, ServerWriter<ServerStatusResponse>*) override;
+
     // Statistics configuration.
     Status GetStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
     Status ClearStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
@@ -88,6 +98,27 @@ private:
         prom_collector_registry_t* registry;
         struct MHD_Daemon* daemon;
     } prometheus;
+
+    struct {
+        struct timespec start_wall;
+        struct timespec start_mono;
+    } timestamp;
+
+    struct {
+        bitset<ServerDebugFlag_MAX + 1> flags;
+    } debug;
+
+    const char* debug_flag_label(const ServerDebugFlag flag);
+
+#define SERVER_LOG_IF_DEBUG(_flag, _label, _stream_statements) \
+    if (this->debug.flags.test(_flag)) { \
+        cerr << "DEBUG_" #_label "[" << this->debug_flag_label(_flag) << "]: " \
+             << _stream_statements << endl; \
+    }
+
+    struct {
+        bitset<ServerControlStatsFlag_MAX + 1> stats_flags;
+    } control;
 
     void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
     void batch_set_defaults(
@@ -156,6 +187,19 @@ private:
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_clear_port_stats(
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    void init_server(void);
+    void deinit_server(void);
+    void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
+    void batch_get_server_config(
+        const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    ErrorCode apply_server_control_stats_flag(ServerControlStatsFlag flag, bool enable);
+    void set_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
+    void batch_set_server_config(
+        const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_server_status(const ServerStatusRequest&, function<void(const ServerStatusResponse&)>);
+    void batch_get_server_status(
+        const ServerStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void get_or_clear_stats(const StatsRequest&, bool, function<void(const StatsResponse&)>);
     void batch_get_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);

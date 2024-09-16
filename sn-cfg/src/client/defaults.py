@@ -56,11 +56,19 @@ def batch_process_defaults_resp(resp):
     if not resp.HasField('defaults'):
         return False
 
+    supported_ops = {
+        BatchOperation.BOP_SET: 'Configured',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
+
     resp = resp.defaults
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    click.echo(f'Applied defaults on device ID {resp.dev_id}.')
+    click.echo(f'{op_label} defaults on device ID {resp.dev_id}.')
     return True
 
 def batch_defaults(op, **kargs):

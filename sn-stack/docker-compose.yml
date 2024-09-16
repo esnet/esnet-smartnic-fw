@@ -584,6 +584,11 @@ services:
       - SN_TLS_CHAIN=${SN_TLS_CHAIN:-chain.pem}
       - SN_TLS_FULLCHAIN=${SN_TLS_FULLCHAIN:-fullchain.pem}
       - SN_TLS_KEY=${SN_TLS_KEY:-privkey.pem}
+
+      # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
+      # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
+      #- GRPC_TRACE=tsi,http #all
+      #- GRPC_VERBOSITY=DEBUG
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev

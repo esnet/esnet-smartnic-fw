@@ -12,6 +12,7 @@
 #include "qdma.h"
 
 using namespace grpc;
+using namespace sn_cfg::v1;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
@@ -39,17 +40,18 @@ void SmartnicConfigImpl::init_host(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
-        dev->stats.hosts.push_back(stats);
+        dev->stats.zones[DeviceStatsZone::HOST_COUNTERS].push_back(stats);
     }
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::deinit_host(Device* dev) {
-    while (!dev->stats.hosts.empty()) {
-        auto stats = dev->stats.hosts.back();
+    auto zones = &dev->stats.zones[DeviceStatsZone::HOST_COUNTERS];
+    while (!zones->empty()) {
+        auto stats = zones->back();
         qdma_stats_zone_free(stats->zone);
 
-        dev->stats.hosts.pop_back();
+        zones->pop_back();
         delete stats;
     }
 }
@@ -139,6 +141,7 @@ void SmartnicConfigImpl::batch_get_host_config(
         auto config = bresp.mutable_host_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -245,6 +248,7 @@ void SmartnicConfigImpl::batch_set_host_config(
         auto config = bresp.mutable_host_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
         rdwr->Write(bresp);
     });
 }
@@ -315,15 +319,15 @@ void SmartnicConfigImpl::get_or_clear_host_stats(
             end_host_id = host_id;
         }
 
+        auto& zones = dev->stats.zones[DeviceStatsZone::HOST_COUNTERS];
         for (host_id = begin_host_id; host_id <= end_host_id; ++host_id) {
             HostStatsResponse resp;
 
             if (do_clear) {
-                stats_zone_clear_metrics(dev->stats.hosts[host_id]->zone);
+                stats_zone_clear_metrics(zones[host_id]->zone);
             } else {
                 ctx.stats = resp.mutable_stats();
-                stats_zone_for_each_metric(
-                    dev->stats.hosts[host_id]->zone, get_stats_for_each_metric, &ctx);
+                stats_zone_for_each_metric(zones[host_id]->zone, get_stats_for_each_metric, &ctx);
             }
 
             resp.set_error_code(ErrorCode::EC_OK);
@@ -344,6 +348,7 @@ void SmartnicConfigImpl::batch_get_host_stats(
         auto stats = bresp.mutable_host_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -368,6 +373,7 @@ void SmartnicConfigImpl::batch_clear_host_stats(
         auto stats = bresp.mutable_host_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
         rdwr->Write(bresp);
     });
 }

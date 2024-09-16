@@ -57,9 +57,7 @@ cmd+=( "$@" )
 
 #---------------------------------------------------------------------------------------------------
 # Wait for the FPGA to come out of reset before running the server.
-if ! [[ "${cmd[@]}" =~ '--debug-dir' ]]; then
-    sn-cfg-check-for-fpga-ready
-fi
+sn-cfg-check-for-fpga-ready
 
 # Start the server.
 echo "Starting server: ${cmd[@]}"

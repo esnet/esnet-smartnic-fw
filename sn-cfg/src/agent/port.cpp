@@ -12,6 +12,7 @@
 #include "esnet_smartnic_toplevel.h"
 
 using namespace grpc;
+using namespace sn_cfg::v1;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
@@ -38,17 +39,18 @@ void SmartnicConfigImpl::init_port(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
-        dev->stats.ports.push_back(stats);
+        dev->stats.zones[DeviceStatsZone::PORT_COUNTERS].push_back(stats);
     }
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::deinit_port(Device* dev) {
-    while (!dev->stats.ports.empty()) {
-        auto stats = dev->stats.ports.back();
+    auto zones = &dev->stats.zones[DeviceStatsZone::PORT_COUNTERS];
+    while (!zones->empty()) {
+        auto stats = zones->back();
         cmac_stats_zone_free(stats->zone);
 
-        dev->stats.ports.pop_back();
+        zones->pop_back();
         delete stats;
     }
 }
@@ -137,6 +139,7 @@ void SmartnicConfigImpl::batch_get_port_config(
         auto config = bresp.mutable_port_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -282,6 +285,7 @@ void SmartnicConfigImpl::batch_set_port_config(
         auto config = bresp.mutable_port_config();
         config->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_SET);
         rdwr->Write(bresp);
     });
 }
@@ -375,6 +379,7 @@ void SmartnicConfigImpl::batch_get_port_status(
         auto status = bresp.mutable_port_status();
         status->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -445,15 +450,15 @@ void SmartnicConfigImpl::get_or_clear_port_stats(
             end_port_id = port_id;
         }
 
+        auto& zones = dev->stats.zones[DeviceStatsZone::PORT_COUNTERS];
         for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
             PortStatsResponse resp;
 
             if (do_clear) {
-                stats_zone_clear_metrics(dev->stats.ports[port_id]->zone);
+                stats_zone_clear_metrics(zones[port_id]->zone);
             } else {
                 ctx.stats = resp.mutable_stats();
-                stats_zone_for_each_metric(
-                    dev->stats.ports[port_id]->zone, get_stats_for_each_metric, &ctx);
+                stats_zone_for_each_metric(zones[port_id]->zone, get_stats_for_each_metric, &ctx);
             }
 
             resp.set_error_code(ErrorCode::EC_OK);
@@ -474,6 +479,7 @@ void SmartnicConfigImpl::batch_get_port_stats(
         auto stats = bresp.mutable_port_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -498,6 +504,7 @@ void SmartnicConfigImpl::batch_clear_port_stats(
         auto stats = bresp.mutable_port_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
         rdwr->Write(bresp);
     });
 }

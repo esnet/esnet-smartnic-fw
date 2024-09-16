@@ -65,6 +65,8 @@ struct stats_zone {
 
     struct stats_block** blocks;
     size_t nvalues;
+
+    bool enabled;
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -506,45 +508,47 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
             __stats_metric_read(metric, values);
         }
 
-        if (clear) {
-            for (struct stats_metric_element* e = metric->elements;
-                 e < &metric->elements[metric->nelements];
-                 ++e) {
-                e->value.u64 = mspec->init_value;
-                e->last = mspec->init_value;
-            }
-        } else {
-            switch (mspec->type) {
-            case stats_metric_type_COUNTER: {
-                bool is_clear_on_read = STATS_METRIC_FLAG_TEST(mspec->flags, CLEAR_ON_READ);
-                for (unsigned int n = 0; n < metric->nelements; ++n) {
-                    struct stats_metric_element* e = &metric->elements[n];
-                    uint64_t value = values[n];
+        bool is_clear_on_read = STATS_METRIC_FLAG_TEST(mspec->flags, CLEAR_ON_READ);
+        switch (mspec->type) {
+        case stats_metric_type_COUNTER: {
+            for (unsigned int n = 0; n < metric->nelements; ++n) {
+                struct stats_metric_element* e = &metric->elements[n];
+                uint64_t value = values[n];
+                uint64_t diff = value;
+                if (!is_clear_on_read) {
+                    diff -= e->last;
+                    e->last = value;
+                }
 
-                    uint64_t diff = value;
-                    if (!is_clear_on_read) {
-                        diff -= e->last;
-                        e->last = value;
-                    }
-
+                if (clear) {
+                    e->value.u64 = mspec->init_value;
+                } else {
                     e->value.u64 += diff;
                 }
-                break;
             }
+            break;
+        }
 
-            case stats_metric_type_FLAG:
-                for (unsigned int n = 0; n < metric->nelements; ++n) {
+        case stats_metric_type_FLAG:
+            for (unsigned int n = 0; n < metric->nelements; ++n) {
+                if (clear) {
+                    metric->elements[n].value.u64 = mspec->init_value;
+                } else {
                     metric->elements[n].value.u64 = values[n] ? 1 : 0;
                 }
-                break;
+            }
+            break;
 
-            case stats_metric_type_GAUGE:
-            default:
-                for (unsigned int n = 0; n < metric->nelements; ++n) {
+        case stats_metric_type_GAUGE:
+        default:
+            for (unsigned int n = 0; n < metric->nelements; ++n) {
+                if (clear) {
+                    metric->elements[n].value.u64 = mspec->init_value;
+                } else {
                     metric->elements[n].value.u64 = values[n];
                 }
-                break;
             }
+            break;
         }
 
         for (struct stats_metric_element* e = metric->elements;
@@ -603,6 +607,7 @@ static void __stats_zone_attach(struct stats_zone* zone, struct stats_domain* do
     *link = zone;
     zone->next = NULL;
     zone->domain = domain;
+    zone->enabled = true;
 
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
         __stats_block_attach(*blk, zone);
@@ -630,6 +635,7 @@ static void __stats_zone_detach(struct stats_zone* zone) {
     *link = zone->next;
     zone->next = NULL;
     zone->domain = NULL;
+    zone->enabled = false;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -698,6 +704,20 @@ void stats_zone_free(struct stats_zone* zone) {
 }
 
 //--------------------------------------------------------------------------------------------------
+void stats_zone_enable(struct stats_zone* zone) {
+    stats_domain_lock(zone->domain);
+    zone->enabled = true;
+    stats_domain_unlock(zone->domain);
+}
+
+//--------------------------------------------------------------------------------------------------
+void stats_zone_disable(struct stats_zone* zone) {
+    stats_domain_lock(zone->domain);
+    zone->enabled = false;
+    stats_domain_unlock(zone->domain);
+}
+
+//--------------------------------------------------------------------------------------------------
 size_t stats_zone_number_of_values(struct stats_zone* zone) {
     stats_domain_lock(zone->domain);
     size_t n = zone->nvalues;
@@ -733,6 +753,10 @@ size_t stats_zone_get_values(struct stats_zone* zone,
 
 //--------------------------------------------------------------------------------------------------
 static void __stats_zone_update_metrics(struct stats_zone* zone) {
+    if (!zone->enabled) {
+        return;
+    }
+
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
         __stats_block_update_metrics(*blk, false);
     }

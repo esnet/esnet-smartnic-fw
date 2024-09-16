@@ -8,11 +8,14 @@ import datetime
 import grpc
 import time
 
-from sn_p4_proto.v2 import (
+from sn_cfg_proto import (
     BatchOperation,
     BatchRequest,
     ServerConfig,
     ServerConfigRequest,
+    ServerControl,
+    ServerControlStats,
+    ServerControlStatsFlag,
     ServerDebug,
     ServerDebugFlag,
     ServerStatusRequest,
@@ -26,11 +29,23 @@ HEADER_SEP = '-' * 40
 
 #---------------------------------------------------------------------------------------------------
 DEBUG_FLAG_MAP = {
-    ServerDebugFlag.DEBUG_FLAG_TABLE_CLEAR: 'table-clear',
-    ServerDebugFlag.DEBUG_FLAG_TABLE_RULE_INSERT: 'table-rule-insert',
-    ServerDebugFlag.DEBUG_FLAG_TABLE_RULE_DELETE: 'table-rule-delete',
+    ServerDebugFlag.DEBUG_FLAG_BATCH: 'batch',
 }
 DEBUG_FLAG_RMAP = dict((name, enum) for enum, name in DEBUG_FLAG_MAP.items())
+
+CONTROL_STATS_FLAG_MAP = {
+    ServerControlStatsFlag.CTRL_STATS_FLAG_DOMAIN_COUNTERS: 'domain-counters',
+    ServerControlStatsFlag.CTRL_STATS_FLAG_DOMAIN_MONITORS: 'domain-monitors',
+    ServerControlStatsFlag.CTRL_STATS_FLAG_DOMAIN_MODULES: 'domain-modules',
+
+    ServerControlStatsFlag.CTRL_STATS_FLAG_ZONE_CARD_MONITORS: 'zone-card-monitors',
+    ServerControlStatsFlag.CTRL_STATS_FLAG_ZONE_SYSMON_MONITORS: 'zone-sysmon-monitors',
+    ServerControlStatsFlag.CTRL_STATS_FLAG_ZONE_HOST_COUNTERS: 'zone-host-counters',
+    ServerControlStatsFlag.CTRL_STATS_FLAG_ZONE_PORT_COUNTERS: 'zone-port-counters',
+    ServerControlStatsFlag.CTRL_STATS_FLAG_ZONE_SWITCH_COUNTERS: 'zone-switch-counters',
+    ServerControlStatsFlag.CTRL_STATS_FLAG_ZONE_MODULE_MONITORS: 'zone-module-monitors',
+}
+CONTROL_STATS_FLAG_RMAP = dict((name, enum) for enum, name in CONTROL_STATS_FLAG_MAP.items())
 
 #---------------------------------------------------------------------------------------------------
 def server_config_req(**kargs):
@@ -47,6 +62,19 @@ def server_config_req(**kargs):
 
     if enables or disables:
         config_kargs['debug'] = ServerDebug(enables=enables, disables=disables)
+
+    enables = set()
+    disables = set()
+    for key, flags in (('stats_enables', enables), ('stats_disables', disables)):
+        for flag in kargs.get(key, ()):
+            if flag == 'all':
+                flags.update(CONTROL_STATS_FLAG_MAP)
+                break
+            flags.add(CONTROL_STATS_FLAG_RMAP[flag])
+
+    if enables or disables:
+        config_kargs['control'] = ServerControl(
+            stats=ServerControlStats(enables=enables, disables=disables))
 
     return ServerConfigRequest(config=ServerConfig(**config_kargs))
 
@@ -86,6 +114,17 @@ def _show_server_config(config):
         rows.append(f'    Enabled:  {enabled}')
     if disabled:
         rows.append(f'    Disabled: {disabled}')
+
+    ctrl = config.control
+    rows.append('Control:')
+
+    enabled = ', '.join(sorted(CONTROL_STATS_FLAG_MAP[flag] for flag in ctrl.stats.enables))
+    disabled = ', '.join(sorted(CONTROL_STATS_FLAG_MAP[flag] for flag in ctrl.stats.disables))
+    rows.append('    Stats:')
+    if enabled:
+        rows.append(f'        Enabled:  {enabled}')
+    if disabled:
+        rows.append(f'        Disabled: {disabled}')
 
     click.echo('\n'.join(rows))
 
@@ -191,20 +230,35 @@ def batch_server_status(op, **kargs):
 #---------------------------------------------------------------------------------------------------
 def configure_server_options(fn):
     debug_flag_choice = click.Choice(['all'] + sorted(name for name in DEBUG_FLAG_RMAP))
+    stats_flag_choice = click.Choice(['all'] + sorted(name for name in CONTROL_STATS_FLAG_RMAP))
     options = (
         click.option(
-            '--debug-enable', '-e',
+            '--debug-enable',
             'debug_enables',
             type=debug_flag_choice,
             multiple=True,
-            help='Enable debug flag.',
+            help='Flag to enable debug logging.',
         ),
         click.option(
-            '--debug-disable', '-d',
+            '--debug-disable',
             'debug_disables',
             type=debug_flag_choice,
             multiple=True,
-            help='Disable debug flag.',
+            help='Flag to disable debug logging.',
+        ),
+        click.option(
+            '--stats-enable',
+            'stats_enables',
+            type=stats_flag_choice,
+            multiple=True,
+            help='Flag to enable collection for a statistics domain.',
+        ),
+        click.option(
+            '--stats-disable',
+            'stats_disables',
+            type=stats_flag_choice,
+            multiple=True,
+            help='Flag to disable collection for a statistics domain.',
         ),
     )
     return apply_options(options, fn)
@@ -217,21 +271,21 @@ def add_batch_commands(cmd):
     @configure_server_options
     def configure_server(**kargs):
         '''
-        Configuration for the SmartNIC P4 server.
+        Configuration for the SmartNIC Configuration server.
         '''
         return batch_server_config(BatchOperation.BOP_SET, **kargs)
 
     @cmd.command(name='show-server-config')
     def show_server_config(**kargs):
         '''
-        Display the configuration of the SmartNIC P4 server.
+        Display the configuration of the SmartNIC Configuration server.
         '''
         return batch_server_config(BatchOperation.BOP_GET, **kargs)
 
     @cmd.command(name='show-server-status')
     def show_server_status(**kargs):
         '''
-        Display the current status of the SmartNIC P4 server.
+        Display the current status of the SmartNIC Configuration server.
         '''
         return batch_server_status(BatchOperation.BOP_GET, **kargs)
 
@@ -242,7 +296,7 @@ def add_configure_commands(cmd):
     @click.pass_context
     def server(ctx, **kargs):
         '''
-        Configuration for the SmartNIC P4 server.
+        Configuration for the SmartNIC Configuration server.
         '''
         configure_server(ctx.obj, **kargs)
 
@@ -252,7 +306,7 @@ def add_show_commands(cmd):
     @click.pass_context
     def server(ctx):
         '''
-        Display SmartNIC P4 server.
+        Display SmartNIC Configuration server.
         '''
         if ctx.invoked_subcommand is None:
             client = ctx.obj
@@ -263,7 +317,7 @@ def add_show_commands(cmd):
     @click.pass_context
     def config(ctx, **kargs):
         '''
-        Display the configuration of the SmartNIC P4 server.
+        Display the configuration of the SmartNIC Configuration server.
         '''
         show_server_config(ctx.obj, **kargs)
 
@@ -271,7 +325,7 @@ def add_show_commands(cmd):
     @click.pass_context
     def status(ctx, **kargs):
         '''
-        Display the current status of the SmartNIC P4 server.
+        Display the current status of the SmartNIC Configuration server.
         '''
         show_server_status(ctx.obj, **kargs)
 

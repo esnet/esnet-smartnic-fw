@@ -67,17 +67,19 @@ def batch_process_device_info_resp(resp):
     if not resp.HasField('device_info'):
         return False
 
-    supported_ops = (
-        BatchOperation.BOP_GET,
-    )
-    if resp.op not in supported_ops:
-        raise click.ClickException('Response for unsupported batch operation: {resp.op}')
+    supported_ops = {
+        BatchOperation.BOP_GET: 'Got',
+    }
+    op = resp.op
+    if op not in supported_ops:
+        raise click.ClickException('Response for unsupported batch operation: {op}')
+    op_label = supported_ops[op]
 
     resp = resp.device_info
     if resp.error_code != ErrorCode.EC_OK:
         raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
 
-    if resp.HasField('info'):
+    if op == BatchOperation.BOP_GET:
         _show_device_info(resp.dev_id, resp.info)
     return True
 

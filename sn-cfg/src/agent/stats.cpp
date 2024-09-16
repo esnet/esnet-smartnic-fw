@@ -9,6 +9,7 @@
 #include "sn_cfg_v1.grpc.pb.h"
 
 using namespace grpc;
+using namespace sn_cfg::v1;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
@@ -46,6 +47,10 @@ extern "C" {
         scope->set_domain(spec->domain->name);
         scope->set_zone(spec->zone->name);
         scope->set_block(spec->block->name);
+
+        auto last_update = metric->mutable_last_update();
+        last_update->set_seconds(spec->last_update.tv_sec);
+        last_update->set_nanos(spec->last_update.tv_nsec);
 
         auto value = metric->mutable_value();
         value->set_u64(spec->values->u64);
@@ -123,6 +128,7 @@ void SmartnicConfigImpl::batch_get_stats(
         auto stats = bresp.mutable_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_GET);
         rdwr->Write(bresp);
     });
 }
@@ -147,6 +153,7 @@ void SmartnicConfigImpl::batch_clear_stats(
         auto stats = bresp.mutable_stats();
         stats->CopyFrom(resp);
         bresp.set_error_code(ErrorCode::EC_OK);
+        bresp.set_op(BatchOperation::BOP_CLEAR);
         rdwr->Write(bresp);
     });
 }

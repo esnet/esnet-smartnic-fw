@@ -1,3 +1,3 @@
 #---------------------------------------------------------------------------------------------------
-from sn_cfg_v1_pb2 import *
-from sn_cfg_v1_pb2_grpc import *
+from . import v1
+from .v1 import *
