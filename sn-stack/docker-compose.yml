@@ -10,6 +10,13 @@ x-smartnic-dpdk-service: &smartnic-dpdk-service
   image: ${SMARTNIC_DPDK_IMAGE_URI-smartnic-dpdk-docker:$USER-dev}
   restart: unless-stopped
 
+# https://github.com/traefik/traefik/releases
+# https://traefik.io/traefik/
+# https://hub.docker.com/_/traefik/
+x-traefik-service: &traefik-service
+  image: '${DOCKERHUB_PROXY-}library/traefik:3.1.4'
+  restart: unless-stopped
+
 services:
   xilinx-hwserver:
     <<: *labtools-service
@@ -638,6 +645,87 @@ services:
       - /test/entrypoint.sh
     profiles:
       - smartnic-test
+
+  traefik:
+    <<: *traefik-service
+    hostname: traefik
+    ports:
+      - "${SN_INGRESS_PORT-8440}:443"
+      #- '8080:8080'
+    networks:
+      - default
+    volumes:
+      - ${SN_STACK_ROOT-${PWD}}/traefik:/etc/traefik:ro
+      # Expose the docker socket to this container to allow for service auto-discovery
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Import the host's TLS certificates
+      - type: bind
+        source: ${SN_TLS_HOST_DIR:-${PWD}/letsencrypt}
+        target: /certs
+        read_only: true
+        bind:
+          create_host_path: false
+    environment:
+      - SN_TLS_PATH_PREFIX=${SN_TLS_PATH_PREFIX-}
+      - SN_TLS_FULLCHAIN=${SN_TLS_FULLCHAIN:-fullchain.pem}
+      - SN_TLS_KEY=${SN_TLS_KEY:-privkey.pem}
+    healthcheck:
+      test:
+        - CMD
+        - traefik
+        - healthcheck
+        - --ping
+    command:
+      # See: https://doc.traefik.io/traefik/
+      # Note:
+      #  * Configuration via command line parameters vs. yaml file are mutually exclusive
+      #  * We use command line options here so allow templating in global config which doesn't work in yaml files
+      #  * Using templating is required in order to ignore docker containers from outside of our compose stack (docker.constraints)
+
+      # Turn off any outbound connections
+      - --global.checkNewVersion=false
+      - --global.sendAnonymousUsage=false
+
+      # Set up Configuration Discovery via the docker provider
+      #   Only consider containers that:
+      #     * explicitly opt-in by setting label traefik.enable=true
+      #     * are in the same docker stack with label com.docker.compose.project=$COMPOSE_PROJECT_NAME
+      - --providers.docker.exposedByDefault=false
+      - '--providers.docker.constraints=Label(`com.docker.compose.project`,`$COMPOSE_PROJECT_NAME`)'
+
+      # Set up Configuration Discover via files for dynamic configuration changes (to detect TLS cert renewal)
+      - --providers.file.directory=/etc/traefik/config.d
+      - --providers.file.watch=true
+      #- --providers.debugloggeneratedtemplate=true
+
+      # Allow external connections to the reverse proxy
+      - --entrypoints.smartnic_api.address=:443
+      - --entrypoints.smartnic_api.http.tls=true
+
+      # Disable TLS cert verification for internal services since they're all re-using
+      # the host's cert which doesn't match the docker service's "hostname" and thus fails
+      # hostname verification.
+      - --serversTransport.insecureSkipVerify=true
+
+      # Enable prometheus metrics scrape endpoint for this daemon
+      - --metrics.prometheus=true
+
+      # Log all service accesses
+      - --accesslog=true
+
+      # Enable logging
+      - --log.level=info
+      #- --log.level=trace
+
+      # Enable API and disable dashboard advertisement
+      #- --api.dashboard=true
+      - --api.insecure=true
+      - --api.disabledashboardad=true
+
+      # Provide a convenient health check service
+      - --ping=true
+    profiles:
+      - smartnic-ingress
 
 volumes:
   # NOTE: If you're about to add a bind mount here and give it a name so that you don't repeat it
