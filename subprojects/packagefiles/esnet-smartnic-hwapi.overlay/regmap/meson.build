@@ -14,23 +14,38 @@ dev_ = dev.underscorify()
 top_ir = dev + '-top-ir.yaml'
 template_dir = '@SOURCE_ROOT@/regio/src/regio/tools/templates'
 
-regmap_info = run_command(
+regmap_info_blocks = run_command(
   regio_info_prog,
+  '--blocks',
   top_ir,
   check: true,
 )
 
-regmap_blocks = regmap_info.stdout().strip().split('\n')
+regmap_blocks = regmap_info_blocks.stdout().strip().split('\n')
 regmap_block_headers = []
 foreach b : regmap_blocks
   message('Block: ' + b)
   regmap_block_headers += b + '_block.h'
 endforeach
 
+regmap_info_decoders = run_command(
+  regio_info_prog,
+  '--decoders',
+  top_ir,
+  check: true,
+)
+
+regmap_decoders = regmap_info_decoders.stdout().strip().split('\n')
+regmap_decoder_headers = []
+foreach d : regmap_decoders
+  message('Decoder: ' + d)
+  regmap_decoder_headers += d + '_decoder.h'
+endforeach
+
 regmap_c_headers = custom_target(
   'regmap-c-headers',
   input : top_ir,
-  output : regmap_block_headers + [dev_ + '_toplevel.h'],
+  output : regmap_block_headers + regmap_decoder_headers + [dev_ + '_toplevel.h'],
   command : [
     regio_generate_prog,
     '--file-type', 'top',
