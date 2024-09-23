@@ -21,10 +21,11 @@ regmap_info_blocks = run_command(
   check: true,
 )
 
-regmap_blocks = regmap_info_blocks.stdout().strip().split('\n')
+regmap_blocks = regmap_info_blocks.stdout().splitlines()
 regmap_block_headers = []
+message('Regmap Blocks: @0@'.format(regmap_blocks.length()))
 foreach b : regmap_blocks
-  message('Block: ' + b)
+  message('    - Block: ' + b)
   regmap_block_headers += b + '_block.h'
 endforeach
 
@@ -35,10 +36,11 @@ regmap_info_decoders = run_command(
   check: true,
 )
 
-regmap_decoders = regmap_info_decoders.stdout().strip().split('\n')
+regmap_decoders = regmap_info_decoders.stdout().splitlines()
 regmap_decoder_headers = []
+message('Regmap Decoders: @0@'.format(regmap_decoders.length()))
 foreach d : regmap_decoders
-  message('Decoder: ' + d)
+  message('    - Decoder: ' + d)
   regmap_decoder_headers += d + '_decoder.h'
 endforeach
 
