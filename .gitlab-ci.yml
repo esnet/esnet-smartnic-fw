@@ -248,11 +248,13 @@ review:
     action: start
   parallel:
     matrix:
+      # Target nodes with au280 cards
       - AAP_LIMIT:
           - ftap-ht1.es.net
           - ftap-ht2.es.net
           - ftap-ht3.es.net
           - ftap-ht4.es.net
+        SYSTEM_HW_BOARD: au280
   variables:
     # host, hostgroup or list of hosts
     # AAP_LIMIT: # from parallel matrix
@@ -260,7 +262,10 @@ review:
     AAP_JOB_TEMPLATE: 458
     EXTRA_VARS: "{ 'jobid': ${SN_FW_API_JOB_NUMBER} }"
   rules:
-    - when: manual
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
+      when: never
+    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD)
+      when: manual
       allow_failure: true
   needs:
     - package
