@@ -46,7 +46,7 @@ variables:
     value: wharf.es.net/ht/smartnic-dpdk-docker:57593-gfd1ea53b
     description: smartnic-dpdk-docker image to use as basis for DPDK builds
   LABTOOLS_IMAGE_URI:
-    value: wharf.es.net/ht/xilinx-labtools-docker:53144-g319f2bac
+    value: wharf.es.net/ht/xilinx-labtools-docker:57755-g977a5678
     description: xilinx-labtools-docker image to use when deploying the sn-stack HW services
   SN_HW_GROUP:
     value: ht
