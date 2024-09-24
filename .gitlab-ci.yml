@@ -255,6 +255,10 @@ review:
           - ftap-ht3.es.net
           - ftap-ht4.es.net
         SYSTEM_HW_BOARD: au280
+      # Target nodes with au55c cards
+      #- AAP_LIMIT:
+      #    - foo-test.es.net
+      #  SYSTEM_HW_BOARD: au55c
   variables:
     # host, hostgroup or list of hosts
     # AAP_LIMIT: # from parallel matrix
