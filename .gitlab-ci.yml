@@ -26,22 +26,8 @@ stages:
   - trigger_downstream
 
 variables:
-  # These variables are hard-coded here and are not expected to be overridden
-  #
-  SN_HW_GROUP_DEFAULT:    ht
-  SN_HW_REPO_DEFAULT:     esnet-smartnic-ht
-  SN_HW_BRANCH_DEFAULT:   main
-  SN_HW_API_JOB_DEFAULT:  export_hwapi
-  SN_HW_BOARD_DEFAULT:    au280
-  SN_HW_APP_NAME_DEFAULT: esnet-smartnic-ht
-
-  # These variables are initialized to the defaults above but may be overridden
-  # by manual pipeline runs or from triggered pipelines from other repos
-  #
-  # NOTE: It is important that these values are initialized to match the defaults.
-  #       Simply setting them to $SN_HW_*_DEFAULT breaks the web ui for manual pipelines
-  #       and *also* variable comparisons in rules:if statements.
-  #
+  # These variables may be overridden by manual pipeline runs or from triggered
+  # pipelines from other repos.
   SMARTNIC_DPDK_IMAGE_URI:
     value: wharf.es.net/ht/smartnic-dpdk-docker:57593-gfd1ea53b
     description: smartnic-dpdk-docker image to use as basis for DPDK builds
@@ -248,11 +234,17 @@ review:
     action: start
   parallel:
     matrix:
+      # Target nodes with au280 cards
       - AAP_LIMIT:
           - ftap-ht1.es.net
           - ftap-ht2.es.net
           - ftap-ht3.es.net
           - ftap-ht4.es.net
+        SYSTEM_HW_BOARD: au280
+      # Target nodes with au55c cards
+      #- AAP_LIMIT:
+      #    - foo-test.es.net
+      #  SYSTEM_HW_BOARD: au55c
   variables:
     # host, hostgroup or list of hosts
     # AAP_LIMIT: # from parallel matrix
@@ -260,7 +252,10 @@ review:
     AAP_JOB_TEMPLATE: 458
     EXTRA_VARS: "{ 'jobid': ${SN_FW_API_JOB_NUMBER} }"
   rules:
-    - when: manual
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
+      when: never
+    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD)
+      when: manual
       allow_failure: true
   needs:
     - package
