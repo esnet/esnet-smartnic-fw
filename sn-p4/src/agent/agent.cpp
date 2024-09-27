@@ -228,7 +228,7 @@ public:
         if (md == auth_metadata.end()) {
             return Status(StatusCode::UNAUTHENTICATED, "Missing token key from metadata.");
         }
-        const auto md_token = md->second.data();
+        const auto md_token = md->second;
 
         for (const auto& token : tokens) {
             if (md_token == token) {
