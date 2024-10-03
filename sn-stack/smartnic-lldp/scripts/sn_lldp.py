@@ -49,19 +49,21 @@ def main(slotaddr, host, ttl):
     lldp_contexts = []
     for tapif, portid in port_bindings:
         print("  {} -> {}".format(tapif, portid))
-        packet = Packet(Ether(dst="01:80:c2:00:00:0e",
-                              src=get_if_hwaddr(tapif)) /
-                        LLDPDU() /
-                        LLDPDUChassisID(subtype="chassis component",
-                                        id="ESnet SmartNIC " + slotaddr) /
-                        LLDPDUPortID(subtype="interface name",
-                                     id=portid) /
-                        LLDPDUTimeToLive(ttl=ttl) /
-                        LLDPDUSystemName(system_name=host) /
-                        LLDPDUSystemDescription(description="ESnet SmartNIC HW=" +
-                                                os.environ['SN_HW_VER'] +
-                                                " FW=" + os.environ['SN_FW_VER']) /
-                        LLDPDUEndOfLLDPDU())
+        packet = (
+            Ether(dst="01:80:c2:00:00:0e",
+                  src=get_if_hwaddr(tapif)) /
+            LLDPDU() /
+            LLDPDUChassisID(subtype="chassis component",
+                            id="ESnet SmartNIC " + slotaddr) /
+            LLDPDUPortID(subtype="interface name",
+                         id=portid) /
+            LLDPDUTimeToLive(ttl=ttl) /
+            LLDPDUSystemName(system_name=host) /
+            LLDPDUSystemDescription(description="ESnet SmartNIC HW=" +
+                                    os.environ['SN_HW_VER'] +
+                                    " FW=" + os.environ['SN_FW_VER']) /
+            LLDPDUEndOfLLDPDU()
+        )
         lldp_contexts.append(LLDPContext(tapif=tapif, packet=packet))
 
     while(True):
