@@ -339,11 +339,13 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
             TableRuleResponse resp;
             auto err = ErrorCode::EC_OK;
 
+            unsigned int rule_count = req.rules_size();
             SERVER_LOG_IF_DEBUG(debug_flag, INFO,
-                "Processing " << req.rules_size() <<
+                "Processing " << rule_count <<
                 " rules in pipeline ID " << pipeline_id <<
                 " on device ID " << dev_id);
 
+            unsigned int rule_idx = 0;
             for (auto rule : req.rules()) {
                 const auto table_name = rule.table_name();
                 const auto ti = pipeline_get_table_info(pipeline, table_name);
@@ -352,7 +354,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                     SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                         "Invalid table '" << table_name <<
                         "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
+                        " on device ID " << dev_id <<
+                        " (rule " << rule_idx << "/" << rule_count << ")");
                     goto write_response;
                 }
 
@@ -371,7 +374,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                             " matches, but got " << nmatches <<
                             " for table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id);
+                            " on device ID " << dev_id <<
+                            " (rule " << rule_idx << "/" << rule_count << ")");
                         goto clear_rule;
                     } else if (nmatches > ti->num_matches) {
                         err = ErrorCode::EC_TABLE_RULE_TOO_MANY_MATCHES;
@@ -380,14 +384,16 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                             " matches, but got " << nmatches <<
                             " for table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id);
+                            " on device ID " << dev_id <<
+                            " (rule " << rule_idx << "/" << rule_count << ")");
                         goto clear_rule;
                     }
 
                     SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                         "Matches for table '" << table_name <<
                         "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
+                        " on device ID " << dev_id <<
+                        " (rule " << rule_idx << "/" << rule_count << ")");
 
                     for (const auto& match : rule.matches()) {
                         SERVER_LOG_IF_DEBUG(debug_flag, INFO,
@@ -414,7 +420,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                             "Invalid action name '" << action_name <<
                             "' for table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id);
+                            " on device ID " << dev_id <<
+                            " (rule " << rule_idx << "/" << rule_count << ")");
                         goto clear_rule;
                     }
                     sr.action_name = ai->name;
@@ -428,7 +435,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                             " to action '" << action_name <<
                             "' for table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id);
+                            " on device ID " << dev_id <<
+                            " (rule " << rule_idx << "/" << rule_count << ")");
                         goto clear_rule;
                     } else if (nparams > ai->num_params) {
                         err = ErrorCode::EC_TABLE_RULE_TOO_MANY_ACTION_PARAMETERS;
@@ -438,7 +446,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                             " to action '" << action_name <<
                             "' for table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id);
+                            " on device ID " << dev_id <<
+                            " (rule " << rule_idx << "/" << rule_count << ")");
                         goto clear_rule;
                     }
 
@@ -446,7 +455,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                         "Parameters to action '" << action_name <<
                         "' for table '" << table_name <<
                         "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
+                        " on device ID " << dev_id <<
+                        " (rule " << rule_idx << "/" << rule_count << ")");
 
                     for (const auto& param : action.parameters()) {
                         SERVER_LOG_IF_DEBUG(debug_flag, INFO,
@@ -472,7 +482,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                             "Failed to pack rule for table '" << table_name <<
                             "' in pipeline ID " << pipeline_id <<
                             " on device ID " << dev_id <<
-                            " (" << ErrorCode_Name(err) << ")");
+                            " (" << ErrorCode_Name(err) << ")" <<
+                            " (rule " << rule_idx << "/" << rule_count << ")");
                         goto clear_rule;
                     }
 
@@ -489,17 +500,33 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                             SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                                 "Failed to insert rule into table '" << table_name <<
                                 "' in pipeline ID " << pipeline_id <<
-                                " on device ID " << dev_id);
+                                " on device ID " << dev_id <<
+                                " (rule " << rule_idx << "/" << rule_count << ")");
+                        } else {
+                            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                                "Inserted rule into table '" << table_name <<
+                                "' in pipeline ID " << pipeline_id <<
+                                " on device ID " << dev_id <<
+                                " (rule " << rule_idx << "/" << rule_count << ")");
                         }
-                    } else if (!snp4_table_delete_k(pipeline->handle,
+                    } else {
+                        if (!snp4_table_delete_k(pipeline->handle,
                                                     sr.table_name,
                                                     pack.key, pack.key_len,
                                                     pack.mask, pack.mask_len)) {
-                        err = ErrorCode::EC_FAILED_DELETE_TABLE_RULE;
-                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
-                            "Failed to delete rule from table '" << table_name <<
-                            "' in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id);
+                            err = ErrorCode::EC_FAILED_DELETE_TABLE_RULE;
+                            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                                "Failed to delete rule from table '" << table_name <<
+                                "' in pipeline ID " << pipeline_id <<
+                                " on device ID " << dev_id <<
+                                " (rule " << rule_idx << "/" << rule_count << ")");
+                        } else {
+                            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                                "Deleted rule from table '" << table_name <<
+                                "' in pipeline ID " << pipeline_id <<
+                                " on device ID " << dev_id <<
+                                " (rule " << rule_idx << "/" << rule_count << ")");
+                        }
                     }
                     snp4_pack_clear(&pack);
                 }
@@ -509,6 +536,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                 if (err != ErrorCode::EC_OK) {
                     break;
                 }
+
+                rule_idx += 1;
             }
 
         write_response:
