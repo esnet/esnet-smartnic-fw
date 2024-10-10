@@ -741,7 +741,7 @@ services:
       - --metrics.prometheus=true
 
       # Log all service accesses
-      - --accesslog=true
+      - --accesslog=${SN_INGRESS_ENABLE_ACCESS_LOG:-false}
 
       # Enable logging
       - --log.level=info
