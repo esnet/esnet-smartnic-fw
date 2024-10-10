@@ -1,6 +1,6 @@
 from robot.api import logger
 
-from regio.regmap.io import FileMmapIOForSpec
+from regio.regmap.io.methods import FileMmapIOForSpec
 from regio.regmap.proxy import start_io, stop_io
 import regmap_esnet_smartnic.toplevel as top
 
