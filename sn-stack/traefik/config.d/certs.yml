@@ -1,0 +1,6 @@
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: "/certs/{{ env `SN_TLS_PATH_PREFIX` }}{{ env `SN_TLS_FULLCHAIN` }}"
+        keyFile:  "/certs/{{ env `SN_TLS_PATH_PREFIX` }}{{ env `SN_TLS_KEY` }}"
