@@ -509,6 +509,7 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
         }
 
         bool is_clear_on_read = STATS_METRIC_FLAG_TEST(mspec->flags, CLEAR_ON_READ);
+        bool do_clear = clear && !STATS_METRIC_FLAG_TEST(mspec->flags, NEVER_CLEAR);
         switch (mspec->type) {
         case stats_metric_type_COUNTER: {
             for (unsigned int n = 0; n < metric->nelements; ++n) {
@@ -520,7 +521,7 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
                     e->last = value;
                 }
 
-                if (clear) {
+                if (do_clear) {
                     e->value.u64 = mspec->init_value;
                 } else {
                     e->value.u64 += diff;
@@ -531,7 +532,7 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
 
         case stats_metric_type_FLAG:
             for (unsigned int n = 0; n < metric->nelements; ++n) {
-                if (clear) {
+                if (do_clear) {
                     metric->elements[n].value.u64 = mspec->init_value;
                 } else {
                     metric->elements[n].value.u64 = values[n] ? 1 : 0;
@@ -542,7 +543,7 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
         case stats_metric_type_GAUGE:
         default:
             for (unsigned int n = 0; n < metric->nelements; ++n) {
-                if (clear) {
+                if (do_clear) {
                     metric->elements[n].value.u64 = mspec->init_value;
                 } else {
                     metric->elements[n].value.u64 = values[n];
