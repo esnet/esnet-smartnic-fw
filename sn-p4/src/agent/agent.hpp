@@ -64,6 +64,13 @@ private:
         struct MHD_Daemon* daemon;
     } prometheus;
 
+    struct ServerStats {
+        struct stats_zone* zone;
+    };
+    struct {
+        struct stats_domain* domain;
+    } server_stats;
+
     struct {
         struct timespec start_wall;
         struct timespec start_mono;

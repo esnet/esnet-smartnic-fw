@@ -169,6 +169,26 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         devices.push_back(dev);
     }
 
+    struct stats_domain_spec server_spec = {
+        .name = "sn-cfg",
+        .thread = {
+            .interval_ms = 1000,
+        },
+        .prometheus = {
+            .registry = prometheus.registry,
+        },
+    };
+    server_stats.domain = stats_domain_alloc(&server_spec);
+    if (server_stats.domain == NULL) {
+        cerr << "ERROR: Failed to allocate server statistics domain." << endl;
+        exit(EXIT_FAILURE);
+    }
+
+    init_server();
+
+    stats_domain_clear_metrics(server_stats.domain);
+    stats_domain_start(server_stats.domain);
+
     promhttp_set_active_collector_registry(prometheus.registry);
     prometheus.daemon = promhttp_start_daemon(
         MHD_USE_SELECT_INTERNALLY, prometheus_port, NULL, NULL);
@@ -176,15 +196,14 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         cerr << "ERROR: Failed to start prometheus HTTP daemon." << endl;
         exit(EXIT_FAILURE);
     }
-
-    init_server();
 }
 
 //--------------------------------------------------------------------------------------------------
 SmartnicConfigImpl::~SmartnicConfigImpl() {
-    deinit_server();
-
     MHD_stop_daemon(prometheus.daemon);
+
+    deinit_server();
+    stats_domain_free(server_stats.domain);
 
     while (!devices.empty()) {
         auto dev = devices.back();
