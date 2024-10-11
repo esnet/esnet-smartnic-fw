@@ -107,6 +107,7 @@ private:
     };
     struct {
         struct stats_domain* domain;
+        ServerStats* status;
     } server_stats;
 
     struct {
@@ -199,6 +200,7 @@ private:
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void init_server(void);
+    void init_server_stats(void);
     void deinit_server(void);
     void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
     void batch_get_server_config(

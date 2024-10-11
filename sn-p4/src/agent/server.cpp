@@ -52,6 +52,79 @@ bool SmartnicP4Impl::get_server_times(struct timespec* start, struct timespec* u
 }
 
 //--------------------------------------------------------------------------------------------------
+extern "C" {
+    enum ServerStat {
+        START_TIME,
+        UP_TIME,
+    };
+
+    static void server_stats_read_metric(const struct stats_block_spec* bspec,
+                                         const struct stats_metric_spec* mspec,
+                                         uint64_t* value,
+                                         [[maybe_unused]] void* data) {
+        SmartnicP4Impl* impl = (typeof(impl))bspec->io.data.ptr;
+
+        struct timespec start;
+        struct timespec up;
+        if (!impl->get_server_times(&start, &up)) {
+            return;
+        }
+
+        switch ((ServerStat)mspec->io.data.u64) {
+        case ServerStat::START_TIME:
+            *value = start.tv_sec;
+            break;
+
+        case ServerStat::UP_TIME:
+            *value = up.tv_sec;
+            break;
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::init_server_stats(void) {
+    struct stats_metric_spec mspecs[2];
+    memset(mspecs, 0, sizeof(mspecs));
+    auto mspec = mspecs;
+
+    mspec->name = "start_time_sec";
+    mspec->type = stats_metric_type_GAUGE;
+    mspec->flags = STATS_METRIC_FLAG_MASK(NEVER_CLEAR);
+    mspec->io.data.u64 = ServerStat::START_TIME;
+    mspec += 1;
+
+    mspec->name = "up_time_sec";
+    mspec->type = stats_metric_type_GAUGE;
+    mspec->flags = STATS_METRIC_FLAG_MASK(NEVER_CLEAR);
+    mspec->io.data.u64 = ServerStat::UP_TIME;
+    mspec += 1;
+
+    struct stats_block_spec bspec;
+    memset(&bspec, 0, sizeof(bspec));
+    bspec.name = "status";
+    bspec.metrics = mspecs;
+    bspec.nmetrics = sizeof(mspecs) / sizeof(mspecs[0]);
+    bspec.read_metric = server_stats_read_metric;
+    bspec.io.data.ptr = this;
+
+    struct stats_zone_spec zspec;
+    memset(&zspec, 0, sizeof(zspec));
+    zspec.name = "server";
+    zspec.blocks = &bspec;
+    zspec.nblocks = 1;
+
+    auto stats = new ServerStats;
+    stats->zone = stats_zone_alloc(server_stats.domain, &zspec);
+    if (stats->zone == NULL) {
+        cerr << "ERROR: Failed to alloc server status stats zone."  << endl;
+        exit(EXIT_FAILURE);
+    }
+
+    server_stats.status = stats;
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::init_server(void) {
     auto rv = timespec_get(&timestamp.start_wall, TIME_UTC);
     if (rv != TIME_UTC) {
@@ -65,6 +138,8 @@ void SmartnicP4Impl::init_server(void) {
         exit(EXIT_FAILURE);
     }
 
+    init_server_stats();
+
     cout << "--- UTC start time: "
          << put_time(gmtime(&timestamp.start_wall.tv_sec), "%Y-%m-%d %H:%M:%S %z")
          << " ["
@@ -76,6 +151,11 @@ void SmartnicP4Impl::init_server(void) {
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::deinit_server(void) {
+    auto stats = server_stats.status;
+    server_stats.status = NULL;
+
+    stats_zone_free(stats->zone);
+    delete stats;
 }
 
 //--------------------------------------------------------------------------------------------------
