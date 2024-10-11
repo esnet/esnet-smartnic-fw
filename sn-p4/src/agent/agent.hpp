@@ -6,6 +6,7 @@
 #include "sn_p4_v2.grpc.pb.h"
 
 #include <bitset>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,8 @@ public:
     // Stats configuration.
     Status GetStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
     Status ClearStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
+
+    bool get_server_times(struct timespec* start, struct timespec* up);
 
 private:
     vector<Device*> devices;

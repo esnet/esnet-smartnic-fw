@@ -25,6 +25,31 @@ const char* SmartnicConfigImpl::debug_flag_label(const ServerDebugFlag flag) {
 }
 
 //--------------------------------------------------------------------------------------------------
+bool SmartnicConfigImpl::get_server_times(struct timespec* start, struct timespec* up) {
+    if (start != NULL) {
+        start->tv_sec = timestamp.start_wall.tv_sec;
+        start->tv_nsec = timestamp.start_wall.tv_nsec;
+    }
+
+    if (up != NULL) {
+        struct timespec now_mono;
+        auto rv = clock_gettime(CLOCK_MONOTONIC, &now_mono);
+        if (rv != 0) {
+            return false;
+        }
+
+        up->tv_sec = now_mono.tv_sec - timestamp.start_mono.tv_sec;
+        up->tv_nsec = now_mono.tv_nsec - timestamp.start_mono.tv_nsec;
+        if (up->tv_nsec < 0) {
+            up->tv_sec -= 1;
+            up->tv_nsec += 1000000000;
+        }
+    }
+
+    return true;
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::init_server(void) {
     auto rv = timespec_get(&timestamp.start_wall, TIME_UTC);
     if (rv != TIME_UTC) {
@@ -64,28 +89,21 @@ void SmartnicConfigImpl::get_server_status(
     function<void(const ServerStatusResponse&)> write_resp) {
     ServerStatusResponse resp;
     auto err = ErrorCode::EC_OK;
-    struct timespec now_mono;
-    auto rv = clock_gettime(CLOCK_MONOTONIC, &now_mono);
-    if (rv != 0) {
+    struct timespec start;
+    struct timespec up;
+
+    if (!get_server_times(&start, &up)) {
         err = ErrorCode::EC_SERVER_FAILED_GET_TIME;
     } else {
         auto status = resp.mutable_status();
 
         auto start_time = status->mutable_start_time();
-        start_time->set_seconds(timestamp.start_wall.tv_sec);
-        start_time->set_nanos(timestamp.start_wall.tv_nsec);
-
-        struct timespec diff;
-        diff.tv_sec = now_mono.tv_sec - timestamp.start_mono.tv_sec;
-        diff.tv_nsec = now_mono.tv_nsec - timestamp.start_mono.tv_nsec;
-        if (diff.tv_nsec < 0) {
-            diff.tv_sec -= 1;
-            diff.tv_nsec += 1000000000;
-        }
+        start_time->set_seconds(start.tv_sec);
+        start_time->set_nanos(start.tv_nsec);
 
         auto up_time = status->mutable_up_time();
-        up_time->set_seconds(diff.tv_sec);
-        up_time->set_nanos(diff.tv_nsec);
+        up_time->set_seconds(up.tv_sec);
+        up_time->set_nanos(up.tv_nsec);
     }
 
     resp.set_error_code(err);

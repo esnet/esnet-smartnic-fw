@@ -6,6 +6,7 @@
 #include "sn_cfg_v1.grpc.pb.h"
 
 #include <bitset>
+#include <ctime>
 #include <string>
 #include <time.h>
 #include <vector>
@@ -90,6 +91,8 @@ public:
         ServerContext*, const SwitchStatsRequest*, ServerWriter<SwitchStatsResponse>*) override;
     Status ClearSwitchStats(
         ServerContext*, const SwitchStatsRequest*, ServerWriter<SwitchStatsResponse>*) override;
+
+    bool get_server_times(struct timespec* start, struct timespec* up);
 
 private:
     vector<Device*> devices;
