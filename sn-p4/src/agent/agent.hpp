@@ -6,6 +6,7 @@
 #include "sn_p4_v2.grpc.pb.h"
 
 #include <bitset>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,8 @@ public:
     Status GetStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
     Status ClearStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
 
+    bool get_server_times(struct timespec* start, struct timespec* up);
+
 private:
     vector<Device*> devices;
 
@@ -60,6 +63,14 @@ private:
         prom_collector_registry_t* registry;
         struct MHD_Daemon* daemon;
     } prometheus;
+
+    struct ServerStats {
+        struct stats_zone* zone;
+    };
+    struct {
+        struct stats_domain* domain;
+        ServerStats* status;
+    } server_stats;
 
     struct {
         struct timespec start_wall;
@@ -120,6 +131,7 @@ private:
         const TableRuleRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void init_server(void);
+    void init_server_stats(void);
     void deinit_server(void);
     void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
     void batch_get_server_config(

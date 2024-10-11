@@ -6,6 +6,7 @@
 #include "sn_cfg_v1.grpc.pb.h"
 
 #include <bitset>
+#include <ctime>
 #include <string>
 #include <time.h>
 #include <vector>
@@ -91,6 +92,8 @@ public:
     Status ClearSwitchStats(
         ServerContext*, const SwitchStatsRequest*, ServerWriter<SwitchStatsResponse>*) override;
 
+    bool get_server_times(struct timespec* start, struct timespec* up);
+
 private:
     vector<Device*> devices;
 
@@ -98,6 +101,14 @@ private:
         prom_collector_registry_t* registry;
         struct MHD_Daemon* daemon;
     } prometheus;
+
+    struct ServerStats {
+        struct stats_zone* zone;
+    };
+    struct {
+        struct stats_domain* domain;
+        ServerStats* status;
+    } server_stats;
 
     struct {
         struct timespec start_wall;
@@ -189,6 +200,7 @@ private:
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void init_server(void);
+    void init_server_stats(void);
     void deinit_server(void);
     void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
     void batch_get_server_config(

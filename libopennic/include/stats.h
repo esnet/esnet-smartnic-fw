@@ -61,6 +61,7 @@ enum stats_metric_type {
 
 enum stats_metric_flag {
     stats_metric_flag_CLEAR_ON_READ,
+    stats_metric_flag_NEVER_CLEAR,
     stats_metric_flag_ARRAY,
 };
 

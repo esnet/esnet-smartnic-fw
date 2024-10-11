@@ -25,6 +25,104 @@ const char* SmartnicConfigImpl::debug_flag_label(const ServerDebugFlag flag) {
 }
 
 //--------------------------------------------------------------------------------------------------
+bool SmartnicConfigImpl::get_server_times(struct timespec* start, struct timespec* up) {
+    if (start != NULL) {
+        start->tv_sec = timestamp.start_wall.tv_sec;
+        start->tv_nsec = timestamp.start_wall.tv_nsec;
+    }
+
+    if (up != NULL) {
+        struct timespec now_mono;
+        auto rv = clock_gettime(CLOCK_MONOTONIC, &now_mono);
+        if (rv != 0) {
+            return false;
+        }
+
+        up->tv_sec = now_mono.tv_sec - timestamp.start_mono.tv_sec;
+        up->tv_nsec = now_mono.tv_nsec - timestamp.start_mono.tv_nsec;
+        if (up->tv_nsec < 0) {
+            up->tv_sec -= 1;
+            up->tv_nsec += 1000000000;
+        }
+    }
+
+    return true;
+}
+
+//--------------------------------------------------------------------------------------------------
+extern "C" {
+    enum ServerStat {
+        START_TIME,
+        UP_TIME,
+    };
+
+    static void server_stats_read_metric(const struct stats_block_spec* bspec,
+                                         const struct stats_metric_spec* mspec,
+                                         uint64_t* value,
+                                         [[maybe_unused]] void* data) {
+        SmartnicConfigImpl* impl = (typeof(impl))bspec->io.data.ptr;
+
+        struct timespec start;
+        struct timespec up;
+        if (!impl->get_server_times(&start, &up)) {
+            return;
+        }
+
+        switch ((ServerStat)mspec->io.data.u64) {
+        case ServerStat::START_TIME:
+            *value = start.tv_sec;
+            break;
+
+        case ServerStat::UP_TIME:
+            *value = up.tv_sec;
+            break;
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::init_server_stats(void) {
+    struct stats_metric_spec mspecs[2];
+    memset(mspecs, 0, sizeof(mspecs));
+    auto mspec = mspecs;
+
+    mspec->name = "start_time_sec";
+    mspec->type = stats_metric_type_GAUGE;
+    mspec->flags = STATS_METRIC_FLAG_MASK(NEVER_CLEAR);
+    mspec->io.data.u64 = ServerStat::START_TIME;
+    mspec += 1;
+
+    mspec->name = "up_time_sec";
+    mspec->type = stats_metric_type_GAUGE;
+    mspec->flags = STATS_METRIC_FLAG_MASK(NEVER_CLEAR);
+    mspec->io.data.u64 = ServerStat::UP_TIME;
+    mspec += 1;
+
+    struct stats_block_spec bspec;
+    memset(&bspec, 0, sizeof(bspec));
+    bspec.name = "status";
+    bspec.metrics = mspecs;
+    bspec.nmetrics = sizeof(mspecs) / sizeof(mspecs[0]);
+    bspec.read_metric = server_stats_read_metric;
+    bspec.io.data.ptr = this;
+
+    struct stats_zone_spec zspec;
+    memset(&zspec, 0, sizeof(zspec));
+    zspec.name = "server";
+    zspec.blocks = &bspec;
+    zspec.nblocks = 1;
+
+    auto stats = new ServerStats;
+    stats->zone = stats_zone_alloc(server_stats.domain, &zspec);
+    if (stats->zone == NULL) {
+        cerr << "ERROR: Failed to alloc server status stats zone."  << endl;
+        exit(EXIT_FAILURE);
+    }
+
+    server_stats.status = stats;
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::init_server(void) {
     auto rv = timespec_get(&timestamp.start_wall, TIME_UTC);
     if (rv != TIME_UTC) {
@@ -37,6 +135,8 @@ void SmartnicConfigImpl::init_server(void) {
         cerr << "ERROR: monotonic clock_gettime failed with " << rv << "." << endl;
         exit(EXIT_FAILURE);
     }
+
+    init_server_stats();
 
     cout << "--- UTC start time: "
          << put_time(gmtime(&timestamp.start_wall.tv_sec), "%Y-%m-%d %H:%M:%S %z")
@@ -56,6 +156,11 @@ void SmartnicConfigImpl::init_server(void) {
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::deinit_server(void) {
+    auto stats = server_stats.status;
+    server_stats.status = NULL;
+
+    stats_zone_free(stats->zone);
+    delete stats;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -64,28 +169,21 @@ void SmartnicConfigImpl::get_server_status(
     function<void(const ServerStatusResponse&)> write_resp) {
     ServerStatusResponse resp;
     auto err = ErrorCode::EC_OK;
-    struct timespec now_mono;
-    auto rv = clock_gettime(CLOCK_MONOTONIC, &now_mono);
-    if (rv != 0) {
+    struct timespec start;
+    struct timespec up;
+
+    if (!get_server_times(&start, &up)) {
         err = ErrorCode::EC_SERVER_FAILED_GET_TIME;
     } else {
         auto status = resp.mutable_status();
 
         auto start_time = status->mutable_start_time();
-        start_time->set_seconds(timestamp.start_wall.tv_sec);
-        start_time->set_nanos(timestamp.start_wall.tv_nsec);
-
-        struct timespec diff;
-        diff.tv_sec = now_mono.tv_sec - timestamp.start_mono.tv_sec;
-        diff.tv_nsec = now_mono.tv_nsec - timestamp.start_mono.tv_nsec;
-        if (diff.tv_nsec < 0) {
-            diff.tv_sec -= 1;
-            diff.tv_nsec += 1000000000;
-        }
+        start_time->set_seconds(start.tv_sec);
+        start_time->set_nanos(start.tv_nsec);
 
         auto up_time = status->mutable_up_time();
-        up_time->set_seconds(diff.tv_sec);
-        up_time->set_nanos(diff.tv_nsec);
+        up_time->set_seconds(up.tv_sec);
+        up_time->set_nanos(up.tv_nsec);
     }
 
     resp.set_error_code(err);
