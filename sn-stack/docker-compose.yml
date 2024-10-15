@@ -691,7 +691,7 @@ services:
       # Import the host's TLS certificates
       - type: bind
         source: ${SN_TLS_HOST_DIR:-${PWD}/letsencrypt}
-        target: /certs
+        target: /etc/letsencrypt
         read_only: true
         bind:
           create_host_path: false
