@@ -2,6 +2,7 @@ import ctypes
 from ioctl_util import IO
 
 # Definitions transcribed from include/uapi/linux/vfio.h in linux
+# https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/vfio.h
 
 # API versions
 VFIO_API_VERSION = 0
@@ -58,6 +59,16 @@ class VfioDeviceInfo(ctypes.Structure):
             ('num_regions', ctypes.c_uint),
             ('num_irqs', ctypes.c_uint),
    ]
+
+VFIO_DEVICE_FLAGS_RESET    = (1 << 0)	# Device supports reset
+VFIO_DEVICE_FLAGS_PCI      = (1 << 1)	# vfio-pci device */
+VFIO_DEVICE_FLAGS_PLATFORM = (1 << 2)	# vfio-platform device
+VFIO_DEVICE_FLAGS_AMBA     = (1 << 3)	# vfio-amba device
+VFIO_DEVICE_FLAGS_CCW      = (1 << 4)	# vfio-ccw device
+VFIO_DEVICE_FLAGS_AP       = (1 << 5)	# vfio-ap device
+VFIO_DEVICE_FLAGS_FSL_MC   = (1 << 6)	# vfio-fsl-mc device
+VFIO_DEVICE_FLAGS_CAPS     = (1 << 7)	# Info supports caps
+VFIO_DEVICE_FLAGS_CDX      = (1 << 8)	# vfio-cdx device
 
 # Fixed region and IRQ index mapping
 VFIO_PCI_BAR0_REGION_INDEX     = 0
@@ -146,4 +157,18 @@ class VfioRegionInfoCapSparseMmap(ctypes.Structure):
             ('reserved', ctypes.c_uint),
             ('areas', VfioRegionSparseMmapArea*64),
     ]
+
+VfioDeviceFeatureData = ctypes.c_ubyte * 64
+class VfioDeviceFeature(ctypes.Structure):
+    _fields_ = [
+            ('argsz', ctypes.c_uint),
+            ('flags', ctypes.c_uint),
+            ('data', VfioDeviceFeatureData),
+    ]
+VFIO_DEVICE_FEATURE_MASK    = (0xffff)  # 16-bit feature index
+VFIO_DEVICE_FEATURE_GET     = (1 << 16) # Get feature into data[]
+VFIO_DEVICE_FEATURE_SET     = (1 << 17) # Set feature from data[]
+VFIO_DEVICE_FEATURE_PROBE   = (1 << 18) # Probe feature support
+
+VFIO_DEVICE_FEATURE_PCI_VF_TOKEN  = 0
 
