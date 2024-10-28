@@ -150,79 +150,234 @@ Bring down the running stack after flash reset is completed.
 docker compose down -v --remove-orphans
 ```
 
-Using the sn-cli tool
+Using the sn-cfg tool
 ---------------------
 
-The sn-cli tool provides subcommands to help you accomplish many common tasks for inspecting and configuring the smartnic platform components.
+The sn-cfg tool provides subcommands to help you accomplish many common tasks for inspecting and configuring the smartnic platform components.
 
 All commands described below are expected to be executed within the `smartnic-fw` container environment.  Use this command to enter the appropriate environment.
 ```
-docker compose exec smartnic-fw bash
+docker compose exec smartnic-fw bash -l
 ```
 
-The `sn-cli` tool will automatically look for an environment variable called `SN_CLI_SLOTADDR` which can be set to the PCIe BDF address of the device that you would like to interract with.  In the `smartnic-fw` container, this value will already be set for you.
+# Displaying device information with the "show device" subcommand
 
-# Displaying device information with the "dev" subcommand
-
-This will show information about the device such as the build version, build date/time and temperature.
+This will show information about the device such as the build version, build date/time, and serial number.
 
 ```
-root@smartnic-fw:/# sn-cli dev version
-Device Version Info
-	DNA:           0x40020000012306a21c10c285
-	USR_ACCESS:    0x000086d3 (34515)
-	BUILD_STATUS:  0x04130920
-
-root@smartnic-fw:/# sn-cli dev temp
-Temperature Monitors
-	FPGA SLR0:    45.551 (deg C)
+root@smartnic-fw:/# sn-cfg show device info
+----------------------------------------
+Device ID: 0
+----------------------------------------
+PCI:
+    Bus ID:    0000:d8:00.0
+    Vendor ID: 0x10ee
+    Device ID: 0x903f
+Build:
+    Number: 0x0000e417
+    Status: 0x10140810
+    DNA[0]: 0x2c9082c5
+    DNA[1]: 0x013b83c1
+    DNA[2]: 0x40020000
+Card:
+    Name:                  ALVEO U280 PQ
+    Profile:               U280
+    Serial Number:         21770323Y043
+    Revision:              1.0
+    SC Version:            4.3.31
+    Config Mode:           MASTER_SPI_X4
+    Fan Presence:          P
+    Total Power Available: 225W
+    Cage Types:
+    MAC Addresses:
+        0: 00:0A:35:xx:xx:xx
+        1: 00:0A:35:xx:xx:xx
 ```
-The `USR_ACCESS` value is typically the unique build pipeline number that produced the embedded FPGA bitfile.
-The `BUILD_STATUS` value holds an encoded date/time (Aug 30 at 05:32am) which is when the embedded FPGA bitfile build was started.
-The `DNA` value holds the factory programmed unique ID of the FPGA
+The `Build Number` value is typically the unique build pipeline number that produced the embedded FPGA bitfile.
+The `Build Status` value holds an encoded date/time (Oct 14 at 08:10am) which is when the embedded FPGA bitfile build was started.
+The `Build DNA[]` value holds the factory programmed unique ID of the FPGA
 
-# Inspecting and Configuring the CMAC (100G) Interfaces with the "cmac" subcommand
+```
+root@smartnic-fw:/# sn-cfg show device status
+----------------------------------------
+Device ID: 0
+----------------------------------------
+Device Alarms:
+    card:
+        power_good: yes
+Device Monitors:
+    card:
+             _12v_aux_avg: 12.11
+        _12v_aux_i_in_avg: 1.396
+        _12v_aux_i_in_ins: 1.385
+        _12v_aux_i_in_max: 1.422
+             _12v_aux_ins: 12.13
+             _12v_aux_max: 12.14
+             _12v_pex_avg: 12.06
+             _12v_pex_ins: 12.09
+             _12v_pex_max: 12.09
+              _12v_sw_avg: 12.09
+              _12v_sw_ins: 12.11
+              _12v_sw_max: 12.12
+[...]
+               vccint_avg: 0.85
+             vccint_i_avg: 13.75
+             vccint_i_ins: 13.93
+             vccint_i_max: 14.02
+               vccint_ins: 0.851
+               vccint_max: 0.851
+    sysmon0:
+        max_temperature: 58.98
+             max_vccaux: 1.799
+            max_vccbram: 0.8555
+             max_vccint: 0.8496
+        min_temperature: 52.51
+             min_vccaux: 1.784
+            min_vccbram: 0.8438
+             min_vccint: 0.8408
+            temperature: 55.5
+                 vccaux: 1.79
+                vccbram: 0.8496
+                 vccint: 0.8467
+                  vp_vn: 0
+    sysmon1:
+        max_temperature: 57.99
+[...]
+                 vccint: 0.8467
+                 vuser0: 1.198
+    sysmon2:
+        max_temperature: 56.49
+[...]
+                 vccint: 0.8467
+                 vuser0: 0
+```
+
+# Inspecting and Configuring the CMAC (100G) Ports with the "show/configure port" subcommands
+
+Show the configuration (administrative state) of the 100G ports
+
+```
+root@smartnic-fw:/# sn-cfg show port config
+----------------------------------------
+Port ID: 0 on device ID 0
+----------------------------------------
+State:    enable
+FEC:      none
+Loopback: none
+----------------------------------------
+Port ID: 1 on device ID 0
+----------------------------------------
+State:    enable
+FEC:      none
+Loopback: none
+```
+
+Show the current operational state of the 100G ports
+
+```
+root@smartnic-fw:/# sn-cfg show port status
+----------------------------------------
+Port ID: 0 on device ID 0
+----------------------------------------
+Link: up
+----------------------------------------
+Port ID: 1 on device ID 0
+----------------------------------------
+Link: up
+```
+
+Show the current (non-zero) port statistics
+
+```
+root@smartnic-fw:/# sn-cfg show port stats
+----------------------------------------
+Port ID: 0 on device ID 0
+----------------------------------------
+        rx_broadcast: 402956        
+        rx_multicast: 2581941       
+     rx_pkt_64_bytes: 86200514      
+ rx_pkt_65_127_bytes: 50704644337   
+rx_pkt_128_255_bytes: 344660255002  
+rx_pkt_256_511_bytes: 41321         
+      rx_total_bytes: 51083551553232
+ rx_total_good_bytes: 51083551553232
+  rx_total_good_pkts: 395451141174  
+       rx_total_pkts: 395451141174  
+          rx_unicast: 395448156277  
+             rx_vlan: 395451099853  
+        tx_multicast: 61085         
+tx_pkt_128_255_bytes: 61085         
+      tx_total_bytes: 8368645       
+ tx_total_good_bytes: 8368645       
+  tx_total_good_pkts: 61085         
+       tx_total_pkts: 61085         
+----------------------------------------
+Port ID: 1 on device ID 0
+----------------------------------------
+        tx_multicast: 61085  
+tx_pkt_128_255_bytes: 61085  
+      tx_total_bytes: 8368645
+ tx_total_good_bytes: 8368645
+  tx_total_good_pkts: 61085  
+       tx_total_pkts: 61085  
+```
 
 Enable/Disable one or more (or all by default) 100G MAC interfaces using these commands:
 
 ```
-sn-cli cmac enable
-sn-cli cmac disable
+sn-cfg configure port --state enable
+sn-cfg configure port --state disable
 
-sn-cli cmac -p 0 enable
-sn-cli cmac -p 1 disable
+sn-cfg configure port --port-id 0 --state enable
+sn-cfg configure port --port-id 1 --state disable
 ```
 Enabling a CMAC interface allows frames to pass (Rx/Tx) at the MAC layer.  These commands **do not affect** whether the underlying physical layer (PHY) is operational.
 
 Enable/Disable Reed-Solomon Forward Error Correction (RS-FEC) on one or more (or all by default) 100G MAC interfaces using these commands:
 
 ```
-sn-cli cmac rsfec-enable
-sn-cli cmac rsfec-disable
+sn-cfg configure port --fec reed-solomon
+sn-cfg configure port --fec none
 
-sn-cli cmac -p 0 rsfec-enable
-sn-cli cmac -p 1 rsfec-disable
+sn-cfg configure port --port-id 0 --fec reed-solomon
+sn-cfg configure port --port-id 1 --fec none
 ```
 
 **NOTE** The RS-FEC setting must be configured identically on **both ends of the physical link** or the link will not be established.
 
-Display the current MAC and PHY status of one or more (or all by default) 100G MAC interfaces using these commands:
+Display the current PHY status of one or more (or all by default) 100G MAC interfaces using these commands:
 ```
-root@smartnic-fw:/# sn-cli cmac status
-CMAC0
-  Tx (MAC Enabled/RS-FEC Off/PHY UP -> UP)  
-  Rx (MAC Enabled/RS-FEC Off/PHY UP -> UP)  
+root@smartnic-fw:/# sn-cfg show port status
+----------------------------------------
+Port ID: 0 on device ID 0
+----------------------------------------
+Link: up
+----------------------------------------
+Port ID: 1 on device ID 0
+----------------------------------------
+Link: up
 
-CMAC1
-  Tx (MAC Enabled/RS-FEC Off/PHY DOWN -> DOWN)  
-  Rx (MAC Enabled/RS-FEC Off/PHY DOWN -> DOWN)  
+root@smartnic-fw:/# sn-cfg show port config
+----------------------------------------
+Port ID: 0 on device ID 0
+----------------------------------------
+State:    enable
+FEC:      none
+Loopback: none
+----------------------------------------
+Port ID: 1 on device ID 0
+----------------------------------------
+State:    enable
+FEC:      none
+Loopback: none
+
 ```
 
-In the example output above, CMAC0 PHY layer is **UP** in both the Tx and Rx directions.  The MAC is fully enabled.  This link is operational and should be passing packets normally.
+In the example output above, Port0 and Port1 PHY layers are **up**.  The MAC is enabled, RS-FEC is disabled.  This link is operational and should be passing packets normally.
 
-In the example output above, CMAC1 PHY layer is **DOWN** in the Rx (receive) direction.  Possible causes for this are:
-* No QSFP28 plugged into 100G port 0 the U280 card
-* Wrong type of QSFP28 module plugged into 100G port 0
+If the port shows `Link: down`.  Possible causes for this are:
+* No QSFP28 plugged into 100G the corresponding port the U280 card
+* Wrong type of QSFP28 module plugged into 100G port
   * 100G QSFP28 SR4 or LR4 modules are supported
   * Some 100G AOC or DACs are known to work
   * QSFP+ 40G modules **are not supported**
@@ -238,84 +393,59 @@ In the example output above, CMAC1 PHY layer is **DOWN** in the Rx (receive) dir
   * Configure far end in 100G mode
 * Far end has RS-FEC (Reed-Solomon Forward Error Correction) enabled
   * The smartnic platform supports RS-FEC but it is disabled by default
-  * Use the `sn-cli cmac rsfec-enable` command to manualy enable RS-FEC on the CMAC ports
+  * Use the `sn-cfg configure port --fec reed-solomon` command to manualy enable RS-FEC on the CMAC ports
   * Alternatively, disable RS-FEC on the far end equipment
 
-A more detailed status can also be displayed using the `--verbose` option.  Note that the `--verbose` option is a global option and thus must be positioned **before** the `cmac` subcommand.
-```
-root@smartnic-fw:/# sn-cli --verbose cmac -p 1 status
-CMAC1
-  Tx (MAC Enabled/RS-FEC Off/PHY UP -> UP)  
-	           tx_local_fault 0 -> 0
-  Rx (MAC Enabled/FEC Off/PHY DOWN -> DOWN)  
-	         rx_got_signal_os 0 -> 0
-	               rx_bad_sfd 0 -> 0
-	          rx_bad_preamble 0 -> 0
-	 rx_test_pattern_mismatch 0 -> 0
-	  rx_received_local_fault 0 -> 0
-	  rx_internal_local_fault 1 -> 1
-	           rx_local_fault 1 -> 1
-	          rx_remote_fault 0 -> 0
-	                rx_hi_ber 0 -> 0
-	           rx_aligned_err 0 -> 0
-	            rx_misaligned 0 -> 0
-	               rx_aligned 0 -> 0
-```
-Display summary statistics for packets Rx'd and Tx'd from CMAC ports
-```
-root@smartnic-fw:/# sn-cli cmac stats
-CMAC0: TX      0 RX      0 RX-DISC      0 RX-ERR      0
-CMAC1: TX      0 RX      0 RX-DISC      0 RX-ERR      0
-```
-Note: The CMAC counters are only cleared/reset when the FPGA is reprogrammed.
+More detailed status can also be queried directly from the QSFP module using the `sn-cfg show module status` command.  This command will show signal levels as well as any active alarms indicated by the QSFP module.
 
-# Inspecting and Configuring the PCIe Queue DMA (QDMA) block with the "qdma" subcommand
+# Inspecting and Configuring the Host PCIe Queue DMA (QDMA) block with the "show/configure host" subcommands
 
-The QDMA block is responsible for managing all DMA queues used for transferring packets and/or events bidirectionally between the U280 card and the Host CPU over the PCIe bus.  In order for any DMA transfers to be allowed on either of the PCIe Physical Functions (PF), an appropriate number of DMA Queue IDs must be provisioned.  This can be done using the `qdma` subcommand.
+The QDMA block is responsible for managing all DMA queues used for transferring packets and/or events bidirectionally between the U280 card and the Host CPU over the PCIe bus.  In order for any DMA transfers to be allowed on either of the PCIe Physical Functions (PF), an appropriate number of DMA Queue IDs must be provisioned.  This can be done using the `configure host` subcommand.
 
 Configure the number of queues allocated to each of the PCIe Physical Functions
 ```
-sn-cli qdma setqs 1 1
+sn-cfg configure host --host-id 0 --dma-base-queue 0 --dma-num-queues 1
+sn-cfg configure host --host-id 1 --dma-base-queue 1 --dma-num-queues 1
 ```
-This assigns 1 QID to PF0 and 1 QIDs to PF1.  The `setqs` subcommand also takes care of configuring the RSS entropy -> QID map with an equal weighted distribution of all allocated queues.  If you're unsure of how many QIDs to allocate, using `1 1` here is your best choice.
+This assigns 1 QID to Host PF0 and 1 QID to Host PF1.  The `configure host` subcommand also takes care of configuring the RSS entropy -> QID map with an equal weighted distribution of all allocated queues.  If you're unsure of how many QIDs to allocate, using `--dma-num-queues 1` here is your best choice.
 
 Inspect the configuration of the QDMA block
 ```
-sn-cli qdma status
+sn-cfg show host config
 ```
 
 Packet, byte and error counters are tracked for packets heading between the QDMA engine and the user application.  You can display them with this command:
 ```
-sn-cli qdma stats
+sn-cfg show host stats
 ```
 Refer to the `open-nic-shell` documentation for an explanation of exactly where in the FPGA design these statistics are measured.
 
 
-# Inspecting packet counters in the smartnic platform with the "probe" subcommand
+# Inspecting packet counters in the smartnic platform with the "show switch stats" subcommand
 
 The smartnic platform implements monitoring points in the datapath at various locations.  You an inspect these counters using this command:
 ```
-sn-cli probe stats
+sn-cfg show switch stats
 ```
 Refer to the `esnet-smartnic-hw` documentation for an explanation of exactly where in the FPGA design these statistics are measured.
 
-# Configuring the smartnic platform ingress/egress/bypass switch port remapping functions with the "sw" subcommand
+# Configuring the smartnic platform ingress/egress/bypass switch port remapping functions with the "configure switch" subcommand
 
-The smartnic platform implements reconfigurable ingress and egress port remapping, connections and redirecting.  You can inspect and modify these configuration points using the "sw" subcommand.
+The smartnic platform implements reconfigurable ingress and egress port remapping, connections and redirecting.  You can inspect and modify these configuration points using the "configure switch" subcommand.
 
-Most of the `sw` subcommands take one or more port bindings as parameters.  The port bindings are of the form:
+Most of the `configure switch` subcommands take one or more port bindings as parameters.  The port bindings are of the form:
 ```
 <port>:<port-connector>
 ```
 Where:
 * `<port>` is one of
-  * cmac0  -- 100G port 0
-  * cmac1  -- 100G port 1
+  * port0  -- 100G port 0
+  * port1  -- 100G port 1
   * host0  -- DMA over PCIe Physical Function 0 (PF0)
   * host1  -- DMA over PCIe Physical Function 1 (PF1)
 * `<port-connector>` is context dependent and is one of
-  * cmac0
-  * cmac1
+  * port0
+  * port1
   * host0
   * host1
   * bypass -- a high bandwidth channel through the smartnic which does **NOT** pass through the user's application
@@ -323,56 +453,65 @@ Where:
   * app1   -- user application port 1 (only available when user implements it in verilog)
   * drop   -- infinite blackhole that discards all packets sent to it
 
+The following configuration settings provide you with a normal operating mode.  You almost certainly want to apply exactly these settings on startup.
+```
+# 1:1 Source port setting: packets all appear to be coming from their actual source ports, normal mode, no fakery (you want this)
+sn-cfg configure switch -s host0:host0 \
+                        -s host1:host1 \
+			-s port0:port0 \
+			-s port1:port1
+
+# 1:1 Egress port setting: destination ports selected by the application pipeline are mapped normally, normal mode, no fakery (you want this)
+
+# app0 = user's P4 program (you definitely have an app0) (you want this)
+sn-cfg configure switch -e app0:host0:host0 \
+                        -e app0:host1:host1 \
+			-e app0:port0:port0 \
+			-e app0:port1:port1
+# app1 = user's custom RTL (you only have an app1 if you have written custom FPGA code as part of the HW build step) (you want this even if you don't have an app1 in your design, it's safe)
+sn-cfg configure switch -e app1:host0:host0 \
+                        -e app1:host1:host1 \
+			-e app1:port0:port0 \
+			-e app1:port1:port1
+
+# Bypass path switching: when connected to the bypass, "wire" host0 <-> port0 and "wire" host1 <-> port1 (you probably want this, it only gets used if you connect ingress ports to bypass)
+sn-cfg configure switch -e bypass:host0:port0 \
+                        -e bypass:host1:port1 \
+			-e bypass:port0:host0 \
+			-e bypass:port1:host1
+
+# Ingress port connectivity:
+#   * connect 100G port0/1 directly into your P4 program so that your p4 program handles all 100G Rx packets
+#   * connect host0/1 to the bypass path so host software sends directly out of each 100G port via the bypass (useful for injecting LLDP)
+sn-cfg configure switch -i host0:bypass \
+                        -i host1:bypass \
+			-i port0:app0 \
+			-i port1:app0
+```
+
+## Skipping the p4 program and wiring the host ports to 100G ports for debugging
+
+This **optional** configuration snippet allows you to *entirely bypass the p4 program* contained in the smartnic and deliver all packets directly to the host software.  This is often useful for debug if you have reason to think your p4 program is mishandling the packets.
+
+```
+# Bypass path switching: when connected to the bypass, "wire" host0 <-> port0 and "wire" host1 <-> port1
+sn-cfg configure switch -e bypass:host0:port0 \
+                        -e bypass:host1:port1 \
+			-e bypass:port0:host0 \
+			-e bypass:port1:host1
+
+# Ingress port connections: connect all ingress ports to the bypass path (THIS ENTIRELY SKIPS YOUR P4 PROGRAM and is only for debug/testing that packets are flowing)
+sn-cfg configure switch -i host0:bypass \
+                        -i host1:bypass \
+			-i port0:bypass \
+			-i port1:bypass
+```
+
+**NOTE** Don't forget to restore these settings after you're finished debugging.  Any packets that follow the bypass path will not be processed by the user's p4 program.
+
 ## Display the current configuration status
 ```
-sn-cli sw status
-```
-
-## Remap/rename physical input ports to logical input ports
-
-The `in-port-rename` subcommand allows you to remap the identity of a smartnic platform physical ingress port to any logical port as seen by the user logic.  Once remapped (eg. from `a`->`b`), all following logic in the smartnic will perceive that the packet arrived on ingress port `b` even though it physically arrived on port `a`.  This can be useful for test injection scenarios but would typically be set to a straight-through mapping in production.
-```
-sn-cli sw in-port-rename a:b
-```
-
-To reset this mapping so each port maps to its usual identity:
-```
-sn-cli sw in-port-rename cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
-```
-
-## Attach logical input ports to pipelines
-
-The `in-port-connect` subcommand allows you to connect a logical input port to different processing pipelines within the smartnic.  This can be used to connect to a p4 program or to custom logic within the user application.  It can also be used to shunt all packets to a blackhole or to bypass packets around the user application entirely.
-
-```
-sn-cli sw in-port-connect cmac0:app0 cmac1:app0 host0:bypass host1:bypass
-```
-
-## Connect input ports to output ports in the bypass path
-
-The `bypass-connect` subcommand allows you to connect input ports directly to output ports as they pass through the bypass path (ie. not through the user application).  This is useful for providing direct connectivity from host PCIe PFs to 100G CMAC interfaces for network testing.
-
-```
-sn-cli sw bypass-connect host0:cmac0 host1:cmac1 cmac0:host0 cmac1:host1
-```
-
-**NOTE** any packets that follow the bypass path will not be processed by the user's p4 program
-
-## Override user application output port decisions and redirect to an alternate port
-
-The `app0-port-redirect` and `app1-port-redirect` subcommands allow the user to override the forwarding decisions made by the user application and/or p4 program and redirect any given output port to a different output port.  This can be useful during development/debugging and in test fixtures.
-
-**NOTE** there are separate overrides for the app0 outputs and the app1 outputs.
-
-```
-sn-cli sw app0-port-redirect cmac0:host0 cmac1:host1
-sn-cli sw app1-port-redirect cmac0:host0 cmac1:host1
-```
-
-To reset this mapping so each output ports maps to its usual destination:
-```
-sn-cli sw app0-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
-sn-cli sw app1-port-redirect cmac0:cmac0 cmac1:cmac1 host0:host0 host1:host1
+sn-cfg show switch config
 ```
 
 # Using the sn-p4 tool
@@ -384,7 +523,7 @@ All commands described below are expected to be executed within the `smartnic-fw
 docker compose exec smartnic-fw bash -l
 ```
 
-The `sn-p4` tool will automatically look for an environment variable called `SN_P4_CLI_ADDRESS` which can be set to the hostname or IP address of the `sn-p4-agent` that will perform all of the requested actions on the real hardware.  In the `smartnic-fw` container, this value will already be set for you.
+The `sn-p4` tool will automatically look for an environment variable called `SN_P4_CLI_ADDRESS` which can be set to the hostname or IP address of the `smartnic-p4` container that will perform all of the requested actions on the real hardware.  In the `smartnic-fw` container, this value will already be set for you.
 
 By default, all operations performed by the `sn-p4` tool will target the ingress pipeline. A different pipeline can be operated on by using the `--pipeline-id` option to select an alternate. Use the `--help` option to see which pipelines are supported.
 
@@ -514,7 +653,7 @@ Broadly speaking, the steps required to bring up a DPDK application are as follo
 	* Take the FPGA device out of reset
 	* Open and map large memory regions for DMA using the kernel's `hugepages` driver
   * The application is responsible for assigning buffers to one or more of the FPGA's DMA queues
-* Use the `sn-cli` tool to configure some of the low-level hardware components in the FPGA
+* Use the `sn-cfg` tool to configure some of the low-level hardware components in the FPGA
   * Configure the set of valid DMA queues in the FPGA (must match what is set in the DPDK application)
   * Bring up the physical ethernet ports
 
@@ -528,10 +667,14 @@ For more information about the `pktgen-dpdk` application, see:
 
 Before you bring up the `sn-stack`, please ensure that you have uncommented this line in your `.env` file
 ```
-COMPOSE_PROFILES=smartnic-dpdk
+COMPOSE_PROFILES=smartnic-mgr-dpdk-manual
 ```
 
-If you changed this while the stack was already running, you'll need to restart the stack with down/up.
+If you changed this while the stack was already running, you'll need to restart the stack with:
+```
+docker compose down -v --remove-orphans
+docker compose up -d
+```
 
 First, you'll need to start up the `pktgen` application to open the vfio-pci device for PF0 and PF1 and take the FPGA out of reset.
 ```
@@ -546,13 +689,14 @@ Open a **separate** shell window which you will use for doing the low-level smar
 Configure the Queue mappings for host PF0 and PF1 interfaces and bring up the physical ethernet ports using the `smartnic-fw` container.
 
 ```
-$ docker compose exec smartnic-fw bash
-root@smartnic-fw:/# sn-cli qdma setqs 1 1
-root@smartnic-fw:/# sn-cli qdma status
-root@smartnic-fw:/# sn-cli cmac enable
-root@smartnic-fw:/# sn-cli cmac status
+$ docker compose exec smartnic-fw bash -l
+root@smartnic-fw:/# sn-cfg configure host --host-id 0 --dma-base-queue 0 --dma-num-queues 1
+root@smartnic-fw:/# sn-cfg configure host --host-id 1 --dma-base-queue 1 --dma-num-queues 1
+root@smartnic-fw:/# sn-cfg show host config
+root@smartnic-fw:/# sn-cfg configure port --state enable
+root@smartnic-fw:/# sn-cfg show port status
 ```
-Setting up the queue mappings tells the smartnic platform which QDMA queues to use for h2c and c2h packets.  Enabling the CMACs allows Rx and Tx packets to flow (look for `MAC ENABLED/PHY UP`).
+Setting up the queue mappings tells the smartnic platform which QDMA queues to use for h2c and c2h packets.  Enabling the CMACs allows Rx and Tx packets to flow (look for `Link: up`).
 
 Advanced usage of the pktgen-dpdk application
 =============================================
