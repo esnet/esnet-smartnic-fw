@@ -475,9 +475,11 @@ services:
         condition: service_healthy
     # Python needs a tty to print logs to stdout
     tty: true
-    # Run in the same network namespace as the smartnic-dpdk-portlink container this
-    # service can send using the tap interfaces created there.
-    network_mode: "service:smartnic-dpdk-portlink"
+    # Run in the same network namespace as the smartnic-dpdk-portlink container so this
+    # service can send using the tap interfaces created there.  When embedding this stack
+    # into another compose file that provides a different container with tap interfaces,
+    # set the SN_PF_NETDEV_SERVICE env var to run this service in a different container context.
+    network_mode: "service:${SN_PF_NETDEV_SERVICE:-smartnic-dpdk-portlink}"
     environment:
       - SN_LLDP_SLOTADDR=$FPGA_PCIE_DEV
       - SN_LLDP_HOST=${SN_HOST:-sn-host-unset}
