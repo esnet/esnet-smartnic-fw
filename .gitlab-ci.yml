@@ -95,34 +95,14 @@ pull_sn_hw:
         hwapi.env
   needs: []
 
-.docker:
+package:
+  stage: build
   image: docker:26.1
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERT_DIR: ""
-    INTERNAL_IMAGE_URI: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
-    PUBLISH_URI: $HSITE/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
   services:
     - docker:26.1-dind
-
-pull_cve_allowlist:
-  extends: .harbor_cve_allowlist
-
-container_scanning:
-  variables:
-    CS_IMAGE: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
-  # use 'dependencies' here rather than 'needs' since the gitlab container scanning
-  # include sets 'dependencies: []' which takes precedence over 'needs'
-  dependencies:
-    - pull_cve_allowlist
-    - package
-
-package:
-  extends:
-    - .docker
-  stage: build
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
+    PUBLISH_URI: $HSITE/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
     SN_FW_GROUP: ${CI_PROJECT_NAMESPACE}
     SN_FW_REPO: ${CI_PROJECT_NAME}
     SN_FW_BRANCH: ${CI_COMMIT_BRANCH}
@@ -136,11 +116,6 @@ package:
     # Install bash and GNU find (with full regex support).
     - apk add bash findutils
   script:
-    # Auth with gitlab container registry
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    # Auth (read-only) with external registry to pull private dependencies
-    - docker login -u "$HUSER_RO" -p "$HTOKEN_RO" "$HSITE"
-
     # Set up the build environment
     - |
       cat <<_EOF > .env
@@ -165,12 +140,14 @@ package:
     # Setup the HW application test directory.
     - ./build-setup-hw-test.sh
 
+    # Auth to external registry
+    - docker login -u "$HUSER" -p "$HTOKEN" "$HSITE"
+
     # Build the container image
     - ./build.sh $PUBLISH_URI$TAG_SUFFIX
 
-    # Push the container to the internal registry to be scanned
-    - docker tag $PUBLISH_URI$TAG_SUFFIX $INTERNAL_IMAGE_URI
-    - docker push $INTERNAL_IMAGE_URI
+    # Push to external registry
+    - docker push $PUBLISH_URI$TAG_SUFFIX
 
     # Capture this job's ID for downstream triggered pipelines
     - |
@@ -204,25 +181,18 @@ package:
       variables:
         TAG_SUFFIX: -dev
 
-wharf_release:
-  extends:
-    - .docker
-  stage: push
+pull_cve_allowlist:
+  extends: .harbor_cve_allowlist
+
+container_scanning:
   variables:
-    GIT_STRATEGY: none
-  script:
-    # Auth and pull the image from gitlab
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker pull $INTERNAL_IMAGE_URI
-
-    # Tag the image for release
-    - docker tag $INTERNAL_IMAGE_URI $SMARTNIC_FW_IMAGE_URI
-
-    # Auth and push to external registry
-    - docker login -u "$HUSER" -p "$HTOKEN" "$HSITE"
-    - docker push $SMARTNIC_FW_IMAGE_URI
-  timeout: 1h
-  needs:
+    CS_REGISTRY_USER: $HUSER_RO
+    CS_REGISTRY_PASSWORD: $HTOKEN_RO
+    CS_IMAGE: $SMARTNIC_FW_IMAGE_URI
+  # use 'dependencies' here rather than 'needs' since the gitlab container scanning
+  # include sets 'dependencies: []' which takes precedence over 'needs'
+  dependencies:
+    - pull_cve_allowlist
     - package
 
 review:
@@ -259,7 +229,6 @@ review:
       allow_failure: true
   needs:
     - package
-    - wharf_release
 
 .trigger_sw:
   stage: trigger_downstream
@@ -295,7 +264,6 @@ trigger_sw_ht:
     branch: main
   needs:
     - package
-    - wharf_release
 
 trigger_sw_demo:
   extends: .trigger_sw
@@ -307,4 +275,3 @@ trigger_sw_demo:
     branch: main
   needs:
     - package
-    - wharf_release
