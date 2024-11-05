@@ -87,7 +87,7 @@ Inspecting registers and interacting with the firmware
 The firmware runtime environment exists inside of the `smartnic-fw` container.  Here, we exec a shell inside of that container and have a look around.
 
 ```
-docker compose exec smartnic-fw bash -l # Note: the "-l" option to bash is needed for tab completion
+docker compose exec smartnic-fw bash
 sn-cfg show device info
 regio-esnet-smartnic dump dev0.bar2.syscfg
 ```
@@ -157,7 +157,7 @@ The sn-cfg tool provides subcommands to help you accomplish many common tasks fo
 
 All commands described below are expected to be executed within the `smartnic-fw` container environment.  Use this command to enter the appropriate environment.
 ```
-docker compose exec smartnic-fw bash -l
+docker compose exec smartnic-fw bash
 ```
 
 # Displaying device information with the "show device" subcommand
@@ -520,7 +520,7 @@ The user's p4 application embedded within the smartnic design may have configura
 
 All commands described below are expected to be executed within the `smartnic-fw` container environment.  Use this command to enter the appropriate environment.
 ```
-docker compose exec smartnic-fw bash -l
+docker compose exec smartnic-fw bash
 ```
 
 The `sn-p4` tool will automatically look for an environment variable called `SN_P4_CLI_ADDRESS` which can be set to the hostname or IP address of the `smartnic-p4` container that will perform all of the requested actions on the real hardware.  In the `smartnic-fw` container, this value will already be set for you.
@@ -689,7 +689,7 @@ Open a **separate** shell window which you will use for doing the low-level smar
 Configure the Queue mappings for host PF0 and PF1 interfaces and bring up the physical ethernet ports using the `smartnic-fw` container.
 
 ```
-$ docker compose exec smartnic-fw bash -l
+$ docker compose exec smartnic-fw bash
 root@smartnic-fw:/# sn-cfg configure host --host-id 0 --dma-base-queue 0 --dma-num-queues 1
 root@smartnic-fw:/# sn-cfg configure host --host-id 1 --dma-base-queue 1 --dma-num-queues 1
 root@smartnic-fw:/# sn-cfg show host config

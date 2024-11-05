@@ -118,6 +118,14 @@ RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
     regio-esnet-smartnic -t zero -p none completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
     sn-cfg completions bash >/usr/share/bash-completion/completions/sn-cfg
     sn-p4 completions bash >/usr/share/bash-completion/completions/sn-p4
+
+    cat <<'_EOF' >>/root/.bashrc
+
+# Enable bash completion for non-login interactive shells.
+if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
+    . /etc/bash_completion
+fi
+_EOF
 EOF
 
 COPY <<EOF /sn-fw/buildinfo.env
@@ -156,4 +164,4 @@ ADD \
     /usr/local/bin/mc
 
 WORKDIR /
-CMD ["/bin/bash", "-l"]
+CMD ["/bin/bash"]
