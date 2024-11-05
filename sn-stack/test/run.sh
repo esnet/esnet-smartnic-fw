@@ -75,7 +75,7 @@ while true; do
             ;;
 
         -s | --shell)
-            run_args+=( "--entrypoint=bash -l" )
+            run_args+=( "--entrypoint=bash" )
             ;;
 
         *)
