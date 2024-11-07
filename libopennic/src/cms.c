@@ -1228,6 +1228,7 @@ void cms_card_stats_zone_free(struct stats_zone* zone) {
 
 //--------------------------------------------------------------------------------------------------
 enum cms_module_metric_type { // Limited to 1 byte (see cms_module_metric_flags below).
+    cms_module_metric_type_GPIO,
     cms_module_metric_type_ALARM,
     cms_module_metric_type_MONITOR_MIN,
     cms_module_metric_type_MONITOR_TEMP = cms_module_metric_type_MONITOR_MIN,
@@ -1248,6 +1249,21 @@ struct cms_module_metric {
     struct stats_metric_spec spec;
     union cms_module_metric_flags flags;
 };
+
+#define CMS_MODULE_METRIC_GPIO(_type, _name) \
+{ \
+    .spec = { \
+        __STATS_METRIC_SPEC(#_type "_gpio_" #_name, NULL, FLAG, 0, 0), \
+        .io = { \
+            .offset = offsetof(struct cms_module_gpio, _type._name), \
+        }, \
+    }, \
+    .flags = { \
+        .type = cms_module_metric_type_GPIO, \
+    }, \
+}
+
+#define CMS_MODULE_METRIC_QSFP_GPIO(_name) CMS_MODULE_METRIC_GPIO(qsfp, _name)
 
 #define CMS_MODULE_METRIC_ALARM(_name, _offset, _pos) \
 { \
@@ -1281,6 +1297,12 @@ struct cms_module_metric {
 
 // TODO: add units as extra label for each metric?
 static const struct cms_module_metric cms_module_metrics[] = {
+    CMS_MODULE_METRIC_QSFP_GPIO(reset),
+    CMS_MODULE_METRIC_QSFP_GPIO(low_power_mode),
+    CMS_MODULE_METRIC_QSFP_GPIO(select),
+    CMS_MODULE_METRIC_QSFP_GPIO(present),
+    CMS_MODULE_METRIC_QSFP_GPIO(interrupt),
+
     CMS_MODULE_METRIC_ALARM(channel_los_rx1, 3, 0),
     CMS_MODULE_METRIC_ALARM(channel_los_rx2, 3, 1),
     CMS_MODULE_METRIC_ALARM(channel_los_rx3, 3, 2),
@@ -1397,6 +1419,7 @@ union cms_module_block_io_data {
 } __attribute__((packed));
 
 struct cms_module_block_latch_data {
+    struct cms_module_gpio gpio;
     union cms_module_page* lo;
 };
 
@@ -1406,8 +1429,9 @@ static void cms_module_stats_latch_metrics(const struct stats_block_spec* bspec,
     union cms_module_block_io_data io = {._v = bspec->io.data.u64};
     struct cms_module_block_latch_data* latch = data;
 
-    struct cms_module_gpio gpio = {.type = cms_module_gpio_type_QSFP};
-    if (cms_module_gpio_read(cms, io.cage, &gpio) && gpio.qsfp.present && !gpio.qsfp.reset) {
+    latch->gpio.type = cms_module_gpio_type_QSFP;
+    if (cms_module_gpio_read(cms, io.cage, &latch->gpio) &&
+        latch->gpio.qsfp.present && !latch->gpio.qsfp.reset) {
         struct cms_module_id id = {.cage = io.cage};
         latch->lo = cms_module_page_read(cms, &id);
     }
@@ -1433,6 +1457,10 @@ static void cms_module_stats_read_metric(const struct stats_block_spec* UNUSED(b
     union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
     *value = 0;
     switch (flags.type) {
+    case cms_module_metric_type_GPIO:
+        *value = *((bool*)(((void*)&latch->gpio) + mspec->io.offset)) ? 1 : 0;
+        break;
+
     case cms_module_metric_type_ALARM:
         if (have_lo) {
             *value = (latch->lo->u8[mspec->io.offset] >> mspec->io.shift) & 1;
@@ -1462,6 +1490,7 @@ static double cms_module_stats_convert_metric(const struct stats_block_spec* UNU
     union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
     double f64 = 0.0;
     switch (flags.type) {
+    case cms_module_metric_type_GPIO:
     case cms_module_metric_type_ALARM:
         f64 = value != 0 ? 1.0 : 0.0;
         break;
@@ -1540,6 +1569,11 @@ void cms_module_stats_zone_free(struct stats_zone* zone) {
 }
 
 //--------------------------------------------------------------------------------------------------
+bool cms_module_stats_is_gpio_metric(const struct stats_metric_spec* mspec) {
+    union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
+    return flags.type == cms_module_metric_type_GPIO;
+}
+
 bool cms_module_stats_is_alarm_metric(const struct stats_metric_spec* mspec) {
     union cms_module_metric_flags flags = {._v = mspec->io.data.u64};
     return flags.type == cms_module_metric_type_ALARM;
