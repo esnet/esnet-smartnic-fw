@@ -1406,8 +1406,11 @@ static void cms_module_stats_latch_metrics(const struct stats_block_spec* bspec,
     union cms_module_block_io_data io = {._v = bspec->io.data.u64};
     struct cms_module_block_latch_data* latch = data;
 
-    struct cms_module_id id = {.cage = io.cage};
-    latch->lo = cms_module_page_read(cms, &id);
+    struct cms_module_gpio gpio = {.type = cms_module_gpio_type_QSFP};
+    if (cms_module_gpio_read(cms, io.cage, &gpio) && gpio.qsfp.present && !gpio.qsfp.reset) {
+        struct cms_module_id id = {.cage = io.cage};
+        latch->lo = cms_module_page_read(cms, &id);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
