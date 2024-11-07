@@ -506,8 +506,6 @@ services:
     privileged: true
     restart: unless-stopped
     environment:
-      - REGIO_SELECT=$FPGA_PCIE_DEV.0
-      - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
@@ -658,8 +656,6 @@ services:
     user: root
     privileged: true
     environment:
-      - REGIO_SELECT=$FPGA_PCIE_DEV.0
-      - REGIO_REGMAP=/usr/local/share/esnet-smartnic/esnet-smartnic-top-ir.yaml
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
