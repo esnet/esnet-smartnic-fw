@@ -17,6 +17,5 @@ subdir('libsnp4')
 subdir('libopennic')
 
 subdir('protobuf') # Must occur before dependencies needing protobuf/grpc generated sources.
-subdir('sn-cli')
 subdir('sn-cfg')
 subdir('sn-p4')
