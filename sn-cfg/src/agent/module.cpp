@@ -99,6 +99,21 @@ private:
 };
 
 //--------------------------------------------------------------------------------------------------
+static ErrorCode check_module_present(struct cms* cms, unsigned int mod_id) {
+    // TODO: Query module type from card info?
+    struct cms_module_gpio cms_gpio;
+    cms_gpio.type = cms_module_gpio_type_QSFP;
+    if (!cms_module_gpio_read(cms, mod_id, &cms_gpio)) {
+        return ErrorCode::EC_MODULE_GPIO_READ_FAILED;
+    }
+
+    if (!cms_gpio.qsfp.present || cms_gpio.qsfp.reset) {
+        return ErrorCode::EC_MODULE_NOT_PRESENT;
+    }
+    return ErrorCode::EC_OK;
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicConfigImpl::init_module(Device* dev) {
     for (unsigned int mod_id = 0; mod_id < dev->nports; ++mod_id) {
         ostringstream name;
@@ -646,6 +661,8 @@ void SmartnicConfigImpl::get_module_info(
         int begin_mod_id = 0;
         int end_mod_id = dev->nports - 1;
         int mod_id = req.mod_id(); // 0-based index. -1 means all modules.
+        bool is_range = mod_id < 0;
+
         if (mod_id > end_mod_id) {
             ModuleInfoResponse resp;
             resp.set_error_code(ErrorCode::EC_INVALID_MODULE_ID);
@@ -661,17 +678,28 @@ void SmartnicConfigImpl::get_module_info(
 
         for (mod_id = begin_mod_id; mod_id <= end_mod_id; ++mod_id) {
             ModuleInfoResponse resp;
-            auto err = ErrorCode::EC_OK;
 
-            ModulePages pages(&dev->cms, mod_id);
-            if (pages.error()) {
-                err = ErrorCode::EC_MODULE_PAGE_READ_FAILED;
-            } else {
+            auto err = check_module_present(&dev->cms, mod_id);
+            if (err != ErrorCode::EC_OK) {
+                if (is_range) {
+                    continue;
+                }
+                goto write_response;
+            }
+
+            {
+                ModulePages pages(&dev->cms, mod_id);
+                if (pages.error()) {
+                    err = ErrorCode::EC_MODULE_PAGE_READ_FAILED;
+                    goto write_response;
+                }
+
                 auto info = resp.mutable_info();
                 add_module_info_vendor(*info, pages);
                 add_module_info_device(*info, pages);
             }
 
+        write_response:
             resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_mod_id(mod_id);
@@ -733,6 +761,8 @@ void SmartnicConfigImpl::get_module_mem(
         int begin_mod_id = 0;
         int end_mod_id = dev->nports - 1;
         int mod_id = req.mod_id(); // 0-based index. -1 means all modules.
+        bool is_range = mod_id < 0;
+
         if (mod_id > end_mod_id) {
             ModuleMemResponse resp;
             resp.set_error_code(ErrorCode::EC_INVALID_MODULE_ID);
@@ -783,7 +813,14 @@ void SmartnicConfigImpl::get_module_mem(
 
         for (mod_id = begin_mod_id; mod_id <= end_mod_id; ++mod_id) {
             ModuleMemResponse resp;
-            auto err = ErrorCode::EC_OK;
+
+            auto err = check_module_present(&dev->cms, mod_id);
+            if (err != ErrorCode::EC_OK) {
+                if (is_range) {
+                    continue;
+                }
+                goto write_response;
+            }
 
             /*
              * The CMS interface doesn't expose the I2C sequential read operation for arbitrary
@@ -897,6 +934,8 @@ void SmartnicConfigImpl::set_module_mem(
         int begin_mod_id = 0;
         int end_mod_id = dev->nports - 1;
         int mod_id = req.mod_id(); // 0-based index. -1 means all modules.
+        bool is_range = mod_id < 0;
+
         if (mod_id > end_mod_id) {
             ModuleMemResponse resp;
             resp.set_error_code(ErrorCode::EC_INVALID_MODULE_ID);
@@ -946,7 +985,14 @@ void SmartnicConfigImpl::set_module_mem(
 
         for (mod_id = begin_mod_id; mod_id <= end_mod_id; ++mod_id) {
             ModuleMemResponse resp;
-            auto err = ErrorCode::EC_OK;
+
+            auto err = check_module_present(&dev->cms, mod_id);
+            if (err != ErrorCode::EC_OK) {
+                if (is_range) {
+                    continue;
+                }
+                goto write_response;
+            }
 
             cms_id.cage = (uint8_t)mod_id;
             for (unsigned int b = 0; b < count; ++b) {
@@ -1039,6 +1085,8 @@ void SmartnicConfigImpl::get_module_status(
         int begin_mod_id = 0;
         int end_mod_id = dev->nports - 1;
         int mod_id = req.mod_id(); // 0-based index. -1 means all modules.
+        bool is_range = mod_id < 0;
+
         if (mod_id > end_mod_id) {
             ModuleStatusResponse resp;
             resp.set_error_code(ErrorCode::EC_INVALID_MODULE_ID);
@@ -1055,12 +1103,23 @@ void SmartnicConfigImpl::get_module_status(
         auto& zones = dev->stats.zones[DeviceStatsZone::MODULE_MONITORS];
         for (mod_id = begin_mod_id; mod_id <= end_mod_id; ++mod_id) {
             ModuleStatusResponse resp;
-            GetModuleStatsContext ctx = {
-                .status = resp.mutable_status(),
-            };
 
-            stats_zone_for_each_metric(zones[mod_id]->zone, __get_module_stats, &ctx);
+            auto err = check_module_present(&dev->cms, mod_id);
+            if (err != ErrorCode::EC_OK) {
+                if (is_range) {
+                    continue;
+                }
+                goto write_response;
+            }
 
+            {
+                GetModuleStatsContext ctx = {
+                    .status = resp.mutable_status(),
+                };
+                stats_zone_for_each_metric(zones[mod_id]->zone, __get_module_stats, &ctx);
+            }
+
+        write_response:
             resp.set_error_code(ErrorCode::EC_OK);
             resp.set_dev_id(dev_id);
             resp.set_mod_id(mod_id);

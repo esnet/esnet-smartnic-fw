@@ -73,6 +73,7 @@ enum ErrorCode {
     EC_UNKNOWN_MODULE_GPIO_TYPE = 707;
     EC_MODULE_GPIO_READ_FAILED = 708;
     EC_MODULE_GPIO_WRITE_FAILED = 709;
+    EC_MODULE_NOT_PRESENT = 710;
 
     // Server configuration error codes.
     EC_SERVER_FAILED_GET_TIME = 800;
