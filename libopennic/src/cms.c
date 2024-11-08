@@ -311,6 +311,42 @@ void cms_disable(struct cms* cms) {
 }
 
 //--------------------------------------------------------------------------------------------------
+enum cms_msg_error {
+    cms_msg_error_NONE,
+    cms_msg_error_BAD_OPCODE_ERR,
+    cms_msg_error_BRD_INFO_MISSING_ERR,
+    cms_msg_error_LENGTH_ERR,
+    cms_msg_error_SAT_FW_WRITE_FAIL,
+    cms_msg_error_SAT_FW_UPDATE_FAIL,
+    cms_msg_error_SAT_FW_LOAD_FAIL,
+    cms_msg_error_SAT_FW_ERASE_FAIL,
+    cms_msg_error_RESERVED0,
+    cms_msg_error_CSDR_FAILED,
+    cms_msg_error_QSFP_FAIL,
+};
+
+static const char* cms_msg_error_to_str(enum cms_msg_error error) {
+    const char* str = "UNKNOWN";
+    switch (error) {
+#define CASE_MSG_ERROR(_name) case cms_msg_error_##_name: str = #_name; break
+    CASE_MSG_ERROR(NONE);
+    CASE_MSG_ERROR(BAD_OPCODE_ERR);
+    CASE_MSG_ERROR(BRD_INFO_MISSING_ERR);
+    CASE_MSG_ERROR(LENGTH_ERR);
+    CASE_MSG_ERROR(SAT_FW_WRITE_FAIL);
+    CASE_MSG_ERROR(SAT_FW_UPDATE_FAIL);
+    CASE_MSG_ERROR(SAT_FW_LOAD_FAIL);
+    CASE_MSG_ERROR(SAT_FW_ERASE_FAIL);
+    CASE_MSG_ERROR(RESERVED0);
+    CASE_MSG_ERROR(CSDR_FAILED);
+    CASE_MSG_ERROR(QSFP_FAIL);
+#undef CASE_MSG_ERROR
+    }
+
+    return str;
+}
+
+//--------------------------------------------------------------------------------------------------
 enum cms_mailbox_opcode {
     // https://docs.amd.com/r/en-US/pg348-cms-subsystem/Satellite-Controller-Firmware-Update
     cms_mailbox_opcode_SC_FW_SEC = 0x01,
@@ -374,19 +410,20 @@ static volatile struct cms_mailbox* cms_mailbox_post(volatile struct cms_block* 
 
     if (!cms_mailbox_is_ready(cms)) {
         log_err(EBUSY, "mailbox done timeout");
-        return NULL;
+        mailbox = NULL;
     }
 
     union cms_error_reg error = {._v = cms->error_reg._v};
     if (error.pkt_error) {
-        log_err(EIO, "packet error");
-        return NULL;
+        enum cms_msg_error err = cms->host_msg_error_reg;
+        log_err(EIO, "packet error %u (%s)", err, cms_msg_error_to_str(err));
+        mailbox = NULL;
     }
 
     if (error.sat_ctrl_err) {
         log_err(EIO, "satellite controller error %u (%s)", error.sat_ctrl_err_code,
                 cms_sc_error_to_str(error.sat_ctrl_err_code));
-        return NULL;
+        mailbox = NULL;
     }
 
     return mailbox;
@@ -540,6 +577,7 @@ static struct cms_card_info* cms_card_info_parse(volatile struct cms_mailbox* ma
 
     struct cms_card_info* info = calloc(1, sizeof(*info) + nwords * sizeof(uint32_t));
     if (info == NULL) {
+        log_err(ENOMEM, "failed to alloc card info");
         return NULL;
     }
     uint8_t* payload = (typeof(payload))&info[1];
@@ -571,6 +609,7 @@ struct cms_card_info* cms_card_info_read(struct cms* cms) {
 
     volatile struct cms_mailbox* mailbox = cms_mailbox_post(cms->blk, &req, 0);
     if (mailbox == NULL) {
+        log_err(EIO, "failed to query card info");
         goto unlock;
     }
 
@@ -704,18 +743,23 @@ union cms_module_page* cms_module_page_read(struct cms* cms, const struct cms_mo
     volatile struct cms_mailbox* mailbox = cms_mailbox_post(
         cms->blk, &op.overlay, sizeof(op.message.request) / sizeof(uint32_t));
     if (mailbox == NULL) {
+        log_err(EIO, "failed to read %s page %u of cage %u",
+                id->upper ? "upper" : "lower", id->page, id->cage);
         goto unlock;
     }
 
     volatile union cms_op_block_read_module_i2c* mb = (typeof(mb))mailbox;
     size_t size = mb->message.response.size;
     if (size != sizeof(page->u8)) {
-        //log_err(EINVAL, "Got %zu bytes, expected %zu", size, sizeof(page->u8));
+        log_err(EIO, "read of %s page %u of cage %u responded with %zu bytes, expected %zu",
+                id->upper ? "upper" : "lower", id->page, id->cage, size, sizeof(page->u8));
         goto unlock;
     }
 
     page = malloc(sizeof(*page));
     if (page == NULL) {
+        log_err(ENOMEM, "failed to alloc %zu bytes for %s page %u of cage %u",
+                sizeof(*page), id->upper ? "upper" : "lower", id->page, id->cage);
         goto unlock;
     }
 
@@ -768,6 +812,7 @@ bool cms_module_byte_read(struct cms* cms,
                           uint8_t offset,
                           uint8_t* value) {
     bool upper = offset >= CMS_MODULE_PAGE_SIZE;
+    uint8_t page = upper ? id->page : 0;
     union cms_op_byte_read_module_i2c op = {
         .message = {
             .header = {
@@ -776,7 +821,7 @@ bool cms_module_byte_read(struct cms* cms,
             .request = {
                 .select = {
                     .cage = id->cage,
-                    .page = upper ? id->page : 0, // Lower memory mapping is fixed.
+                    .page = page, // Lower memory mapping is fixed.
                     .upper = upper, // Upper memory mapping is paged (except SFP).
                     .sfp_diag = id->sfp_diag ? 1 : 0,
                     .cmis_bank_valid = id->cmis ? 1 : 0,
@@ -793,6 +838,9 @@ bool cms_module_byte_read(struct cms* cms,
     if (mailbox != NULL) {
         volatile union cms_op_byte_read_module_i2c* mb = (typeof(mb))mailbox;
         *value = mb->message.response.value;
+    } else {
+        log_err(EIO, "failed to read byte at offset 0x%02x from %s page %u of cage %u",
+                offset, upper ? "upper" : "lower", page, id->cage);
     }
     cms_unlock(cms);
 
@@ -832,6 +880,7 @@ bool cms_module_byte_write(struct cms* cms,
                            uint8_t offset,
                            uint8_t value) {
     bool upper = offset >= CMS_MODULE_PAGE_SIZE;
+    uint8_t page = upper ? id->page : 0;
     union cms_op_byte_write_module_i2c op = {
         .message = {
             .header = {
@@ -840,7 +889,7 @@ bool cms_module_byte_write(struct cms* cms,
             .request = {
                 .select = {
                     .cage = id->cage,
-                    .page = upper ? id->page : 0, // Lower memory mapping is fixed.
+                    .page = page, // Lower memory mapping is fixed.
                     .upper = upper ? 1 : 0, // Upper memory mapping is paged (except SFP).
                     .sfp_diag = id->sfp_diag ? 1 : 0,
                     .cmis_bank_valid = id->cmis ? 1 : 0,
@@ -857,7 +906,12 @@ bool cms_module_byte_write(struct cms* cms,
         cms->blk, &op.overlay, sizeof(op.message.request) / sizeof(uint32_t));
     cms_unlock(cms);
 
-    return mailbox != NULL;
+    if (mailbox == NULL) {
+        log_err(EIO, "failed to write byte at offset 0x%02x to %s page %u of cage %u",
+                offset, upper ? "upper" : "lower", page, id->cage);
+        return false;
+    }
+    return true;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -924,6 +978,7 @@ bool cms_module_gpio_read(struct cms* cms, uint8_t cage, struct cms_module_gpio*
     volatile struct cms_mailbox* mailbox = cms_mailbox_post(
         cms->blk, &op.overlay, sizeof(op.message.request) / sizeof(uint32_t));
     if (mailbox == NULL) {
+        log_err(EIO, "failed to read gpio for cage %u", cage);
         goto unlock;
     }
 
@@ -1025,7 +1080,11 @@ bool cms_module_gpio_write(struct cms* cms, uint8_t cage, const struct cms_modul
         cms->blk, &op.overlay, sizeof(op.message.request) / sizeof(uint32_t));
     cms_unlock(cms);
 
-    return mailbox != NULL;
+    if (mailbox == NULL) {
+        log_err(EIO, "failed to write gpio for cage %u", cage);
+        return false;
+    }
+    return true;
 }
 
 //--------------------------------------------------------------------------------------------------
