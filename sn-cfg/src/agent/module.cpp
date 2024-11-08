@@ -400,7 +400,13 @@ static void add_module_info_vendor(ModuleInfo& info, ModulePages& pages) {
     date->set_year(u00->date_code.year, sizeof(u00->date_code.year));
     date->set_month(u00->date_code.month, sizeof(u00->date_code.month));
     date->set_day(u00->date_code.day, sizeof(u00->date_code.day));
-    date->set_vendor(u00->date_code.vendor, sizeof(u00->date_code.vendor));
+
+    size = count_printable(u00->date_code.vendor, sizeof(u00->date_code.vendor));
+    if (size > 0) {
+        date->set_vendor(u00->date_code.vendor, size);
+    } else {
+        date->set_vendor("unspecified");
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
