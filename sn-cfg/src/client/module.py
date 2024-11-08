@@ -189,7 +189,8 @@ def _show_module_info(dev_id, mod_id, info):
     rows.append(f'    Tx CDR:                {yes_or_no(ident.tx_cdr)}')
     rows.append(f'    Connector Type:        {ident.connector_type}')
     rows.append(f'    Encoding:              {ident.encoding}')
-    rows.append(f'    Baud Rate:             {ident.baud_rate} Megabaud')
+    if ident.baud_rate > 0:
+        rows.append(f'    Baud Rate:             {ident.baud_rate} Megabaud')
 
     if any_spec_comp:
         rows.append( '    Spec Compliance:')
