@@ -152,6 +152,7 @@ bool cms_module_byte_write(struct cms* cms, const struct cms_module_id* id,
 struct stats_zone* cms_module_stats_zone_alloc(struct stats_domain* domain, struct cms* cms,
                                                uint8_t cage, const char* name);
 void cms_module_stats_zone_free(struct stats_zone* zone);
+bool cms_module_stats_is_gpio_metric(const struct stats_metric_spec* mspec);
 bool cms_module_stats_is_alarm_metric(const struct stats_metric_spec* mspec);
 bool cms_module_stats_is_monitor_metric(const struct stats_metric_spec* mspec);
 
