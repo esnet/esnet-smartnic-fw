@@ -49,6 +49,32 @@ extern bool snp4_table_ecc_counters_read(void * snp4_handle,
                                          uint32_t * detected_double_bit_errors);
 extern void snp4_print_target_config (unsigned int sdnet_idx);
 
+
+struct snp4_table_data {
+  uint8_t * value;
+  uint8_t * mask;
+  uint32_t width; // in bits
+  size_t len;     // in bytes
+};
+
+struct snp4_table_entry {
+  const char * table_name;
+
+  uint32_t priority;
+  struct snp4_table_data key;
+
+  struct {
+    const char * name;
+    struct snp4_table_data params;
+  } action;
+};
+
+extern bool snp4_table_for_each_entry(void * snp4_handle,
+                                      const char * table_name,
+                                      bool (*callback)(const struct snp4_table_entry * entry,
+                                                       void * arg),
+                                      void * arg);
+
 // Define some limits for the supported pipeline properties handled by this library
 // NOTE: These are not necessarily related to the limits of the underlying hardware
 #define SNP4_MAX_PIPELINE_TABLES 64

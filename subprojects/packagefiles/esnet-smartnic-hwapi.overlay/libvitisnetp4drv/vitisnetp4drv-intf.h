@@ -69,12 +69,46 @@ struct vitis_net_p4_drv_intf {
         XilVitisNetP4ReturnType (*delete)(
             XilVitisNetP4TableCtx *CtxPtr, uint8_t *KeyPtr, uint8_t *MaskPtr);
 
-        XilVitisNetP4ReturnType (*get_action_id)(
-            XilVitisNetP4TableCtx *CtxPtr, char *ActionNamePtr,
-            uint32_t *ActionIdPtr);
-
         XilVitisNetP4ReturnType (*get_mode)(
             XilVitisNetP4TableCtx *CtxPtr, XilVitisNetP4TableMode *ModePtr);
+
+        XilVitisNetP4ReturnType (*get_action_id)(
+            XilVitisNetP4TableCtx *CtxPtr, char *ActionNamePtr, uint32_t *ActionIdPtr);
+
+        XilVitisNetP4ReturnType (*get_action_name)(
+            XilVitisNetP4TableCtx *CtxPtr,
+            uint32_t ActionId,
+            char *ActionNamePtr,
+            uint32_t ActionNameNumBytes);
+
+        XilVitisNetP4ReturnType (*get_num_actions)(
+            XilVitisNetP4TableCtx *CtxPtr, uint32_t *NumActionsPtr);
+
+        XilVitisNetP4ReturnType (*get_key_size_bits)(
+            XilVitisNetP4TableCtx *CtxPtr, uint32_t *KeySizeBitsPtr);
+
+        XilVitisNetP4ReturnType (*get_action_id_size_bits)(
+            XilVitisNetP4TableCtx *CtxPtr, uint32_t *ActionIdWidthBitsPtr);
+
+        XilVitisNetP4ReturnType (*get_action_params_size_bits)(
+            XilVitisNetP4TableCtx *CtxPtr, uint32_t *ActionParamsSizeBitsPtr);
+
+        XilVitisNetP4ReturnType (*get_by_key)(
+            XilVitisNetP4TableCtx *CtxPtr,
+            uint8_t *KeyPtr,
+            uint8_t *MaskPtr,
+            uint32_t *PriorityPtr,
+            uint32_t *ActionIdPtr,
+            uint8_t *ActionParamsPtr);
+
+        XilVitisNetP4ReturnType (*get_by_response)(
+            XilVitisNetP4TableCtx *CtxPtr,
+            uint32_t ActionId,
+            uint8_t *ActionParamsPtr,
+            uint8_t *ActionParamsMaskPtr,
+            uint32_t *PositionPtr,
+            uint8_t *KeyPtr,
+            uint8_t *MaskPtr);
 
         XilVitisNetP4ReturnType (*get_ecc_counters)(
             XilVitisNetP4TableCtx *CtxPtr,
