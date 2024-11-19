@@ -4,6 +4,8 @@ project(
   default_options : [
     'warning_level=2',
     'werror=true',
+    'optimization=2',
+    'debug=true',
   ],
 )
 
