@@ -66,20 +66,10 @@ void SmartnicP4Impl::clear_table(
             auto err = ErrorCode::EC_OK;
 
             // Request table_name empty means all tables in the pipeline.
-#define TABLE_CLEAR_LOOP_COUNT 50
             if (table_name.empty()) {
-                for (unsigned int i = 0; i < TABLE_CLEAR_LOOP_COUNT; ++i) {
-                    if (!snp4_reset_all_tables(pipeline->handle)) {
-                        err = ErrorCode::EC_FAILED_CLEAR_ALL_TABLES;
-                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
-                            "Failed to clear all tables in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id <<
-                            " (iteration " << i << "/" << TABLE_CLEAR_LOOP_COUNT << ")");
-                        break;
-                    }
-                }
-
-                if (err == ErrorCode::EC_OK) {
+                if (!snp4_reset_all_tables(pipeline->handle)) {
+                    err = ErrorCode::EC_FAILED_CLEAR_ALL_TABLES;
+                } else {
                     SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                         "Cleared all tables in pipeline ID " << pipeline_id <<
                         " on device ID " << dev_id);
@@ -90,27 +80,18 @@ void SmartnicP4Impl::clear_table(
                     "Invalid table '" << table_name <<
                     "' in pipeline ID " << pipeline_id <<
                     " on device ID " << dev_id);
+            } else if (!snp4_reset_one_table(pipeline->handle, table_name.c_str())) {
+                err = ErrorCode::EC_FAILED_CLEAR_TABLE;
+                SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                    "Failed to clear table '" << table_name <<
+                    "' in pipeline ID " << pipeline_id <<
+                    " on device ID " << dev_id);
             } else {
-                for (unsigned int i = 0; i < TABLE_CLEAR_LOOP_COUNT; ++i) {
-                    if (!snp4_reset_one_table(pipeline->handle, table_name.c_str())) {
-                        err = ErrorCode::EC_FAILED_CLEAR_TABLE;
-                        SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
-                            "Failed to clear table '" << table_name <<
-                            "' in pipeline ID " << pipeline_id <<
-                            " on device ID " << dev_id <<
-                            " (iteration " << i << "/" << TABLE_CLEAR_LOOP_COUNT << ")");
-                        break;
-                    }
-                }
-
-                if (err == ErrorCode::EC_OK) {
-                    SERVER_LOG_IF_DEBUG(debug_flag, INFO,
-                        "Cleared table '" << table_name <<
-                        "' in pipeline ID " << pipeline_id <<
-                        " on device ID " << dev_id);
-                }
+                SERVER_LOG_IF_DEBUG(debug_flag, INFO,
+                    "Cleared table '" << table_name <<
+                    "' in pipeline ID " << pipeline_id <<
+                    " on device ID " << dev_id);
             }
-#undef TABLE_CLEAR_LOOP_COUNT
 
             resp.set_error_code(err);
             resp.set_dev_id(dev_id);
