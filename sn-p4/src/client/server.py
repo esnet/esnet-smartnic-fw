@@ -29,6 +29,7 @@ DEBUG_FLAG_MAP = {
     ServerDebugFlag.DEBUG_FLAG_TABLE_CLEAR: 'table-clear',
     ServerDebugFlag.DEBUG_FLAG_TABLE_RULE_INSERT: 'table-rule-insert',
     ServerDebugFlag.DEBUG_FLAG_TABLE_RULE_DELETE: 'table-rule-delete',
+    ServerDebugFlag.DEBUG_FLAG_PIPELINE_INFO: 'pipeline-info',
 }
 DEBUG_FLAG_RMAP = dict((name, enum) for enum, name in DEBUG_FLAG_MAP.items())
 
