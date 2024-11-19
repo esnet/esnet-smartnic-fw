@@ -345,7 +345,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                 " rules in pipeline ID " << pipeline_id <<
                 " on device ID " << dev_id);
 
-            unsigned int rule_idx = 0;
+            unsigned int rule_idx = 1;
             for (auto rule : req.rules()) {
                 const auto table_name = rule.table_name();
                 const auto ti = pipeline_get_table_info(pipeline, table_name);
