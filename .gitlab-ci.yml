@@ -242,11 +242,13 @@ review:
       - SN_FW_REPO
       - SN_FW_PIPELINE_ID
       - SN_FW_API_JOB
+      - SN_HW_BOARD
   variables:
     SN_FW_GROUP: ${SN_FW_GROUP}
     SN_FW_REPO: ${SN_FW_REPO}
     SN_FW_PIPELINE_ID: ${SN_FW_PIPELINE_ID}
     SN_FW_API_JOB: ${SN_FW_API_JOB}
+    SN_HW_BOARD: ${SN_HW_BOARD}
   rules:
     # Compare HW_APP_NAME to HW_EXPECTED_APP_NAME here since the dynamically computed FW_APP_NAME is not visible to the rules section
     - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH) && ($SN_HW_APP_NAME == $SN_HW_EXPECTED_APP_NAME)
