@@ -18,6 +18,7 @@ const char* SmartnicP4Impl::debug_flag_label(const ServerDebugFlag flag) {
     case ServerDebugFlag::DEBUG_FLAG_TABLE_CLEAR: return "TABLE_CLEAR";
     case ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_INSERT: return "TABLE_RULE_INSERT";
     case ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_DELETE: return "TABLE_RULE_DELETE";
+    case ServerDebugFlag::DEBUG_FLAG_PIPELINE_INFO: return "PIPELINE_INFO";
 
     case ServerDebugFlag::DEBUG_FLAG_UNKNOWN:
     default:
@@ -219,6 +220,10 @@ void SmartnicP4Impl::get_server_config(
 
     auto dbg = config->mutable_debug();
     for (auto flag = ServerDebugFlag_MIN + 1; flag <= ServerDebugFlag_MAX; ++flag) {
+        if (!ServerDebugFlag_IsValid(flag)) {
+            continue;
+        }
+
         if (debug.flags.test(flag)) {
             dbg->add_enables((ServerDebugFlag)flag);
         } else {
@@ -267,7 +272,7 @@ void SmartnicP4Impl::set_server_config(
         auto dbg = config.debug();
 
         for (auto flag : dbg.enables()) {
-            if (flag > ServerDebugFlag_MAX) {
+            if (!ServerDebugFlag_IsValid(flag)) {
                 err = ErrorCode::EC_SERVER_INVALID_DEBUG_FLAG;
                 goto write_response;
             }
@@ -275,7 +280,7 @@ void SmartnicP4Impl::set_server_config(
         }
 
         for (auto flag : dbg.disables()) {
-            if (flag > ServerDebugFlag_MAX) {
+            if (!ServerDebugFlag_IsValid(flag)) {
                 err = ErrorCode::EC_SERVER_INVALID_DEBUG_FLAG;
                 goto write_response;
             }

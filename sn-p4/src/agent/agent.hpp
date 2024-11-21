@@ -83,10 +83,13 @@ private:
 
     const char* debug_flag_label(const ServerDebugFlag flag);
 
-#define SERVER_LOG_IF_DEBUG(_flag, _label, _stream_statements) \
+#define SERVER_LOG_DEBUG(_flag_label, _log_type, _stream_statements) \
+    cerr << "DEBUG_" #_log_type "[" << _flag_label << "]: " << _stream_statements
+#define SERVER_LOG_LINE_DEBUG(_flag, _log_type, _stream_statements) \
+    SERVER_LOG_DEBUG(this->debug_flag_label(_flag), _log_type, _stream_statements << endl)
+#define SERVER_LOG_IF_DEBUG(_flag, _log_label, _stream_statements) \
     if (this->debug.flags.test(_flag)) { \
-        cerr << "DEBUG_" #_label "[" << this->debug_flag_label(_flag) << "]: " \
-             << _stream_statements << endl; \
+        SERVER_LOG_LINE_DEBUG(_flag, _log_type, _stream_statements); \
     }
 
     void get_device_info(const DeviceInfoRequest&, function<void(const DeviceInfoResponse&)>);

@@ -343,6 +343,199 @@ bool snp4_table_delete_k(void * snp4_handle,
   return true;
 }
 
+struct snp4_table_get_response {
+  struct snp4_table_data key;
+  struct {
+    uint32_t id;
+    struct snp4_table_data params;
+  } action;
+};
+
+struct snp4_table_get_context {
+  struct snp4_user_context * user;
+
+  struct {
+    const char * name;
+    XilVitisNetP4TableCtx * handle;
+    XilVitisNetP4TableMode mode;
+  } table;
+
+  bool (*callback)(struct snp4_table_get_context * ctx,
+                   const struct snp4_table_get_response * resp);
+  void * arg;
+};
+
+static bool _snp4_table_get_by_response(struct snp4_table_get_context * ctx)
+{
+  const struct vitis_net_p4_drv_intf * intf = ctx->user->intf;
+  XilVitisNetP4ReturnType rt;
+
+  rt = intf->target.get_table_by_name(
+    &ctx->user->target, (char *)ctx->table.name, &ctx->table.handle);
+  if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  struct snp4_table_get_response resp = {0};
+  rt = intf->table.get_key_size_bits(ctx->table.handle, &resp.key.width);
+  if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+  resp.key.len = (resp.key.width + 8 - 1) / 8;
+
+  uint8_t key[resp.key.len * 2];
+  memset(key, 0, resp.key.len * 2);
+  resp.key.value = key;
+  resp.key.mask = &key[resp.key.len];
+
+  rt = intf->table.get_action_params_size_bits(ctx->table.handle, &resp.action.params.width);
+  if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+  resp.action.params.len = (resp.action.params.width + 8 - 1) / 8;
+
+  uint8_t params[resp.action.params.len * 2];
+  memset(params, 0, resp.action.params.len * 2);
+  resp.action.params.value = params;
+  resp.action.params.mask = &params[resp.action.params.len];
+
+  // Certain table modes insist on a NULL mask parameter
+  rt = intf->table.get_mode(ctx->table.handle, &ctx->table.mode);
+  if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  switch (ctx->table.mode) {
+  case XIL_VITIS_NET_P4_TABLE_MODE_DCAM:
+  case XIL_VITIS_NET_P4_TABLE_MODE_BCAM:
+    // Mask parameter must be NULL for these table modes.
+    resp.key.mask = NULL;
+    break;
+
+  default:
+    // All other table modes require the mask.
+    break;
+  }
+
+  uint32_t num_actions = 0;
+  rt = intf->table.get_num_actions(ctx->table.handle, &num_actions);
+  if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  for (resp.action.id = 0; resp.action.id < num_actions; ++resp.action.id) {
+    uint32_t position = 0;
+    while (1) {
+      rt = intf->table.get_by_response(
+        ctx->table.handle, resp.action.id, resp.action.params.value, resp.action.params.mask,
+        &position, resp.key.value, resp.key.mask);
+      if (rt == XIL_VITIS_NET_P4_CAM_ERR_KEY_NOT_FOUND) {
+        break;
+      }
+
+      if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+        return false;
+      }
+
+      if (!ctx->callback(ctx, &resp)) {
+        return true;
+      }
+    }
+  }
+
+  return true;
+}
+
+struct snp4_table_for_each_context {
+  bool (*callback)(const struct snp4_table_entry * entry, void * arg);
+  void * arg;
+};
+
+static bool _snp4_table_for_each_entry(struct snp4_table_get_context * gctx,
+                                       const struct snp4_table_get_response * resp)
+{
+  struct snp4_table_for_each_context * fctx = gctx->arg;
+  struct snp4_table_entry entry = {
+    .table_name = gctx->table.name,
+    .key = {
+      .width = resp->key.width,
+      .len = resp->key.len,
+    },
+    .action = {
+      .params = {
+        .width = resp->action.params.width,
+        .len = resp->action.params.len,
+      },
+    },
+  };
+
+  uint8_t key[resp->key.len * 2];
+  entry.key.value = key;
+  entry.key.mask = &key[resp->key.len];
+  memcpy(entry.key.value, resp->key.value, resp->key.len);
+
+  uint8_t params[resp->action.params.len * 2];
+  entry.action.params.value = params;
+  entry.action.params.mask = &params[resp->action.params.len];
+  memset(entry.action.params.mask, 0xff, resp->action.params.len);
+
+  uint8_t * mask = NULL;
+  uint32_t * priority = NULL;
+  switch (gctx->table.mode) {
+  case XIL_VITIS_NET_P4_TABLE_MODE_DCAM:
+  case XIL_VITIS_NET_P4_TABLE_MODE_BCAM:
+    // Mask and priority parameters must be NULL for these table modes.
+    memset(entry.key.mask, 0xff, resp->key.len); // Make sure the callback always has a key mask.
+    break;
+
+  default:
+    // All other table modes require the mask and priority.
+    memcpy(entry.key.mask, resp->key.mask, resp->key.len);
+    mask = entry.key.mask;
+    priority = &entry.priority;
+    break;
+  }
+
+  uint32_t action_id;
+  XilVitisNetP4ReturnType rt = gctx->user->intf->table.get_by_key(
+    gctx->table.handle, entry.key.value, mask, priority,
+    &action_id, entry.action.params.value);
+  if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+    return false;
+  }
+
+  char action_name[256] = {0};
+  rt = gctx->user->intf->table.get_action_name(
+    gctx->table.handle, action_id, action_name, sizeof(action_name));
+  if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+    entry.action.name = "<buffer-too-small>";
+  } else {
+    entry.action.name = action_name;
+  }
+
+  return fctx->callback(&entry, fctx->arg);
+}
+
+bool snp4_table_for_each_entry(void * snp4_handle,
+                               const char * table_name,
+                               bool (*callback)(const struct snp4_table_entry * entry, void * arg),
+                               void * arg)
+{
+  struct snp4_table_for_each_context fctx = {
+    .callback = callback,
+    .arg = arg,
+  };
+  struct snp4_table_get_context gctx = {
+    .user = (struct snp4_user_context *)snp4_handle,
+    .table = {
+      .name = table_name,
+    },
+    .callback = _snp4_table_for_each_entry,
+    .arg = &fctx,
+  };
+  return _snp4_table_get_by_response(&gctx);
+}
+
 bool snp4_table_ecc_counters_read(void * snp4_handle,
                                   const char * table_name,
                                   uint32_t * corrected_single_bit_errors,

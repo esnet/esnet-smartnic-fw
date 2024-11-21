@@ -3,6 +3,8 @@
 #include "stats.hpp"
 
 #include <cstdlib>
+#include <iomanip>
+#include <iostream>
 #include <sstream>
 
 #include <grpc/grpc.h>
@@ -132,9 +134,47 @@ void SmartnicP4Impl::deinit_pipeline(Device* dev) {
 }
 
 //--------------------------------------------------------------------------------------------------
+extern "C" {
+    struct GetPipelinInfoDumpTableContext {
+        const char* label;
+    };
+
+    bool get_pipeline_info_dump_table(const struct snp4_table_entry * entry, void * arg) {
+        GetPipelinInfoDumpTableContext* ctx = static_cast<typeof(ctx)>(arg);
+
+        ostringstream key;
+        key << "0x" << setfill('0') << hex;
+        for (unsigned int i = 0; i < entry->key.len; ++i) {
+            key << setw(2) << (unsigned int)entry->key.value[i];
+        }
+
+        ostringstream mask;
+        mask << "0x" << setfill('0') << hex;
+        for (unsigned int i = 0; i < entry->key.len; ++i) {
+            mask << setw(2) << (unsigned int)entry->key.mask[i];
+        }
+
+        ostringstream params;
+        params << "0x" << setfill('0') << hex;
+        for (unsigned int i = 0; i < entry->action.params.len; ++i) {
+            params << setw(2) << (unsigned int)entry->action.params.value[i];
+        }
+
+        SERVER_LOG_DEBUG(ctx->label, INFO, "--> Key:      " << key.str() << endl);
+        SERVER_LOG_DEBUG(ctx->label, INFO, "    Mask:     " << mask.str() << endl);
+        SERVER_LOG_DEBUG(ctx->label, INFO, "    Priority: " << entry->priority << endl);
+        SERVER_LOG_DEBUG(ctx->label, INFO, "    Action:   " << entry->action.name << endl);
+        SERVER_LOG_DEBUG(ctx->label, INFO, "    Params:   " << params.str() << endl);
+
+        return true;
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::get_pipeline_info(
     const PipelineInfoRequest& req,
     function<void(const PipelineInfoResponse&)> write_resp) {
+    auto debug_flag = ServerDebugFlag::DEBUG_FLAG_PIPELINE_INFO;
     int begin_dev_id = 0;
     int end_dev_id = devices.size() - 1;
     int dev_id = req.dev_id(); // 0-based index. -1 means all devices.
@@ -171,7 +211,8 @@ void SmartnicP4Impl::get_pipeline_info(
         }
 
         for (pipeline_id = begin_pipeline_id; pipeline_id <= end_pipeline_id; ++pipeline_id) {
-            const auto pi = &dev->pipelines[pipeline_id]->info;
+            const auto pipeline = dev->pipelines[pipeline_id];
+            const auto pi = &pipeline->info;
             PipelineInfoResponse resp;
             auto err = ErrorCode::EC_OK;
 
@@ -282,6 +323,21 @@ void SmartnicP4Impl::get_pipeline_info(
 
                         param->set_name(pi->name);
                         param->set_width(pi->bits);
+                    }
+                }
+
+                if (debug.flags.test(debug_flag)) {
+                    GetPipelinInfoDumpTableContext ctx = {
+                        .label = debug_flag_label(debug_flag),
+                    };
+
+                    SERVER_LOG_LINE_DEBUG(debug_flag, INFO, string(40, '-'));
+                    SERVER_LOG_LINE_DEBUG(debug_flag, INFO, "Dump of table '" << ti->name << "':");
+                    snp4_table_for_each_entry(pipeline->handle, ti->name,
+                                              get_pipeline_info_dump_table, &ctx);
+
+                    if (tidx == pi->num_tables - 1) {
+                        SERVER_LOG_LINE_DEBUG(debug_flag, INFO, string(40, '-'));
                     }
                 }
             }
