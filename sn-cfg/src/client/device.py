@@ -72,13 +72,15 @@ def _show_device_info(dev_id, info):
     rows.append(f'    Fan Presence:          {card.fan_presence}')
     rows.append(f'    Total Power Available: {card.total_power_avail}W')
 
-    rows.append(f'    Cage Types:')
-    for i, cage_type in enumerate(card.cage_types):
-        rows.append(f'        {i}: {cage_type}')
+    if card.cage_types:
+        rows.append(f'    Cage Types:')
+        for i, cage_type in enumerate(card.cage_types):
+            rows.append(f'        {i}: {cage_type}')
 
-    rows.append(f'    MAC Addresses:')
-    for i, addr in enumerate(card.mac_addrs):
-        rows.append(f'        {i}: {addr}')
+    if card.mac_addrs:
+        rows.append(f'    MAC Addresses:')
+        for i, addr in enumerate(card.mac_addrs):
+            rows.append(f'        {i}: {addr}')
 
     click.echo('\n'.join(rows))
 
