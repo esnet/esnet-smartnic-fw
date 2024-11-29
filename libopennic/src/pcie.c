@@ -19,7 +19,7 @@ volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_path(const char *path
     flags |= O_CREAT;
   }
 
-  int fd = open(path, flags);
+  int fd = open(path, flags, S_IRUSR | S_IWUSR);
   if (fd < 0) {
     return NULL;
   }

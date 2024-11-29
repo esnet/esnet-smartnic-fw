@@ -41,6 +41,9 @@ extern "C" {
         case stats_metric_type_FLAG:
             type = StatsMetricType::STATS_METRIC_TYPE_FLAG;
             break;
+
+        default:
+            return 0;
         }
 
         if (!ctx->metric_types.test(type)) {
