@@ -7,9 +7,6 @@
 #include <unistd.h>
 #include "unused.h"
 
-// Temporary structures until regmap YAML changes pushed into open-nic-shell.
-#include "sysmon_2_block.h"
-
 //--------------------------------------------------------------------------------------------------
 /*
  * Reference: https://www.xilinx.com/support/documentation/user_guides/ug580-ultrascale-sysmon.pdf
@@ -42,31 +39,26 @@ static float v_to_degc_sysmone4(float v, enum sysmon_flag_ref ref) {
   }
 }
 
-float sysmon_get_temp(volatile struct sysmon_block * _sysmon) {
-  volatile struct sysmon_2_block* sysmon = (typeof(sysmon))_sysmon;
+float sysmon_get_temp(volatile struct sysmon_block * sysmon) {
   float v = adc_to_v(sysmon->temperature.adc);
 
   return (v_to_degc_sysmone4(v, sysmon->flag.ref));
 }
 
 //--------------------------------------------------------------------------------------------------
-void sysmon_master_reset(volatile struct sysmon_block* _sysmon) {
-    volatile struct sysmon_2_block* sysmon = (typeof(sysmon))_sysmon;
-
+void sysmon_master_reset(volatile struct sysmon_block* sysmon) {
     sysmon->software_reset = 0xa;
     barrier();
     usleep(1 * 1000);
 }
 
 //--------------------------------------------------------------------------------------------------
-void sysmon_sequencer_enable(volatile struct sysmon_block* _sysmon,
+void sysmon_sequencer_enable(volatile struct sysmon_block* sysmon,
                              uint64_t select_mask,
                              uint64_t average_mask) {
-    volatile struct sysmon_2_block* sysmon = (typeof(sysmon))_sysmon;
-
     // Disable the sequencer if running.
-    union sysmon_2_config_reg_1 config_reg_1 = {._v = sysmon->config_reg_1._v};
-    config_reg_1.seq = SYSMON_2_CONFIG_REG_1_SEQ_SINGLE_CHANNEL;
+    union sysmon_config_reg_1 config_reg_1 = {._v = sysmon->config_reg_1._v};
+    config_reg_1.seq = SYSMON_CONFIG_REG_1_SEQ_SINGLE_CHANNEL;
     sysmon->config_reg_1._v = config_reg_1._v;
     barrier();
 
@@ -80,7 +72,7 @@ void sysmon_sequencer_enable(volatile struct sysmon_block* _sysmon,
     barrier();
 
     // Enable the sequencer.
-    config_reg_1.seq = SYSMON_2_CONFIG_REG_1_SEQ_CONTINUOUS;
+    config_reg_1.seq = SYSMON_CONFIG_REG_1_SEQ_CONTINUOUS;
     sysmon->config_reg_1._v = config_reg_1._v;
     barrier();
 }
@@ -95,7 +87,7 @@ struct sysmon_metric {
 { \
     .spec = STATS_METRIC_SPEC_IO( \
         #_name, NULL, GAUGE, 0, 0, \
-        struct sysmon_2_block, _name, 10, 6, false, STATS_IO_DATA_NULL \
+        struct sysmon_block, _name, 10, 6, false, STATS_IO_DATA_NULL \
     ), \
     .channel_mask = _channel_mask, \
 }
@@ -109,7 +101,7 @@ struct sysmon_metric {
 { \
     .spec = STATS_METRIC_SPEC_IO( \
         #_name "_alarm", NULL, FLAG, 0, 0, \
-        struct sysmon_2_block, alarm_output_status, 1, _pos, false, STATS_IO_DATA_NULL \
+        struct sysmon_block, alarm_output_status, 1, _pos, false, STATS_IO_DATA_NULL \
      ), \
     .channel_mask = _channel_mask, \
 }
@@ -217,10 +209,9 @@ static double sysmon_stats_convert_metric(const struct stats_block_spec* UNUSED(
 
 //--------------------------------------------------------------------------------------------------
 struct stats_zone* sysmon_stats_zone_alloc(struct stats_domain* domain,
-                                           volatile struct sysmon_block* _sysmon,
+                                           volatile struct sysmon_block* sysmon,
                                            const char* name) {
-    volatile struct sysmon_2_block* sysmon = (typeof(sysmon))_sysmon;
-    bool external = sysmon->flag.ref == SYSMON_2_FLAG_REF_EXTERNAL;
+    bool external = sysmon->flag.ref == SYSMON_FLAG_REF_EXTERNAL;
 
     uint64_t select_mask = sysmon->seqchsel2._v & 0xffff;
     select_mask <<= 16;
