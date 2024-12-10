@@ -507,7 +507,6 @@ services:
     restart: unless-stopped
     environment:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
       - SN_CFG_CLI_TLS_INSECURE=true
       - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
@@ -635,7 +634,6 @@ services:
     privileged: true
     environment:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
       - SN_CFG_CLI_TLS_INSECURE=true
       - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
