@@ -668,7 +668,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Import the host's TLS certificates
       - type: bind
-        source: ${SN_INGRESS_TLS_HOST_DIR:-${PWD}/certs}
+        source: ${SN_INGRESS_TLS_HOST_DIR:-${SN_STACK_ROOT-${PWD}}/certs}
         target: /etc/letsencrypt
         read_only: true
         bind:
