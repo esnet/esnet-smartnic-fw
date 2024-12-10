@@ -706,7 +706,7 @@ services:
       # Set up Configuration Discover via files for dynamic configuration changes (to detect TLS cert renewal)
       - --providers.file.directory=/etc/traefik/config.d
       - --providers.file.watch=true
-      #- --providers.debugloggeneratedtemplate=true
+      #- --providers.file.debugloggeneratedtemplate=true
 
       # Allow external connections to the reverse proxy
       - --entrypoints.smartnic_api.address=:443
