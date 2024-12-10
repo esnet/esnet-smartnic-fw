@@ -712,9 +712,7 @@ services:
       - --entrypoints.smartnic_api.address=:443
       - --entrypoints.smartnic_api.http.tls=true
 
-      # Disable TLS cert verification for internal services since they're all re-using
-      # the host's cert which doesn't match the docker service's "hostname" and thus fails
-      # hostname verification.
+      # Disable TLS cert verification for internal services since they're all using self-signed certs.
       - --serversTransport.insecureSkipVerify=true
 
       # Enable prometheus metrics scrape endpoint for this daemon
