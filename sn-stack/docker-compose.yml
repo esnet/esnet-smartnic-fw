@@ -512,8 +512,8 @@ services:
       - SN_CFG_CLI_TLS_INSECURE=true
       - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
       - SN_P4_CLI_ADDRESS=smartnic-p4
+      - SN_P4_CLI_TLS_INSECURE=true
       - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
-      - SN_P4_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -549,24 +549,13 @@ services:
       - 50050
     environment:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_P4_SERVER_HOST=${SN_HOST}
+      - SN_P4_SERVER_HOST=$$HOSTNAME
       - SN_P4_SERVER_AUTH_TOKENS=${SN_P4_AUTH_TOKEN}
       - SN_P4_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
-      - SN_TLS_PATH_PREFIX=${SN_TLS_PATH_PREFIX-}
-      - SN_TLS_CERT=${SN_TLS_CERT:-cert.pem}
-      - SN_TLS_CHAIN=${SN_TLS_CHAIN:-chain.pem}
-      - SN_TLS_FULLCHAIN=${SN_TLS_FULLCHAIN:-fullchain.pem}
-      - SN_TLS_KEY=${SN_TLS_KEY:-privkey.pem}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
       - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
-      - type: bind
-        source: ${SN_TLS_HOST_DIR:-${PWD}/letsencrypt}
-        target: /etc/letsencrypt-host
-        read_only: true
-        bind:
-          create_host_path: false
     entrypoint:
       - /usr/local/sbin/sn-p4-server-entrypoint.sh
     labels:
@@ -651,8 +640,8 @@ services:
       - SN_CFG_CLI_TLS_INSECURE=true
       - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
       - SN_P4_CLI_ADDRESS=smartnic-p4
+      - SN_P4_CLI_TLS_INSECURE=true
       - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
-      - SN_P4_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
