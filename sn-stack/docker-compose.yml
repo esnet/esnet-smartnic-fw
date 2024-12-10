@@ -551,6 +551,11 @@ services:
       - SN_P4_SERVER_HOST=$$HOSTNAME
       - SN_P4_SERVER_AUTH_TOKENS=${SN_P4_AUTH_TOKEN}
       - SN_P4_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
+
+      # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
+      # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
+      #- GRPC_TRACE=tsi,http #all
+      #- GRPC_VERBOSITY=DEBUG
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
