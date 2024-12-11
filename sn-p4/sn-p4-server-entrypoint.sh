@@ -3,51 +3,29 @@
 set -e -o pipefail
 
 #---------------------------------------------------------------------------------------------------
-certs_dir='/etc/letsencrypt'
-certs_mnt_dir="${certs_dir}-host"
-cert="${certs_dir}/${SN_TLS_PATH_PREFIX}${SN_TLS_CERT}"
-cert_fullchain="${certs_dir}/${SN_TLS_PATH_PREFIX}${SN_TLS_FULLCHAIN}"
-key="${certs_dir}/${SN_TLS_PATH_PREFIX}${SN_TLS_KEY}"
+rm -rf /certs
+mkdir /certs
+chmod 600 /certs
 
-# Copy the server's certificate and private key from the host.
-rm -rf "${certs_dir}"
-if [[ -d "${certs_mnt_dir}" ]]; then
-    cp -r "${certs_mnt_dir}" "${certs_dir}"
-fi
-
-# Generate a self-signed certificate for the server if an external one isn't provided.
-if ! [[ -r "${cert}" ]]; then
-    fqdn=$(hostname --fqdn)
-    sans="DNS:${fqdn}"
-    sans+=",DNS:${SN_P4_SERVER_HOST}"
-    sans+=",DNS:localhost,IP:127.0.0.1"
-    sans+=",DNS:ip6-localhost,IP:::1"
-
-    mkdir -p $(dirname "${cert}")
-    openssl req \
-        -x509 -new -days 365 \
-        -nodes -newkey rsa:4096 -keyout "${key}" \
-        -subj "/CN=${SN_P4_SERVER_HOST}" \
-        -addext "subjectAltName=${sans}" \
-        -out "${cert}"
-    ln -s $(basename "${cert}") "${cert_fullchain}"
-
-    msg='Created self-signed TLS certificate.'
-else
-    msg='Using external TLS certificate.'
-fi
+openssl ecparam -name prime256v1 -genkey -out /certs/key.pem
+openssl req \
+        -x509 -new -days 3650 \
+        -nodes -key /certs/key.pem \
+        -subj "/CN=${HOSTNAME}" \
+        -addext "subjectAltName=DNS:${HOSTNAME}" \
+        -out /certs/cert.pem
 
 echo '================================================================================'
-echo "${msg}"
-openssl x509 -noout -issuer -subject -dates -ext subjectAltName -in "${cert}"
+echo "Created self-signed TLS certificate."
+openssl x509 -noout -issuer -subject -dates -ext subjectAltName -in /certs/cert.pem
 echo '================================================================================'
 
 #---------------------------------------------------------------------------------------------------
 # Build up the command line to invoke the gRPC server.
 cmd=( sn-p4-agent server )
 
-cmd+=( "--tls-cert-chain=${cert_fullchain}" )
-cmd+=( "--tls-key=${key}" )
+cmd+=( "--tls-cert-chain=/certs/cert.pem" )
+cmd+=( "--tls-key=/certs/key.pem" )
 
 # Specify the devices for the server to attach to.
 cmd+=( ${SN_P4_SERVER_DEVICES} )

@@ -507,13 +507,12 @@ services:
     restart: unless-stopped
     environment:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
+      - SN_CFG_CLI_TLS_INSECURE=true
       - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
-      - SN_CFG_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
       - SN_P4_CLI_ADDRESS=smartnic-p4
+      - SN_P4_CLI_TLS_INSECURE=true
       - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
-      - SN_P4_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -549,24 +548,17 @@ services:
       - 50050
     environment:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_P4_SERVER_HOST=${SN_HOST}
       - SN_P4_SERVER_AUTH_TOKENS=${SN_P4_AUTH_TOKEN}
       - SN_P4_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
-      - SN_TLS_PATH_PREFIX=${SN_TLS_PATH_PREFIX-}
-      - SN_TLS_CERT=${SN_TLS_CERT:-cert.pem}
-      - SN_TLS_CHAIN=${SN_TLS_CHAIN:-chain.pem}
-      - SN_TLS_FULLCHAIN=${SN_TLS_FULLCHAIN:-fullchain.pem}
-      - SN_TLS_KEY=${SN_TLS_KEY:-privkey.pem}
+
+      # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
+      # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
+      #- GRPC_TRACE=tsi,http #all
+      #- GRPC_VERBOSITY=DEBUG
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
       - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
-      - type: bind
-        source: ${SN_TLS_HOST_DIR:-${PWD}/letsencrypt}
-        target: /etc/letsencrypt-host
-        read_only: true
-        bind:
-          create_host_path: false
     entrypoint:
       - /usr/local/sbin/sn-p4-server-entrypoint.sh
     labels:
@@ -601,14 +593,8 @@ services:
       - 50100
     environment:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CFG_SERVER_HOST=${SN_HOST}
       - SN_CFG_SERVER_AUTH_TOKENS=${SN_CFG_AUTH_TOKEN}
       - SN_CFG_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
-      - SN_TLS_PATH_PREFIX=${SN_TLS_PATH_PREFIX-}
-      - SN_TLS_CERT=${SN_TLS_CERT:-cert.pem}
-      - SN_TLS_CHAIN=${SN_TLS_CHAIN:-chain.pem}
-      - SN_TLS_FULLCHAIN=${SN_TLS_FULLCHAIN:-fullchain.pem}
-      - SN_TLS_KEY=${SN_TLS_KEY:-privkey.pem}
 
       # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
       # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
@@ -618,12 +604,6 @@ services:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
       - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
-      - type: bind
-        source: ${SN_TLS_HOST_DIR:-${PWD}/letsencrypt}
-        target: /etc/letsencrypt-host
-        read_only: true
-        bind:
-          create_host_path: false
     entrypoint:
       - /usr/local/sbin/sn-cfg-server-entrypoint.sh
     labels:
@@ -657,13 +637,12 @@ services:
     privileged: true
     environment:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CLI_SLOTADDR=$FPGA_PCIE_DEV.0
       - SN_CFG_CLI_ADDRESS=smartnic-cfg
+      - SN_CFG_CLI_TLS_INSECURE=true
       - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
-      - SN_CFG_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
       - SN_P4_CLI_ADDRESS=smartnic-p4
+      - SN_P4_CLI_TLS_INSECURE=true
       - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
-      - SN_P4_CLI_TLS_HOSTNAME_OVERRIDE=${SN_HOST?}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -689,15 +668,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Import the host's TLS certificates
       - type: bind
-        source: ${SN_TLS_HOST_DIR:-${PWD}/letsencrypt}
+        source: ${SN_INGRESS_TLS_HOST_DIR:-${SN_STACK_ROOT-${PWD}}/certs}
         target: /etc/letsencrypt
         read_only: true
         bind:
           create_host_path: false
     environment:
-      - SN_TLS_PATH_PREFIX=${SN_TLS_PATH_PREFIX-}
-      - SN_TLS_FULLCHAIN=${SN_TLS_FULLCHAIN:-fullchain.pem}
-      - SN_TLS_KEY=${SN_TLS_KEY:-privkey.pem}
+      - SN_INGRESS_TLS_FULLCHAIN=${SN_INGRESS_TLS_FULLCHAIN-}
+      - SN_INGRESS_TLS_KEY=${SN_INGRESS_TLS_KEY-}
     healthcheck:
       test:
         - CMD
@@ -725,15 +703,13 @@ services:
       # Set up Configuration Discover via files for dynamic configuration changes (to detect TLS cert renewal)
       - --providers.file.directory=/etc/traefik/config.d
       - --providers.file.watch=true
-      #- --providers.debugloggeneratedtemplate=true
+      #- --providers.file.debugloggeneratedtemplate=true
 
       # Allow external connections to the reverse proxy
       - --entrypoints.smartnic_api.address=:443
       - --entrypoints.smartnic_api.http.tls=true
 
-      # Disable TLS cert verification for internal services since they're all re-using
-      # the host's cert which doesn't match the docker service's "hostname" and thus fails
-      # hostname verification.
+      # Disable TLS cert verification for internal services since they're all using self-signed certs.
       - --serversTransport.insecureSkipVerify=true
 
       # Enable prometheus metrics scrape endpoint for this daemon

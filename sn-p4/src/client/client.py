@@ -38,13 +38,24 @@ HELP_CONFIG_AUTH_TOKEN     = '{"client":{"auth":{"token":"<TOKEN>"}}}'
 
 #---------------------------------------------------------------------------------------------------
 def connect_client(address=None, port=None, auth_token=None,
-                   tls_root_certs=None, tls_hostname_override=None):
+                   tls_root_certs=None, tls_hostname_override=None, tls_insecure=False):
     if address is None:
         address = os.environ.get('SN_P4_CLI_ADDRESS', 'localhost')
     if port is None:
         port = os.environ.get('SN_P4_CLI_PORT', 50050)
     if auth_token is None:
         auth_token = os.environ.get('SN_P4_CLI_AUTH_TOKEN')
+    if tls_insecure:
+        # The current implementation of the Python SSLChannelCredentials (implemented by a cython
+        # wrapper around the gRPC core C library) does not expose the peer verification options from
+        # the grpc_ssl_credentials_create function, which would have allowed ignoring the server's
+        # certificate by simply providing a custom verification callback. Since the cython interface
+        # isn't compatible with ctypes, the grpc_ssl_credentials_create function can't be called
+        # directly. This is worked around by simply fetching the server's certificate and using it
+        # as the CA chain.
+        import ssl
+        server_certs = ssl.get_server_certificate((address, port))
+        tls_root_certs = bytes(server_certs, 'utf-8')
     if tls_root_certs is None:
         tls_root_certs = os.environ.get('SN_P4_CLI_TLS_ROOT_CERTS')
     if tls_root_certs is not None and not isinstance(tls_root_certs, bytes):
@@ -93,19 +104,8 @@ def __connect_client(client):
             f'as {HELP_CONFIG_AUTH_TOKEN}.')
 
     # Setup the root certificates needed for verifying the server.
-    if client.args.tls_insecure:
-        # The current implementation of the Python SSLChannelCredentials (implemented by a cython
-        # wrapper around the gRPC core C library) does not expose the peer verification options from
-        # the grpc_ssl_credentials_create function, which would have allowed ignoring the server's
-        # certificate by simply providing a custom verification callback. Since the cython interface
-        # isn't compatible with ctypes, the grpc_ssl_credentials_create function can't be called
-        # directly. This is worked around by simply fetching the server's certificate and using it
-        # as the CA chain.
-        import ssl
-        server_certs = ssl.get_server_certificate((client.args.address, client.args.port))
-        tls_root_certs = bytes(server_certs, 'utf-8')
-    else:
-        tls_root_certs = client.args.tls_root_certs
+    tls_root_certs = client.args.tls_root_certs
+    if not client.args.tls_insecure:
         if tls_root_certs is None:
             tls_root_certs = config_tls.get('root-certs')
         if tls_root_certs is not None:
@@ -114,7 +114,7 @@ def __connect_client(client):
     # Create the RPC proxy.
     client.stub = connect_client(
         client.args.address, client.args.port, auth_token,
-        tls_root_certs, client.args.tls_hostname_override)
+        tls_root_certs, client.args.tls_hostname_override, client.args.tls_insecure)
 
 #---------------------------------------------------------------------------------------------------
 @click.group(
