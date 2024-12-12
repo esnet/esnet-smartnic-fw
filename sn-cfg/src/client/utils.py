@@ -116,13 +116,6 @@ class MixedInt(click.ParamType):
     name = 'mixed_int' # Needed for auto-generated help (or implement get_metavar method instead).
 
     def convert(self, value, param, ctx):
-        if isinstance(value, int):
-            return value
-
-        if not isinstance(value, str):
-            msg = gettext.gettext(f'"{value}" is not a known integer format.')
-            self.fail(msg, param, ctx)
-
         try:
             return int(value)
         except ValueError:
