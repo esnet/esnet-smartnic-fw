@@ -25,8 +25,9 @@ enum ErrorCode {
     EC_MISSING_HOST_CONFIG = 301;
     EC_MISSING_HOST_DMA_CONFIG = 302;
     EC_UNSUPPORTED_HOST_ID = 303;
-    EC_FAILED_GET_DMA_QUEUES = 304;
-    EC_FAILED_SET_DMA_QUEUES = 305;
+    EC_UNSUPPORTED_HOST_FUNCTION = 304;
+    EC_FAILED_GET_HOST_FUNCTION_DMA_QUEUES = 305;
+    EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES = 306;
 
     // Port configuration error codes.
     EC_INVALID_PORT_ID = 400;
@@ -241,9 +242,26 @@ message DeviceStatusResponse {
 }
 
 //--------------------------------------------------------------------------------------------------
+enum HostFunctionType {
+    HOST_FUNC_UNKNOWN = 0;
+    HOST_FUNC_PHYSICAL = 1;
+    HOST_FUNC_VIRTUAL = 2;
+}
+
+message HostFunctionId {
+    HostFunctionType ftype = 1;
+    uint32 index = 2;
+}
+
+message HostFunctionDmaConfig {
+    HostFunctionId func_id = 1;
+    uint32 base_queue = 2;
+    uint32 num_queues = 3;
+}
+
 message HostDmaConfig {
-    uint32 base_queue = 1;
-    uint32 num_queues = 2;
+    repeated HostFunctionDmaConfig functions = 1;
+    bool reset = 2; // Reset all function DMA configuration prior to applying new settings (if any).
 }
 
 message HostConfig {

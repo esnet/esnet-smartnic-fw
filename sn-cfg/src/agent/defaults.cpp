@@ -37,19 +37,12 @@ static ErrorCode set_defaults_one_to_one(const Device& dev) {
 
     // Default the host interfaces.
     for (unsigned int index = 0; index < dev.nhosts; ++index) {
-        volatile typeof(dev.bar2->qdma_func0)* qdma;
-        switch (index) {
-        case 0: qdma = &dev.bar2->qdma_func0; break;
-        case 1: qdma = &dev.bar2->qdma_func1; break;
-        default:
-            return ErrorCode::EC_UNSUPPORTED_HOST_ID;
+#define NUM_QUEUES 1
+        if (!qdma_function_set_queues(dev.bar2, index, qdma_function_PF,
+                                      index * NUM_QUEUES, NUM_QUEUES)) {
+            return ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
         }
-
-        #define N_QUEUES 1
-        if (!qdma_set_queues(qdma, index * N_QUEUES, N_QUEUES)) {
-            return ErrorCode::EC_FAILED_SET_DMA_QUEUES;
-        }
-        #undef N_QUEUES
+#undef NUM_QUEUES
     }
 
     // Enable the ports.

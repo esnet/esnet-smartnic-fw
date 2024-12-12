@@ -23,8 +23,9 @@ ERROR_MAP = {
     ErrorCode.EC_MISSING_HOST_CONFIG: 'missing-host-config',
     ErrorCode.EC_MISSING_HOST_DMA_CONFIG: 'missing-host-dma-config',
     ErrorCode.EC_UNSUPPORTED_HOST_ID: 'unsupported-host-id',
-    ErrorCode.EC_FAILED_GET_DMA_QUEUES: 'failed-get-dma-queues',
-    ErrorCode.EC_FAILED_SET_DMA_QUEUES: 'failed-set-dma-queues',
+    ErrorCode.EC_UNSUPPORTED_HOST_FUNCTION: 'unsupported-host-function',
+    ErrorCode.EC_FAILED_GET_HOST_FUNCTION_DMA_QUEUES: 'failed-get-host-function-dma-queues',
+    ErrorCode.EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES: 'failed-set-host-function-dma-queues',
 
     # Port configuration error codes.
     ErrorCode.EC_INVALID_PORT_ID: 'invalid-port-id',
