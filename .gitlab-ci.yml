@@ -207,14 +207,13 @@ review:
       # Target nodes with au280 cards
       - AAP_LIMIT:
           - ftap-ht1.es.net
-          - ftap-ht2.es.net
           - ftap-ht3.es.net
           - ftap-ht4.es.net
         SYSTEM_HW_BOARD: au280
       # Target nodes with au55c cards
-      #- AAP_LIMIT:
-      #    - foo-test.es.net
-      #  SYSTEM_HW_BOARD: au55c
+      - AAP_LIMIT:
+          - ftap-ht2.es.net
+        SYSTEM_HW_BOARD: au55c
   variables:
     # host, hostgroup or list of hosts
     # AAP_LIMIT: # from parallel matrix
