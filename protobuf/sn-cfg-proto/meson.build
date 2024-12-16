@@ -1,6 +1,6 @@
 #---------------------------------------------------------------------------------------------------
 base_name = 'sn_cfg'
-v1_proto_file = base_name + '_v1.proto'
+v2_proto_file = base_name + '_v2.proto'
 py_pkg_name = base_name + '_proto'
 py_pkg_ver = '0.1.0'
 py_pkg_stem = py_pkg_name + '-' + py_pkg_ver
@@ -9,7 +9,7 @@ py_pkg_desc = 'SmartNIC Configuration'
 #---------------------------------------------------------------------------------------------------
 # C++ generetor.
 sn_cfg_proto_cpp = declare_dependency(
-    sources: protoc_cpp_gen.process(v1_proto_file),
+    sources: protoc_cpp_gen.process(v2_proto_file),
     dependencies: [
         libgrpcpp,
         libprotobuf,
@@ -23,8 +23,8 @@ custom_target(
     py_pkg_name,
     input: [
         src_dir + '__init__.py',
-        src_dir + 'v1/__init__.py',
-        protoc_py_gen.process(v1_proto_file),
+        src_dir + 'v2/__init__.py',
+        protoc_py_gen.process(v2_proto_file),
     ],
     output: [
         py_pkg_stem + '-py3-none-any.whl',

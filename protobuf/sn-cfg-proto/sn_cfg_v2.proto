@@ -1,7 +1,7 @@
 //--------------------------------------------------------------------------------------------------
 syntax = "proto3";
 
-package sn_cfg.v1;
+package sn_cfg.v2;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
