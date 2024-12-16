@@ -7,6 +7,7 @@
 #include "stats.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include "unused.h"
 
 //--------------------------------------------------------------------------------------------------
@@ -270,36 +271,91 @@ struct switch_stats_block_info {
     uintptr_t offset;
 };
 
-#define SWITCH_STATS_BLOCK_INFO(_name) \
+#define SWITCH_STATS_BLOCK_INFO(_block, _prefix, _name)  \
 { \
-    .name = #_name, \
-    .offset = offsetof(struct esnet_smartnic_bar2, _name), \
+    .name = _prefix #_name, \
+    .offset = offsetof(struct _block, _name), \
 }
 
-static const struct switch_stats_block_info switch_stats_block_info[] = {
-    SWITCH_STATS_BLOCK_INFO(probe_from_cmac_0),
-    SWITCH_STATS_BLOCK_INFO(drops_ovfl_from_cmac_0),
-    SWITCH_STATS_BLOCK_INFO(drops_err_from_cmac_0),
-    SWITCH_STATS_BLOCK_INFO(probe_from_cmac_1),
-    SWITCH_STATS_BLOCK_INFO(drops_ovfl_from_cmac_1),
-    SWITCH_STATS_BLOCK_INFO(drops_err_from_cmac_1),
-    SWITCH_STATS_BLOCK_INFO(probe_from_host_0),
-    SWITCH_STATS_BLOCK_INFO(probe_from_host_1),
-    SWITCH_STATS_BLOCK_INFO(probe_core_to_app0),
-    SWITCH_STATS_BLOCK_INFO(probe_core_to_app1),
-    SWITCH_STATS_BLOCK_INFO(probe_app0_to_core),
-    SWITCH_STATS_BLOCK_INFO(probe_app1_to_core),
-    SWITCH_STATS_BLOCK_INFO(probe_to_cmac_0),
-    SWITCH_STATS_BLOCK_INFO(drops_ovfl_to_cmac_0),
-    SWITCH_STATS_BLOCK_INFO(probe_to_cmac_1),
-    SWITCH_STATS_BLOCK_INFO(drops_ovfl_to_cmac_1),
-    SWITCH_STATS_BLOCK_INFO(probe_to_host_0),
-    SWITCH_STATS_BLOCK_INFO(drops_ovfl_to_host_0),
-    SWITCH_STATS_BLOCK_INFO(probe_to_host_1),
-    SWITCH_STATS_BLOCK_INFO(drops_ovfl_to_host_1),
-    SWITCH_STATS_BLOCK_INFO(probe_to_bypass),
-    SWITCH_STATS_BLOCK_INFO(drops_from_igr_sw),
-    SWITCH_STATS_BLOCK_INFO(drops_from_bypass),
+#define SWITCH_STATS_TOP_INFO(_name) SWITCH_STATS_BLOCK_INFO(esnet_smartnic_bar2, "", _name)
+static const struct switch_stats_block_info switch_stats_top_info[] = {
+    SWITCH_STATS_TOP_INFO(probe_core_to_app0),
+    SWITCH_STATS_TOP_INFO(probe_core_to_app1),
+    SWITCH_STATS_TOP_INFO(probe_app0_to_core),
+    SWITCH_STATS_TOP_INFO(probe_app1_to_core),
+
+    SWITCH_STATS_TOP_INFO(probe_from_cmac_0),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_from_cmac_0),
+    SWITCH_STATS_TOP_INFO(drops_err_from_cmac_0),
+
+    SWITCH_STATS_TOP_INFO(probe_from_cmac_1),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_from_cmac_1),
+    SWITCH_STATS_TOP_INFO(drops_err_from_cmac_1),
+
+    SWITCH_STATS_TOP_INFO(probe_to_cmac_0),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_to_cmac_0),
+
+    SWITCH_STATS_TOP_INFO(probe_to_cmac_1),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_to_cmac_1),
+
+    SWITCH_STATS_TOP_INFO(probe_from_host_0),
+    SWITCH_STATS_TOP_INFO(probe_from_host_1),
+
+    SWITCH_STATS_TOP_INFO(probe_to_host_0),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_to_host_0),
+
+    SWITCH_STATS_TOP_INFO(probe_to_host_1),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_to_host_1),
+
+    SWITCH_STATS_TOP_INFO(probe_to_bypass_0),
+    SWITCH_STATS_TOP_INFO(drops_to_bypass_0),
+    SWITCH_STATS_TOP_INFO(drops_from_bypass_0),
+
+    SWITCH_STATS_TOP_INFO(probe_to_bypass_1),
+    SWITCH_STATS_TOP_INFO(drops_to_bypass_1),
+    SWITCH_STATS_TOP_INFO(drops_from_bypass_1),
+
+    SWITCH_STATS_TOP_INFO(probe_from_pf0),
+    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf0),
+    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf1),
+    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf2),
+
+    SWITCH_STATS_TOP_INFO(probe_to_pf0),
+    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf0),
+    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf1),
+    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf2),
+
+    SWITCH_STATS_TOP_INFO(probe_from_pf1),
+    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf0),
+    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf1),
+    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf2),
+
+    SWITCH_STATS_TOP_INFO(probe_to_pf1),
+    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf0),
+    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf1),
+    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf2),
+
+    SWITCH_STATS_TOP_INFO(drops_q_range_fail_0),
+    SWITCH_STATS_TOP_INFO(drops_q_range_fail_1),
+};
+
+#define SWITCH_STATS_P4_PROC_INFO(_prefix, _name) \
+    SWITCH_STATS_BLOCK_INFO(p4_proc_decoder, "p4_proc_" #_prefix "_", _name)
+
+static const struct switch_stats_block_info switch_stats_p4_proc_igr_info[] = {
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_0),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_1),
+
+    SWITCH_STATS_P4_PROC_INFO(igr, probe_to_pyld_fifo),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_to_pyld_fifo),
+};
+
+static const struct switch_stats_block_info switch_stats_p4_proc_egr_info[] = {
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_0),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_1),
+
+    SWITCH_STATS_P4_PROC_INFO(egr, probe_to_pyld_fifo),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_to_pyld_fifo),
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -345,25 +401,78 @@ static void switch_stats_read_metric(const struct stats_block_spec* bspec,
 struct stats_zone* switch_stats_zone_alloc(struct stats_domain* domain,
                                            volatile struct esnet_smartnic_bar2* bar2,
                                            const char* name) {
-    struct stats_block_spec bspecs[ARRAY_SIZE(switch_stats_block_info)] = {0};
-    for (unsigned int n = 0; n < ARRAY_SIZE(bspecs); ++n) {
-        const struct switch_stats_block_info* binfo = &switch_stats_block_info[n];
-        struct stats_block_spec* bspec = &bspecs[n];
+    struct switch_stats_block_group {
+        const struct switch_stats_block_info* info;
+        size_t ninfo;
+        volatile void* base;
+        bool is_proc;
+        bool is_valid;
+    };
+    struct switch_stats_block_group groups[] = {
+        {
+            .info = switch_stats_top_info,
+            .ninfo = ARRAY_SIZE(switch_stats_top_info),
+            .base = bar2,
+        },
+        {
+            .info = switch_stats_p4_proc_igr_info,
+            .ninfo = ARRAY_SIZE(switch_stats_p4_proc_igr_info),
+            .base = &bar2->p4_proc_igr,
+            .is_proc = true,
+        },
+        {
+            .info = switch_stats_p4_proc_egr_info,
+            .ninfo = ARRAY_SIZE(switch_stats_p4_proc_egr_info),
+            .base = &bar2->p4_proc_egr,
+            .is_proc = true,
+        },
+    };
 
-        bspec->name = binfo->name;
-        bspec->metrics = switch_stats_metrics;
-        bspec->nmetrics = ARRAY_SIZE(switch_stats_metrics);
-        bspec->io.base = (volatile void*)bar2 + binfo->offset;
-        bspec->attach_metrics = switch_stats_attach_metrics;
-        bspec->latch_metrics = switch_stats_latch_metrics;
-        bspec->release_metrics = switch_stats_release_metrics;
-        bspec->read_metric = switch_stats_read_metric;
+    size_t nblocks = 0;
+    for (struct switch_stats_block_group* grp = groups;
+         grp < &groups[ARRAY_SIZE(groups)];
+         ++grp) {
+        if (grp->is_proc) {
+            volatile struct p4_proc_decoder* dec = grp->base;
+            if (dec->p4_proc.status == UINT32_MAX) {
+                // Don't include probes if the P4 processor is not implemented.
+                continue;
+            }
+        }
+
+        nblocks += grp->ninfo;
+        grp->is_valid = true;
+    }
+
+    struct stats_block_spec bspecs[nblocks];
+    memset(bspecs, 0, sizeof(bspecs[0]) * nblocks);
+
+    struct stats_block_spec* bspec = bspecs;
+    for (const struct switch_stats_block_group* grp = groups;
+         grp < &groups[ARRAY_SIZE(groups)];
+         ++grp) {
+        if (!grp->is_valid) {
+            continue;
+        }
+
+        for (const struct switch_stats_block_info* info = grp->info;
+             info < &grp->info[grp->ninfo];
+             ++info, ++bspec) {
+            bspec->name = info->name;
+            bspec->metrics = switch_stats_metrics;
+            bspec->nmetrics = ARRAY_SIZE(switch_stats_metrics);
+            bspec->io.base = grp->base + info->offset;
+            bspec->attach_metrics = switch_stats_attach_metrics;
+            bspec->latch_metrics = switch_stats_latch_metrics;
+            bspec->release_metrics = switch_stats_release_metrics;
+            bspec->read_metric = switch_stats_read_metric;
+        }
     }
 
     struct stats_zone_spec zspec = {
         .name = name,
         .blocks = bspecs,
-        .nblocks = ARRAY_SIZE(bspecs),
+        .nblocks = nblocks,
     };
     return stats_zone_alloc(domain, &zspec);
 }
