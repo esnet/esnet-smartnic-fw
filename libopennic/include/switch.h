@@ -10,53 +10,55 @@ extern "C" {
 #endif
 
 //--------------------------------------------------------------------------------------------------
-enum switch_interface_type {
-    switch_interface_type_UNKNOWN,
-    switch_interface_type_PORT,
-    switch_interface_type_HOST,
-};
-
-struct switch_interface_id {
-    enum switch_interface_type type;
-    unsigned int index;
+enum switch_interface {
+    switch_interface_UNKNOWN,
+    switch_interface_PHYSICAL,
+    switch_interface_TEST,
 };
 
 //--------------------------------------------------------------------------------------------------
-enum switch_processor_type {
-    switch_processor_type_UNKNOWN,
-    switch_processor_type_BYPASS,
-    switch_processor_type_DROP,
-    switch_processor_type_APP,
-};
-
-struct switch_processor_id {
-    enum switch_processor_type type;
-    unsigned int index;
+enum switch_destination {
+    switch_destination_UNKNOWN,
+    switch_destination_BYPASS,
+    switch_destination_DROP,
+    switch_destination_APP,
 };
 
 //--------------------------------------------------------------------------------------------------
-bool switch_get_ingress_source(volatile struct smartnic_block* blk,
-                               const struct switch_interface_id* from_intf,
-                               struct switch_interface_id* to_intf);
-bool switch_set_ingress_source(volatile struct smartnic_block* blk,
-                               const struct switch_interface_id* from_intf,
-                               const struct switch_interface_id* to_intf);
+#define SWITCH_NUM_PORTS 2
+struct switch_ingress_selector {
+    unsigned int index;
+    enum switch_interface intf;
+    enum switch_destination dest;
+};
 
-bool switch_get_ingress_connection(volatile struct smartnic_block* blk,
-                                   const struct switch_interface_id* from_intf,
-                                   struct switch_processor_id* to_proc);
-bool switch_set_ingress_connection(volatile struct smartnic_block* blk,
-                                   const struct switch_interface_id* from_intf,
-                                   const struct switch_processor_id* to_proc);
+struct switch_egress_selector {
+    unsigned int index;
+    enum switch_interface intf;
+};
 
-bool switch_get_egress_connection(volatile struct smartnic_block* blk,
-                                  const struct switch_processor_id* on_proc,
-                                  const struct switch_interface_id* from_intf,
-                                  struct switch_interface_id* to_intf);
-bool switch_set_egress_connection(volatile struct smartnic_block* blk,
-                                  const struct switch_processor_id* on_proc,
-                                  const struct switch_interface_id* from_intf,
-                                  const struct switch_interface_id* to_intf);
+//--------------------------------------------------------------------------------------------------
+enum switch_bypass_mode {
+    switch_bypass_mode_UNKNOWN,
+    switch_bypass_mode_STRAIGHT,
+    switch_bypass_mode_SWAP,
+};
+
+//--------------------------------------------------------------------------------------------------
+bool switch_get_ingress_selector(volatile struct smartnic_block* blk,
+                                 struct switch_ingress_selector* sel);
+bool switch_set_ingress_selector(volatile struct smartnic_block* blk,
+                                 const struct switch_ingress_selector* sel);
+
+bool switch_get_egress_selector(volatile struct smartnic_block* blk,
+                                struct switch_egress_selector* sel);
+bool switch_set_egress_selector(volatile struct smartnic_block* blk,
+                                const struct switch_egress_selector* sel);
+
+bool switch_get_bypass_mode(volatile struct smartnic_block* blk,
+                            enum switch_bypass_mode* mode);
+bool switch_set_bypass_mode(volatile struct smartnic_block* blk,
+                            enum switch_bypass_mode mode);
 
 void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk);
 

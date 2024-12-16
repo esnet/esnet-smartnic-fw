@@ -10,29 +10,23 @@
 #include "unused.h"
 
 //--------------------------------------------------------------------------------------------------
-static bool switch_interface_id_from_igr_sw_tid(struct switch_interface_id* intf,
-                                                const unsigned int tid) {
-    switch (tid) {
-    case SMARTNIC_IGR_SW_TID_VALUE_CMAC_0:
-        intf->type = switch_interface_type_PORT;
-        intf->index = 0;
+static bool switch_port_to_mux_tid(unsigned int index,
+                                   enum switch_interface intf,
+                                   unsigned int* tid) {
+    if (index >= SWITCH_NUM_PORTS) {
+        return false;
+    }
+
+    switch(intf) {
+    case switch_interface_PHYSICAL:
+        *tid = index;
         break;
 
-    case SMARTNIC_IGR_SW_TID_VALUE_CMAC_1:
-        intf->type = switch_interface_type_PORT;
-        intf->index = 1;
+    case switch_interface_TEST:
+        *tid = SWITCH_NUM_PORTS + index;
         break;
 
-    case SMARTNIC_IGR_SW_TID_VALUE_HOST_0:
-        intf->type = switch_interface_type_HOST;
-        intf->index = 0;
-        break;
-
-    case SMARTNIC_IGR_SW_TID_VALUE_HOST_1:
-        intf->type = switch_interface_type_HOST;
-        intf->index = 1;
-        break;
-
+    case switch_interface_UNKNOWN:
     default:
         return false;
     }
@@ -41,540 +35,219 @@ static bool switch_interface_id_from_igr_sw_tid(struct switch_interface_id* intf
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool switch_interface_id_to_igr_sw_tid(const struct switch_interface_id* intf,
-                                              unsigned int* tid) {
-    switch(intf->type) {
-    case switch_interface_type_PORT:
-        switch (intf->index) {
-        case 0: *tid = SMARTNIC_IGR_SW_TID_VALUE_CMAC_0; break;
-        case 1: *tid = SMARTNIC_IGR_SW_TID_VALUE_CMAC_1; break;
-        default: return false;
+static bool switch_destination_from_mux_sel(enum switch_destination* dest, unsigned int value) {
+    switch (value) {
+#define CASE(_name) { \
+        case SMARTNIC_SMARTNIC_MUX_OUT_SEL_VALUE_##_name: \
+            *dest = switch_destination_##_name; \
+            break; \
         }
-        break;
 
-    case switch_interface_type_HOST:
-        switch (intf->index) {
-        case 0: *tid = SMARTNIC_IGR_SW_TID_VALUE_HOST_0; break;
-        case 1: *tid = SMARTNIC_IGR_SW_TID_VALUE_HOST_1; break;
-        default: return false;
-        }
-        break;
+    CASE(BYPASS);
+    CASE(DROP);
+    CASE(APP);
 
-    case switch_interface_type_UNKNOWN:
     default:
         return false;
+
+#undef CASE
     }
 
     return true;
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool switch_processor_id_from_igr_sw_tdest(struct switch_processor_id* proc,
-                                                  const unsigned int tdest) {
-    switch (tdest) {
-    case SMARTNIC_IGR_SW_TDEST_VALUE_APP_BYPASS:
-        proc->type = switch_processor_type_BYPASS;
-        proc->index = 0;
-        break;
+static bool switch_destination_to_mux_sel(enum switch_destination dest, unsigned int* value) {
+    switch (dest) {
+#define CASE(_name) { \
+        case switch_destination_##_name: \
+            *value = SMARTNIC_SMARTNIC_MUX_OUT_SEL_VALUE_##_name; \
+            break; \
+        }
 
-    case SMARTNIC_IGR_SW_TDEST_VALUE_DROP:
-        proc->type = switch_processor_type_DROP;
-        proc->index = 0;
-        break;
+    CASE(BYPASS);
+    CASE(DROP);
+    CASE(APP);
 
-    case SMARTNIC_IGR_SW_TDEST_VALUE_APP_0:
-        proc->type = switch_processor_type_APP;
-        proc->index = 0;
-        break;
-
-    case SMARTNIC_IGR_SW_TDEST_VALUE_APP_1:
-        proc->type = switch_processor_type_APP;
-        proc->index = 1;
-        break;
-
+    case switch_destination_UNKNOWN:
     default:
         return false;
+
+#undef CASE
     }
 
     return true;
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool switch_processor_id_to_igr_sw_tdest(const struct switch_processor_id* proc,
-                                                unsigned int* tdest) {
-    switch (proc->type) {
-    case switch_processor_type_BYPASS:
-        switch (proc->index) {
-        case 0: *tdest = SMARTNIC_IGR_SW_TDEST_VALUE_APP_BYPASS; break;
-        default: return false;
-        }
-        break;
+static bool __switch_get_ingress_selector(volatile struct smartnic_block* blk,
+                                          struct switch_ingress_selector* sel) {
+    unsigned int tid;
+    if (!switch_port_to_mux_tid(sel->index, sel->intf, &tid) ||
+        tid >= ARRAY_SIZE(blk->smartnic_mux_out_sel)) {
+        return false;
+    }
 
-    case switch_processor_type_DROP:
-        switch (proc->index) {
-        case 0: *tdest = SMARTNIC_IGR_SW_TDEST_VALUE_DROP; break;
-        default: return false;
-        }
-        break;
+    union smartnic_smartnic_mux_out_sel mux = {._v = blk->smartnic_mux_out_sel[tid]._v};
+    return switch_destination_from_mux_sel(&sel->dest, mux.value);
+}
 
-    case switch_processor_type_APP:
-        switch (proc->index) {
-        case 0: *tdest = SMARTNIC_IGR_SW_TDEST_VALUE_APP_0; break;
-        case 1: *tdest = SMARTNIC_IGR_SW_TDEST_VALUE_APP_1; break;
-        default: return false;
-        }
-        break;
+bool switch_get_ingress_selector(volatile struct smartnic_block* blk,
+                                 struct switch_ingress_selector* sel) {
+    sel->intf = switch_interface_TEST;
+    if (!__switch_get_ingress_selector(blk, sel)) {
+        return false;
+    }
 
-    case switch_processor_type_UNKNOWN:
+    if (sel->dest != switch_destination_DROP) {
+        return true;
+    }
+
+    sel->intf = switch_interface_PHYSICAL;
+    return __switch_get_ingress_selector(blk, sel);
+}
+
+//--------------------------------------------------------------------------------------------------
+static bool __switch_set_ingress_selector(volatile struct smartnic_block* blk,
+                                          const struct switch_ingress_selector* sel) {
+    unsigned int tid;
+    unsigned int value;
+    if (!switch_port_to_mux_tid(sel->index, sel->intf, &tid) ||
+        !switch_destination_to_mux_sel(sel->dest, &value) ||
+        tid >= ARRAY_SIZE(blk->smartnic_mux_out_sel)) {
+        return false;
+    }
+
+    union smartnic_smartnic_mux_out_sel mux = {._v = blk->smartnic_mux_out_sel[tid]._v};
+    mux.value = value;
+    blk->smartnic_mux_out_sel[tid]._v = mux._v;
+    barrier();
+
+    return true;
+}
+
+bool switch_set_ingress_selector(volatile struct smartnic_block* blk,
+                                 const struct switch_ingress_selector* sel) {
+    struct switch_ingress_selector ps = *sel;
+    ps.intf = switch_interface_PHYSICAL;
+    if (ps.intf != sel->intf) {
+        ps.dest = switch_destination_DROP;
+    }
+
+    struct switch_ingress_selector ts = *sel;
+    ts.intf = switch_interface_TEST;
+    if (ts.intf != sel->intf) {
+        ts.dest = switch_destination_DROP;
+    }
+
+    return __switch_set_ingress_selector(blk, &ps) && __switch_set_ingress_selector(blk, &ts);
+}
+
+//--------------------------------------------------------------------------------------------------
+bool switch_get_egress_selector(volatile struct smartnic_block* blk,
+                                struct switch_egress_selector* sel) {
+    union smartnic_smartnic_demux_out_sel demux = {._v = blk->smartnic_demux_out_sel._v};
+    switch (sel->index) {
+#define CASE(_idx) \
+    case _idx: { \
+        sel->intf = demux.port##_idx ? switch_interface_TEST : switch_interface_PHYSICAL; \
+        break; \
+    }
+
+    CASE(0);
+    CASE(1);
     default:
         return false;
+
+#undef CASE
     }
 
     return true;
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool switch_interface_id_from_bypass_tdest(struct switch_interface_id* intf,
-                                                  const unsigned int tdest) {
-    switch (tdest) {
-    case SMARTNIC_BYPASS_TDEST_VALUE_CMAC_0:
-        intf->type = switch_interface_type_PORT;
-        intf->index = 0;
-        break;
+bool switch_set_egress_selector(volatile struct smartnic_block* blk,
+                                const struct switch_egress_selector* sel) {
+    unsigned int value;
+    switch (sel->intf) {
+    case switch_interface_PHYSICAL: value = 0; break;
+    case switch_interface_TEST: value = 1; break;
+    default: return false;
+    }
 
-    case SMARTNIC_BYPASS_TDEST_VALUE_CMAC_1:
-        intf->type = switch_interface_type_PORT;
-        intf->index = 1;
-        break;
+    union smartnic_smartnic_demux_out_sel demux = {._v = blk->smartnic_demux_out_sel._v};
+    switch (sel->index) {
+#define CASE(_idx) case _idx: demux.port##_idx = value; break
 
-    case SMARTNIC_BYPASS_TDEST_VALUE_HOST_0:
-        intf->type = switch_interface_type_HOST;
-        intf->index = 0;
-        break;
-
-    case SMARTNIC_BYPASS_TDEST_VALUE_HOST_1:
-        intf->type = switch_interface_type_HOST;
-        intf->index = 1;
-        break;
-
+    CASE(0);
+    CASE(1);
     default:
         return false;
+
+#undef CASE
     }
+
+    blk->smartnic_demux_out_sel._v = demux._v;
+    barrier();
 
     return true;
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool switch_interface_id_to_bypass_tdest(const struct switch_interface_id* intf,
-                                                unsigned int* tdest) {
-    switch(intf->type) {
-    case switch_interface_type_PORT:
-        switch (intf->index) {
-        case 0: *tdest = SMARTNIC_BYPASS_TDEST_VALUE_CMAC_0; break;
-        case 1: *tdest = SMARTNIC_BYPASS_TDEST_VALUE_CMAC_1; break;
-        default: return false;
-        }
-        break;
-
-    case switch_interface_type_HOST:
-        switch (intf->index) {
-        case 0: *tdest = SMARTNIC_BYPASS_TDEST_VALUE_HOST_0; break;
-        case 1: *tdest = SMARTNIC_BYPASS_TDEST_VALUE_HOST_1; break;
-        default: return false;
-        }
-        break;
-
-    case switch_interface_type_UNKNOWN:
-    default:
-        return false;
-    }
-
+bool switch_get_bypass_mode(volatile struct smartnic_block* blk,
+                            enum switch_bypass_mode* mode) {
+    union smartnic_bypass_config config = {._v = blk->bypass_config._v};
+    *mode = config.swap_paths ? switch_bypass_mode_SWAP : switch_bypass_mode_STRAIGHT;
     return true;
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool switch_interface_id_from_app_0_tdest(struct switch_interface_id* intf,
-                                                 const unsigned int tdest) {
-    switch (tdest) {
-    case SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_0:
-        intf->type = switch_interface_type_PORT;
-        intf->index = 0;
+bool switch_set_bypass_mode(volatile struct smartnic_block* blk,
+                            enum switch_bypass_mode mode) {
+    union smartnic_bypass_config config = {._v = blk->bypass_config._v};
+    switch (mode) {
+    case switch_bypass_mode_STRAIGHT:
+        config.swap_paths = 0;
         break;
 
-    case SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_1:
-        intf->type = switch_interface_type_PORT;
-        intf->index = 1;
-        break;
-
-    case SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_0:
-        intf->type = switch_interface_type_HOST;
-        intf->index = 0;
-        break;
-
-    case SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_1:
-        intf->type = switch_interface_type_HOST;
-        intf->index = 1;
-        break;
-
-    default:
-        return false;
-    }
-
-    return true;
-}
-
-//--------------------------------------------------------------------------------------------------
-static bool switch_interface_id_to_app_0_tdest(const struct switch_interface_id* intf,
-                                               unsigned int* tdest) {
-    switch(intf->type) {
-    case switch_interface_type_PORT:
-        switch (intf->index) {
-        case 0: *tdest = SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_0; break;
-        case 1: *tdest = SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_1; break;
-        default: return false;
-        }
-        break;
-
-    case switch_interface_type_HOST:
-        switch (intf->index) {
-        case 0: *tdest = SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_0; break;
-        case 1: *tdest = SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_1; break;
-        default: return false;
-        }
-        break;
-
-    case switch_interface_type_UNKNOWN:
-    default:
-        return false;
-    }
-
-    return true;
-}
-
-//--------------------------------------------------------------------------------------------------
-static bool switch_interface_id_from_app_1_tdest(struct switch_interface_id* intf,
-                                                 const unsigned int tdest) {
-    switch (tdest) {
-    case SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_0:
-        intf->type = switch_interface_type_PORT;
-        intf->index = 0;
-        break;
-
-    case SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_1:
-        intf->type = switch_interface_type_PORT;
-        intf->index = 1;
-        break;
-
-    case SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_0:
-        intf->type = switch_interface_type_HOST;
-        intf->index = 0;
-        break;
-
-    case SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_1:
-        intf->type = switch_interface_type_HOST;
-        intf->index = 1;
+    case switch_bypass_mode_SWAP:
+        config.swap_paths = 1;
         break;
 
     default:
         return false;
     }
 
-    return true;
-}
-
-//--------------------------------------------------------------------------------------------------
-static bool switch_interface_id_to_app_1_tdest(const struct switch_interface_id* intf,
-                                               unsigned int* tdest) {
-    switch(intf->type) {
-    case switch_interface_type_PORT:
-        switch (intf->index) {
-        case 0: *tdest = SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_0; break;
-        case 1: *tdest = SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_1; break;
-        default: return false;
-        }
-        break;
-
-    case switch_interface_type_HOST:
-        switch (intf->index) {
-        case 0: *tdest = SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_0; break;
-        case 1: *tdest = SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_1; break;
-        default: return false;
-        }
-        break;
-
-    case switch_interface_type_UNKNOWN:
-    default:
-        return false;
-    }
-
-    return true;
-}
-
-//--------------------------------------------------------------------------------------------------
-bool switch_get_ingress_source(volatile struct smartnic_block* blk,
-                               const struct switch_interface_id* from_intf,
-                               struct switch_interface_id* to_intf) {
-    unsigned int from_tid;
-    if (!switch_interface_id_to_igr_sw_tid(from_intf, &from_tid) ||
-        from_tid >= ARRAY_SIZE(blk->igr_sw_tid)) {
-        return false;
-    }
-
-    union smartnic_igr_sw_tid tid = {._v = blk->igr_sw_tid[from_tid]._v};
-    return switch_interface_id_from_igr_sw_tid(to_intf, tid.value);
-}
-
-//--------------------------------------------------------------------------------------------------
-bool switch_set_ingress_source(volatile struct smartnic_block* blk,
-                               const struct switch_interface_id* from_intf,
-                               const struct switch_interface_id* to_intf) {
-    unsigned int from_tid;
-    unsigned int to_tid;
-    if (!switch_interface_id_to_igr_sw_tid(from_intf, &from_tid) ||
-        !switch_interface_id_to_igr_sw_tid(to_intf, &to_tid) ||
-        from_tid >= ARRAY_SIZE(blk->igr_sw_tid)) {
-        return false;
-    }
-
-    union smartnic_igr_sw_tid tid = {._v = blk->igr_sw_tid[from_tid]._v};
-    tid.value = to_tid;
-    blk->igr_sw_tid[from_tid]._v = tid._v;
-
-    return true;
-}
-
-//--------------------------------------------------------------------------------------------------
-bool switch_get_ingress_connection(volatile struct smartnic_block* blk,
-                                   const struct switch_interface_id* from_intf,
-                                   struct switch_processor_id* to_proc) {
-    unsigned int from_tid;
-    if (!switch_interface_id_to_igr_sw_tid(from_intf, &from_tid) ||
-        from_tid >= ARRAY_SIZE(blk->igr_sw_tdest)) {
-        return false;
-    }
-
-    union smartnic_igr_sw_tdest tdest = {._v = blk->igr_sw_tdest[from_tid]._v};
-    return switch_processor_id_from_igr_sw_tdest(to_proc, tdest.value);
-}
-
-//--------------------------------------------------------------------------------------------------
-bool switch_set_ingress_connection(volatile struct smartnic_block* blk,
-                                   const struct switch_interface_id* from_intf,
-                                   const struct switch_processor_id* to_proc) {
-    unsigned int from_tid;
-    unsigned int to_tdest;
-    if (!switch_interface_id_to_igr_sw_tid(from_intf, &from_tid) ||
-        !switch_processor_id_to_igr_sw_tdest(to_proc, &to_tdest) ||
-        from_tid >= ARRAY_SIZE(blk->igr_sw_tdest)) {
-        return false;
-    }
-
-    union smartnic_igr_sw_tdest tdest = {._v = blk->igr_sw_tdest[from_tid]._v};
-    tdest.value = to_tdest;
-    blk->igr_sw_tdest[from_tid]._v = tdest._v;
-
-    return true;
-}
-
-//--------------------------------------------------------------------------------------------------
-bool switch_get_egress_connection(volatile struct smartnic_block* blk,
-                                  const struct switch_processor_id* on_proc,
-                                  const struct switch_interface_id* from_intf,
-                                  struct switch_interface_id* to_intf) {
-    unsigned int from_tid;
-    if (!switch_interface_id_to_igr_sw_tid(from_intf, &from_tid)) {
-        return false;
-    }
-
-    switch (on_proc->type) {
-    case switch_processor_type_BYPASS: {
-        if (from_tid >= ARRAY_SIZE(blk->bypass_tdest)) {
-            return false;
-        }
-
-        union smartnic_bypass_tdest tdest = {._v = blk->bypass_tdest[from_tid]._v};
-        return switch_interface_id_from_bypass_tdest(to_intf, tdest.value);
-    }
-
-    case switch_processor_type_APP:
-        switch (on_proc->index) {
-        case 0: {
-            if (from_tid >= ARRAY_SIZE(blk->app_0_tdest_remap)) {
-                return false;
-            }
-
-            union smartnic_app_0_tdest_remap tdest = {
-                ._v = blk->app_0_tdest_remap[from_tid]._v};
-            return switch_interface_id_from_app_0_tdest(to_intf, tdest.value);
-        }
-
-        case 1: {
-            if (from_tid >= ARRAY_SIZE(blk->app_1_tdest_remap)) {
-                return false;
-            }
-
-            union smartnic_app_1_tdest_remap tdest = {
-                ._v = blk->app_1_tdest_remap[from_tid]._v};
-            return switch_interface_id_from_app_1_tdest(to_intf, tdest.value);
-        }
-
-        default:
-            return false;
-        }
-        break;
-
-    case switch_processor_type_DROP:
-    case switch_processor_type_UNKNOWN:
-    default:
-        return false;
-    }
-
-    return true;
-}
-
-//--------------------------------------------------------------------------------------------------
-bool switch_set_egress_connection(volatile struct smartnic_block* blk,
-                                  const struct switch_processor_id* on_proc,
-                                  const struct switch_interface_id* from_intf,
-                                  const struct switch_interface_id* to_intf) {
-    unsigned int from_tid;
-    if (!switch_interface_id_to_igr_sw_tid(from_intf, &from_tid)) {
-        return false;
-    }
-
-    unsigned int to_tdest;
-    switch (on_proc->type) {
-    case switch_processor_type_BYPASS: {
-        if (!switch_interface_id_to_bypass_tdest(to_intf, &to_tdest) ||
-            from_tid >= ARRAY_SIZE(blk->bypass_tdest)) {
-            return false;
-        }
-
-        union smartnic_bypass_tdest tdest = {._v = blk->bypass_tdest[from_tid]._v};
-        tdest.value = to_tdest;
-        blk->bypass_tdest[from_tid]._v = tdest._v;
-        break;
-    }
-
-    case switch_processor_type_APP:
-        switch (on_proc->index) {
-        case 0: {
-            if (!switch_interface_id_to_app_0_tdest(to_intf, &to_tdest) ||
-                from_tid >= ARRAY_SIZE(blk->app_0_tdest_remap)) {
-                return false;
-            }
-
-            union smartnic_app_0_tdest_remap tdest = {
-                ._v = blk->app_0_tdest_remap[from_tid]._v};
-            tdest.value = to_tdest;
-            blk->app_0_tdest_remap[from_tid]._v = tdest._v;
-            break;
-        }
-
-        case 1: {
-            if (!switch_interface_id_to_app_1_tdest(to_intf, &to_tdest) ||
-                from_tid >= ARRAY_SIZE(blk->app_1_tdest_remap)) {
-                return false;
-            }
-
-            union smartnic_app_1_tdest_remap tdest = {
-                ._v = blk->app_1_tdest_remap[from_tid]._v};
-            tdest.value = to_tdest;
-            blk->app_1_tdest_remap[from_tid]._v = tdest._v;
-            break;
-        }
-
-        default:
-            return false;
-        }
-        break;
-
-    case switch_processor_type_UNKNOWN:
-    case switch_processor_type_DROP:
-    default:
-        return false;
-    }
+    blk->bypass_config._v = config._v;
+    barrier();
 
     return true;
 }
 
 //--------------------------------------------------------------------------------------------------
 void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk) {
-    unsigned int tid;
-
     // Reset all ingress connections to drop prior to changing the switch configuration.
-    for (tid = 0; tid < ARRAY_SIZE(blk->igr_sw_tdest); ++tid) {
-        blk->igr_sw_tdest[tid]._v = SMARTNIC_IGR_SW_TDEST_VALUE_DROP;
+    for (unsigned int tid = 0; tid < ARRAY_SIZE(blk->smartnic_mux_out_sel); ++tid) {
+        blk->smartnic_mux_out_sel[tid]._v = SMARTNIC_SMARTNIC_MUX_OUT_SEL_VALUE_DROP;
     }
     barrier();
 
-    // Apply ingress source defaults.
-    const union smartnic_igr_sw_tid igr_sw_tid_defaults[] = {
-        {.value = SMARTNIC_IGR_SW_TID_VALUE_CMAC_0}, // CMAC 0
-        {.value = SMARTNIC_IGR_SW_TID_VALUE_CMAC_1}, // CMAC 1
-        {.value = SMARTNIC_IGR_SW_TID_VALUE_HOST_0}, // HOST 0
-        {.value = SMARTNIC_IGR_SW_TID_VALUE_HOST_1}, // HOST 1
+    struct switch_ingress_selector is = {
+        .intf = switch_interface_PHYSICAL,
+        .dest = switch_destination_APP,
     };
-    for (tid = 0; tid < ARRAY_SIZE(blk->igr_sw_tid); ++tid) {
-        blk->igr_sw_tid[tid]._v = igr_sw_tid_defaults[tid]._v;
+    for (is.index = 0; is.index < SWITCH_NUM_PORTS; ++is.index) {
+        switch_set_ingress_selector(blk, &is);
     }
 
-    // Apply ingress connection defaults.
-    const union smartnic_igr_sw_tdest igr_sw_tdest_defaults[] = {
-        {.value = SMARTNIC_IGR_SW_TDEST_VALUE_APP_0},      // CMAC 0
-        {.value = SMARTNIC_IGR_SW_TDEST_VALUE_APP_0},      // CMAC 1
-        {.value = SMARTNIC_IGR_SW_TDEST_VALUE_APP_BYPASS}, // HOST 0
-        {.value = SMARTNIC_IGR_SW_TDEST_VALUE_APP_BYPASS}, // HOST 1
+    struct switch_egress_selector es = {
+        .intf = switch_interface_PHYSICAL,
     };
-    for (tid = 0; tid < ARRAY_SIZE(blk->igr_sw_tdest); ++tid) {
-        blk->igr_sw_tdest[tid]._v = igr_sw_tdest_defaults[tid]._v;
+    for (es.index = 0; es.index < SWITCH_NUM_PORTS; ++es.index) {
+        switch_set_egress_selector(blk, &es);
     }
 
-    // Apply egress connection defaults to the bypass processor.
-    const union smartnic_bypass_tdest bypass_tdest_defaults[] = {
-        {.value = SMARTNIC_BYPASS_TDEST_VALUE_HOST_0}, // CMAC 0
-        {.value = SMARTNIC_BYPASS_TDEST_VALUE_HOST_1}, // CMAC 1
-        {.value = SMARTNIC_BYPASS_TDEST_VALUE_CMAC_0}, // HOST 0
-        {.value = SMARTNIC_BYPASS_TDEST_VALUE_CMAC_1}, // HOST 1
-    };
-    for (tid = 0; tid < ARRAY_SIZE(blk->bypass_tdest); ++tid) {
-        blk->bypass_tdest[tid]._v = bypass_tdest_defaults[tid]._v;
-    }
-
-    // Apply egress connection defaults to the application 0 processor.
-    const union smartnic_app_0_tdest_remap app_0_tdest_remap_defaults[] = {
-        {.value = SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_0}, // CMAC 0
-        {.value = SMARTNIC_APP_0_TDEST_REMAP_VALUE_CMAC_1}, // CMAC 1
-        {.value = SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_0}, // HOST 0
-        {.value = SMARTNIC_APP_0_TDEST_REMAP_VALUE_HOST_1}, // HOST 1
-    };
-    for (tid = 0; tid < ARRAY_SIZE(blk->app_0_tdest_remap); ++tid) {
-        blk->app_0_tdest_remap[tid]._v = app_0_tdest_remap_defaults[tid]._v;
-    }
-
-    // Apply egress connection defaults to the application 1 processor.
-    const union smartnic_app_1_tdest_remap app_1_tdest_remap_defaults[] = {
-        {.value = SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_0}, // CMAC 0
-        {.value = SMARTNIC_APP_1_TDEST_REMAP_VALUE_CMAC_1}, // CMAC 1
-        {.value = SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_0}, // HOST 0
-        {.value = SMARTNIC_APP_1_TDEST_REMAP_VALUE_HOST_1}, // HOST 1
-    };
-    for (tid = 0; tid < ARRAY_SIZE(blk->app_1_tdest_remap); ++tid) {
-        blk->app_1_tdest_remap[tid]._v = app_1_tdest_remap_defaults[tid]._v;
-    }
-
-    // Set up FIFO flow control thresholds for egress switch output FIFOs
-#define EGR_FC_THRESH_UNLIMITED UINT32_MAX
-#define EGR_FC_THRESH_FIFO_MAX  1020
-    uint32_t egr_fc_thresh_defaults[] = {
-        EGR_FC_THRESH_UNLIMITED, // CMAC 0
-        EGR_FC_THRESH_UNLIMITED, // CMAC 1
-        EGR_FC_THRESH_FIFO_MAX,  // HOST 0
-        EGR_FC_THRESH_UNLIMITED, // HOST 1
-    };
-    for (tid = 0; tid < ARRAY_SIZE(blk->egr_fc_thresh); ++tid) {
-        blk->egr_fc_thresh[tid] = egr_fc_thresh_defaults[tid];
-    }
+    switch_set_bypass_mode(blk, switch_bypass_mode_STRAIGHT);
 }
 
 //--------------------------------------------------------------------------------------------------
