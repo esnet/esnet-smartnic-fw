@@ -159,7 +159,7 @@ EOF
 # Install the MinIO client command line tool.
 ADD \
     --chmod=755 \
-    https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2023-11-20T16-30-59Z \
+    https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2024-11-21T17-21-54Z \
     /usr/local/bin/mc
 
 WORKDIR /
