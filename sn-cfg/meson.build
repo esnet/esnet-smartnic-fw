@@ -30,7 +30,7 @@ executable(
         libopennic_dep,
         libprom_dep,
         libpromhttp_dep,
-        sn_cfg_proto_cpp,
+        libsn_cfg_proto_dep,
         regmap_dep,
     ],
     # Force linking all libs so that the unreferenced grpc++_reflection lib gets linked
