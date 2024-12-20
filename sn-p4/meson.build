@@ -32,7 +32,7 @@ executable(
         libprom_dep,
         libpromhttp_dep,
         libsnp4_dep,
-        sn_p4_v2_proto_cpp,
+        libsn_p4_proto_dep,
         regmap_dep,
     ],
     # Force linking all libs so that the unreferenced grpc++_reflection lib gets linked
