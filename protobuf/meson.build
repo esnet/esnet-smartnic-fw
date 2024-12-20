@@ -6,23 +6,6 @@ libprotobuf = dependency('protobuf')
 protoc = find_program('protoc')
 grpc_cpp_plugin = find_program('grpc_cpp_plugin')
 
-protoc_cpp_gen = generator(
-    protoc,
-    output: [
-        '@BASENAME@.grpc.pb.cc',
-        '@BASENAME@.grpc.pb.h',
-        '@BASENAME@.pb.cc',
-        '@BASENAME@.pb.h',
-    ],
-    arguments: [
-        '--proto_path=@CURRENT_SOURCE_DIR@',
-        '--cpp_out=@BUILD_DIR@',
-        '--grpc_out=@BUILD_DIR@',
-        '--plugin=protoc-gen-grpc=@0@'.format(grpc_cpp_plugin.path()),
-        '@INPUT@',
-    ],
-)
-
 #---------------------------------------------------------------------------------------------------
 # Python Protobuf and gRPC
 # As per https://grpc.io/docs/languages/python/basics/
