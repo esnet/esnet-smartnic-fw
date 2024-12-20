@@ -44,7 +44,7 @@ variables:
     value: main
     description: branch for hwapi artifact
   SN_HW_API_JOB:
-    value: export_hwapi
+    value: hwapi_au280
     description: job for hwapi artifact
   SN_HW_BOARD:
     value: au280
