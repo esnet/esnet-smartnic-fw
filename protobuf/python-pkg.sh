@@ -41,7 +41,10 @@ version = "${pkg_ver}"
 description = "Python interface to ${pkg_desc} protobuf structures."
 authors = []
 
-include = ["*_pb2*"] # Include the protobuf/grpc generated files into the package.
+include = [
+    # Include the protobuf/grpc generated files into the package.
+    { path = "*_pb2*", format = ["sdist", "wheel"] }
+]
 
 [tool.poetry.dependencies]
 grpcio = "^1.60.0"
