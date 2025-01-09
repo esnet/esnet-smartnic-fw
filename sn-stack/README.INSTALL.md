@@ -92,6 +92,15 @@ sn-cfg show device info
 regio-esnet-smartnic dump dev0.bar2.syscfg
 ```
 
+Stopping the runtime environment
+--------------------------------
+
+When we're finished using the smartnic runtime environment, we can stop and remove our docker containers.
+
+```
+docker compose down -v
+```
+
 (OPTIONAL) Updating the flash image to a new ESnet Smartnic flash image
 -----------------------------------------------------------------------
 
@@ -151,7 +160,7 @@ docker compose down -v --remove-orphans
 ```
 
 Using the sn-cfg tool
----------------------
+=====================
 
 The sn-cfg tool provides subcommands to help you accomplish many common tasks for inspecting and configuring the smartnic platform components.
 
@@ -160,7 +169,8 @@ All commands described below are expected to be executed within the `smartnic-fw
 docker compose exec smartnic-fw bash
 ```
 
-# Displaying device information with the "show device" subcommand
+Displaying device information with the "show device" subcommand
+---------------------------------------------------------------
 
 This will show information about the device such as the build version, build date/time, and serial number.
 
@@ -252,7 +262,8 @@ Device Monitors:
                  vuser0: 0
 ```
 
-# Inspecting and Configuring the CMAC (100G) Ports with the "show/configure port" subcommands
+Inspecting and Configuring the CMAC (100G) Ports with the "show/configure port" subcommands
+-------------------------------------------------------------------------------------------
 
 Show the configuration (administrative state) of the 100G ports
 
@@ -398,7 +409,8 @@ If the port shows `Link: down`.  Possible causes for this are:
 
 More detailed status can also be queried directly from the QSFP module using the `sn-cfg show module status` command.  This command will show signal levels as well as any active alarms indicated by the QSFP module.
 
-# Inspecting and Configuring the Host PCIe Queue DMA (QDMA) block with the "show/configure host" subcommands
+Inspecting and Configuring the Host PCIe Queue DMA (QDMA) block with the "show/configure host" subcommands
+----------------------------------------------------------------------------------------------------------
 
 The QDMA block is responsible for managing all DMA queues used for transferring packets and/or events bidirectionally between the U280 card and the Host CPU over the PCIe bus.  In order for any DMA transfers to be allowed on either of the PCIe Physical Functions (PF), an appropriate number of DMA Queue IDs must be provisioned.  This can be done using the `configure host` subcommand.
 
@@ -421,7 +433,8 @@ sn-cfg show host stats
 Refer to the `open-nic-shell` documentation for an explanation of exactly where in the FPGA design these statistics are measured.
 
 
-# Inspecting packet counters in the smartnic platform with the "show switch stats" subcommand
+Inspecting packet counters in the smartnic platform with the "show switch stats" subcommand
+-------------------------------------------------------------------------------------------
 
 The smartnic platform implements monitoring points in the datapath at various locations.  You an inspect these counters using this command:
 ```
@@ -429,7 +442,8 @@ sn-cfg show switch stats
 ```
 Refer to the `esnet-smartnic-hw` documentation for an explanation of exactly where in the FPGA design these statistics are measured.
 
-# Configuring the smartnic platform ingress/egress/bypass switch port remapping functions with the "configure switch" subcommand
+Configuring the smartnic platform ingress/egress/bypass switch port remapping functions with the "configure switch" subcommand
+------------------------------------------------------------------------------------------------------------------------------
 
 The smartnic platform implements reconfigurable ingress and egress port remapping, connections and redirecting.  You can inspect and modify these configuration points using the "configure switch" subcommand.
 
@@ -489,7 +503,8 @@ sn-cfg configure switch -i host0:bypass \
 			-i port1:app0
 ```
 
-## Skipping the p4 program and wiring the host ports to 100G ports for debugging
+Skipping the p4 program and wiring the host ports to 100G ports for debugging
+-----------------------------------------------------------------------------
 
 This **optional** configuration snippet allows you to *entirely bypass the p4 program* contained in the smartnic and deliver all packets directly to the host software.  This is often useful for debug if you have reason to think your p4 program is mishandling the packets.
 
@@ -509,12 +524,15 @@ sn-cfg configure switch -i host0:bypass \
 
 **NOTE** Don't forget to restore these settings after you're finished debugging.  Any packets that follow the bypass path will not be processed by the user's p4 program.
 
-## Display the current configuration status
+Display the current configuration status
+----------------------------------------
+
 ```
 sn-cfg show switch config
 ```
 
-# Using the sn-p4 tool
+Using the sn-p4 tool
+====================
 
 The user's p4 application embedded within the smartnic design may have configurable lookup tables which are used during the wire-speed execution of the packet processing pipeline.  The sn-p4 tool provides subcommands to help you to manage the rules in all of the lookup tables defined in your p4 program.
 
@@ -527,7 +545,8 @@ The `sn-p4` tool will automatically look for an environment variable called `SN_
 
 By default, all operations performed by the `sn-p4` tool will target the ingress pipeline. A different pipeline can be operated on by using the `--pipeline-id` option to select an alternate. Use the `--help` option to see which pipelines are supported.
 
-## Inspecting the pipeline structure with the "show pipeline info" subcommand
+Inspecting the pipeline structure with the "show pipeline info" subcommand
+--------------------------------------------------------------------------
 
 The `show pipeline info` subcommand is used to display the pipeline structure, including table names, match fields (and their types), action names and the list of parameters for each action, as well as all counter blocks defined by the p4 program.  This information can be used to formulate new rule definitions for the other subcommands.
 
@@ -535,7 +554,8 @@ The `show pipeline info` subcommand is used to display the pipeline structure, i
 sn-p4 show pipeline info
 ```
 
-## Inserting a new rule into a table
+Inserting a new rule into a table
+---------------------------------
 
 The `insert table rule` subcommand allows you to insert a new rule into a specified table.
 
@@ -566,14 +586,16 @@ Where:
 
 **NOTE**: You can find details about your pipeline structure and valid names by running the `show pipeline info` subcommand.
 
-## Updating an existing rule within a table
+Updating an existing rule within a table
+----------------------------------------
 
 The `insert table rule` subcommand described above also allows you to update the action and parameters for an existing rule within a table by specifying the `--replace` option.
 ```
 sn-p4 insert table rule --replace --table <table-name> --action <action-name> --match <match-expr> [--param <param-expr>]
 ```
 
-## Removing previously inserted rules
+Removing previously inserted rules
+----------------------------------
 
 The `clear table` and `delete table rule` subcommands allow you to remove rules from tables with varying precision.
 
@@ -592,7 +614,8 @@ Remove a specific rule from a specific table.
 sn-p4 delete table rule --table <table-name> --match <match-expr>
 ```
 
-## Bulk changes of rules using a p4 behaviour model (p4bm) simulator rules file
+Bulk changes of rules using a p4 behaviour model (p4bm) simulator rules file
+----------------------------------------------------------------------------
 
 Using the the `apply p4bm` subcommand, a list of pipeline modifications can be applied from a file.  A subset of the full p4bm simulator file format is supported by the `sn-p4` command.
 
@@ -610,7 +633,8 @@ Supported actions within the p4bm file are:
 
 All comment characters `#` and text following them up to the end of the line are ignored.
 
-## Displaying counters defined by a p4 program
+Displaying counters defined by a p4 program
+-------------------------------------------
 
 If a p4 program defines one or more blocks of counters, their type and number of counters within each block can be found in the output of the `show pipeline info` subcommand.  Counters are automatically accumulated by `sn-p4-agent` and made available via the `show pipeline stats` subcommand.
 ```
@@ -626,15 +650,6 @@ sn-p4 clear pipeline stats
 The `sn-p4-agent` server also acts as a Prometheus exporter, making all p4 counters available via HTTP on port `SN_P4_SERVER_PROMETHEUS_PORT` (default is 8000) for scraping and inclusion by a Prometheus data visualization tool such as [Grafana](https://grafana.com/oss/grafana/).
 ```
 curl -s http://smartnic-p4:8000/metrics
-```
-
-Stopping the runtime environment
---------------------------------
-
-When we're finished using the smartnic runtime environment, we can stop and remove our docker containers.
-
-```
-docker compose down -v
 ```
 
 Using the smartnic-dpdk container
@@ -699,7 +714,7 @@ root@smartnic-fw:/# sn-cfg show port status
 Setting up the queue mappings tells the smartnic platform which QDMA queues to use for h2c and c2h packets.  Enabling the CMACs allows Rx and Tx packets to flow (look for `Link: up`).
 
 Advanced usage of the pktgen-dpdk application
-=============================================
+---------------------------------------------
 
 Example of streaming packets out of an interface from a pcap file rather than generating the packets within the UI.
 Note the `-s <P>:file.pcap` option where `P` refers to the port number to bind the pcap file to.
