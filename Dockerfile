@@ -7,9 +7,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
 
-# Configure local ubuntu mirror as package source
-#COPY sources.list /etc/apt/sources.list
-
 RUN <<EOT
     set -ex
     ln -fs /usr/share/zoneinfo/UTC /etc/localtime
