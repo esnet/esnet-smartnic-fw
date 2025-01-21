@@ -352,6 +352,8 @@ services:
       - pipefail
       - -x
       - |
+        # When vfio-pci is not builtin, ensure that it is loaded
+        modinfo vfio-pci | egrep -q '^filename:\s+\(builtin\)$' || modprobe vfio-pci
         echo 1 > /sys/bus/pci/rescan
         sleep 1
         # Bind the vfio-pci driver to each FPGA PF

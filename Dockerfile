@@ -21,6 +21,7 @@ RUN <<EOT
       devscripts \
       equivs \
       fakeroot \
+      kmod \
       less \
       libdistro-info-perl \
       libmicrohttpd-dev \
