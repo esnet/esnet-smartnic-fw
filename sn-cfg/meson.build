@@ -38,6 +38,54 @@ executable(
     install: true,
 )
 
+ext_incdir = include_directories('include')
+libsn_cfg_client = shared_library(
+    'sn_cfg_client',
+    'src/client/client.cpp',
+    dependencies: [
+        libsn_cfg_proto_dep,
+    ],
+    include_directories: [
+        ext_incdir,
+    ],
+    install: true,
+    soversion: 1,
+)
+
+pkg = import('pkgconfig')
+pkg.generate(
+    libsn_cfg_client,
+    subdirs: 'esnet-smartnic',
+)
+
+libsn_cfg_client_dep = declare_dependency(
+    include_directories: [ext_incdir],
+    link_with: [
+        libsn_cfg_client,
+    ],
+    dependencies: [
+        libsn_cfg_proto_dep,
+    ],
+)
+
+install_headers(
+    [
+        'include/sn_cfg_client.hpp',
+    ],
+    subdir: 'esnet-smartnic'
+)
+
+executable(
+    'sn-cfg-client-test',
+    files([
+        'src/client/client_test.cpp',
+    ]),
+    dependencies: [
+        libsn_cfg_client_dep,
+    ],
+    install: true,
+)
+
 install_data(
     'sn-cfg-server-entrypoint.sh',
     'sn-cfg-check-for-fpga-ready',
