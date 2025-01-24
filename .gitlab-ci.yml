@@ -195,25 +195,35 @@ container_scanning:
     - pull_cve_allowlist
     - package
 
-review:
+ftap:
   extends: .aap_run
   stage: review
   environment:
-    name: review/${AAP_LIMIT}
+    name: review/${GL_ENV_NAME}
     url: ssh://${AAP_LIMIT}
     action: start
   parallel:
     matrix:
-      # Target nodes with au280 cards
-      - AAP_LIMIT:
-          - ftap-ht1.es.net
-          - ftap-ht3.es.net
-          - ftap-ht4.es.net
+      # Set GL_ENV_NAME to <hostname>/<card_number>/<extra>
+      #   e.g. ftap-ht1/1/foo
+      # Keep it short since it shows up in the UI
+
+      - GL_ENV_NAME: ftap-ht1/1
         SYSTEM_HW_BOARD: au280
-      # Target nodes with au55c cards
-      - AAP_LIMIT:
-          - ftap-ht2.es.net
+        AAP_LIMIT: ftap-ht1.es.net
+
+      - GL_ENV_NAME: ftap-ht2/1
         SYSTEM_HW_BOARD: au55c
+        AAP_LIMIT: ftap-ht2.es.net
+
+      - GL_ENV_NAME: ftap-ht3/1
+        SYSTEM_HW_BOARD: au280
+        AAP_LIMIT: ftap-ht3.es.net
+
+      - GL_ENV_NAME: ftap-ht4/1
+        SYSTEM_HW_BOARD: au280
+        AAP_LIMIT: ftap-ht4.es.net
+
   variables:
     # host, hostgroup or list of hosts
     # AAP_LIMIT: # from parallel matrix
