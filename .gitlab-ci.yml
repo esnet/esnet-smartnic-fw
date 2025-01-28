@@ -225,10 +225,14 @@ ftap:
         AAP_LIMIT: ftap-ht4.es.net
 
   variables:
-    # host, hostgroup or list of hosts
-    # AAP_LIMIT: # from parallel matrix
-    # AAP job template
-    AAP_JOB_TEMPLATE: 458
+    AAP_JOB_TEMPLATE: 641
+    #
+    # AAP Job Template Overrides
+    #   See here for more overrides: https://gitlab.es.net/ht/cicd-common/-/blob/main/README.md?ref_type=heads#aap-run
+    #
+    #AAP_SCM_BRANCH: testing
+    #AAP_VERBOSITY: 3
+
     EXTRA_VARS: "{ 'jobid': ${SN_FW_API_JOB_NUMBER} }"
   rules:
     - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
