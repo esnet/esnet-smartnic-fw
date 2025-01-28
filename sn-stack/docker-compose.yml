@@ -561,6 +561,12 @@ services:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
       - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-tls", "-tls-no-verify", "-addr", "[::]:50050"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 5s
     entrypoint:
       - /usr/local/sbin/sn-p4-server-entrypoint.sh
     labels:
@@ -606,6 +612,12 @@ services:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
       - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-tls", "-tls-no-verify", "-addr", "[::]:50100"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 5s
     entrypoint:
       - /usr/local/sbin/sn-cfg-server-entrypoint.sh
     labels:
