@@ -245,7 +245,7 @@ services:
       test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
       interval: 10s
       timeout: 10s
-      retries: 6
+      retries: 10
       start_period: 10s
     command:
       - /bin/bash
