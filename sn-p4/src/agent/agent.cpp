@@ -12,6 +12,8 @@
 #include <CLI/CLI.hpp>
 
 #include <grpc/grpc.h>
+#include <grpcpp/ext/proto_server_reflection_plugin.h>
+#include <grpcpp/health_check_service_interface.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 
@@ -241,9 +243,13 @@ public:
                    [[maybe_unused]] AuthContext* context,
                    [[maybe_unused]] OutputMetadata* consumed_auth_metadata,
                    [[maybe_unused]] OutputMetadata* response_metadata) override {
-#define METADATA_TOKEN_KEY "authorization"
+        auto path = auth_metadata.find(":path");
+        if (path != auth_metadata.end() && path->second.starts_with("/grpc.health.v1.Health/")) {
+            // Allow health checking without the token.
+            return Status::OK;
+        }
 
-        auto md = auth_metadata.find(METADATA_TOKEN_KEY);
+        auto md = auth_metadata.find("authorization");
         if (md == auth_metadata.end()) {
             return Status(StatusCode::UNAUTHENTICATED, "Missing token key from metadata.");
         }
@@ -256,8 +262,6 @@ public:
         }
 
         return Status(StatusCode::UNAUTHENTICATED, "Unknown token.");
-
-#undef METADATA_TOKEN_KEY
     }
 
 private:
@@ -366,6 +370,10 @@ static int agent_server_run(const Arguments& args) {
     auto processor = new AuthMetadataToken(auth_tokens);
     credentials->SetAuthMetadataProcessor(shared_ptr<typeof(*processor)>(processor));
 
+    // Enable the builtin health checking protocol.
+    EnableDefaultHealthCheckService(true);
+    reflection::InitProtoReflectionServerBuilderPlugin();
+
     // Set the server's bind address and port.
     string address(args.server.address + ":" +  to_string(args.server.port));
     ServerBuilder builder;
@@ -376,12 +384,9 @@ static int agent_server_run(const Arguments& args) {
     builder.RegisterService(&service);
 
     // Create the server and bind it's address.
-    // TODO:
-    // - Look into enabling health check
-    //   - https://grpc.github.io/grpc/cpp/md_doc_health-checking.html
-    //   - Python example: https://github.com/grpc/grpc/tree/master/examples/python/health_checking
-    // - Look into async API
     auto server = builder.BuildAndStart();
+    auto health_check = server->GetHealthCheckService();
+    health_check->SetServingStatus(true);
 
     // Process RPCs.
     cout << __func__ << ": Serving on " << address << endl;
