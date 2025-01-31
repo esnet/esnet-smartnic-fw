@@ -69,6 +69,19 @@ if [ "$#" -ge 1 ] ; then
     fi
 fi
 
+# Check if we're running on an AMD system and FORCE the FPGA to be reloaded even if USERCODE/UserID registers match
+# This is necessary due to many AMD systems not providing a proper PCIe hot-reset to the cards
+case $(lscpu --json | jq -r '.lscpu[] | select(.field == "Vendor ID:") | .data') in
+    AuthenticAMD)
+	echo "NOTE: Detected AMD CPU/chipset, enabling workaround for missing PCIe Hot Reset.  FPGA will be reloaded even if USERCODE/UserID registers match."
+	FORCE=1
+	;;
+    GenuineIntel)
+	;;
+    *)
+	;;
+esac
+
 # Make note of any extra, ignored command line parameters
 if [ "$#" -gt 0 ] ; then
     echo "WARNING: Ignoring extra command line parameters $@"
