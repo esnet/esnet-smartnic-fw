@@ -2,6 +2,7 @@ sources = files(
   [
     'src/cmac.c',
     'src/cms.c',
+    'src/flow_control.c',
     'src/qdma.c',
     'src/sff-8024.c',
     'src/sff-8089.c',
@@ -41,6 +42,7 @@ install_headers(
   [
     'include/cmac.h',
     'include/cms.h',
+    'include/flow_control.h',
     'include/qdma.h',
     'include/sff-8024.h',
     'include/sff-8089.h',
