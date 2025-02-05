@@ -2,6 +2,7 @@
 __all__ = (
     'apply_options',
     'ChoiceFields',
+    'FLOW_CONTROL_THRESHOLD',
     'format_timestamp',
     'MIXED_INT',
     'natural_sort_key',
@@ -137,3 +138,21 @@ class MixedInt(click.ParamType):
 
 # Since there are no arguments, instantiate a singleton for the parameter type.
 MIXED_INT = MixedInt()
+
+#---------------------------------------------------------------------------------------------------
+class FlowControlThreshold(click.ParamType):
+    # Needed for auto-generated help (or implement get_metavar method instead).
+    name = 'flow_control_threshold'
+
+    def convert(self, value, param, ctx):
+        if value == 'unlimited':
+            return -1
+
+        try:
+            return int(value)
+        except ValueError:
+            msg = gettext.gettext(f'Unable to convert "{threshold}" as an integer.')
+            self.fail(msg, param, ctx)
+
+# Since there are no arguments, instantiate a singleton for the parameter type.
+FLOW_CONTROL_THRESHOLD = FlowControlThreshold()

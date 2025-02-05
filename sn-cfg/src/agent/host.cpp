@@ -11,6 +11,7 @@
 #include "sn_cfg_v2.grpc.pb.h"
 
 #include "esnet_smartnic_toplevel.h"
+#include "flow_control.h"
 #include "qdma.h"
 
 using namespace grpc;
@@ -177,6 +178,24 @@ void SmartnicConfigImpl::get_host_config(
                     func->set_base_queue(base_queue);
                     func->set_num_queues(num_queues);
                 }
+
+                {
+                    struct fc_interface intf = {
+                        .type = fc_interface_type_HOST,
+                        .index = (unsigned int)host_id,
+                    };
+                    uint32_t threshold;
+                    if (!fc_get_egress_threshold(&dev->bar2->smartnic_regs, &intf, &threshold)) {
+                        err = ErrorCode::EC_FAILED_GET_HOST_FC_EGR_THRESHOLD;
+                        goto write_response;
+                    }
+
+                    {
+                        auto fc = config->mutable_flow_control();
+                        fc->set_egress_threshold(
+                            threshold == FC_THRESHOLD_UNLIMITED ? -1 : threshold);
+                    }
+                }
             }
 
         write_response:
@@ -242,14 +261,6 @@ void SmartnicConfigImpl::set_host_config(
     }
     auto config = req.config();
 
-    if (!config.has_dma()) {
-        HostConfigResponse resp;
-        resp.set_error_code(ErrorCode::EC_MISSING_HOST_DMA_CONFIG);
-        write_resp(resp);
-        return;
-    }
-    auto dma = config.dma();
-
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
 
@@ -273,23 +284,42 @@ void SmartnicConfigImpl::set_host_config(
             HostConfigResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            if (dma.reset()) {
-                // Reset the queue configuration for all functions.
-                for (auto qf = qdma_function_MIN; qf < qdma_function_MAX; ++qf) {
-                    qdma_function_set_queues(dev->bar2, host_id, qf, 0, 0);
+            if (config.has_dma()) {
+                auto dma = config.dma();
+
+                if (dma.reset()) {
+                    // Reset the queue configuration for all functions.
+                    for (auto qf = qdma_function_MIN; qf < qdma_function_MAX; ++qf) {
+                        qdma_function_set_queues(dev->bar2, host_id, qf, 0, 0);
+                    }
+                }
+
+                for (auto func : dma.functions()) {
+                    enum qdma_function qf;
+                    if (!convert_to_driver_qdma_function(func.func_id(), qf)) {
+                        err = ErrorCode::EC_UNSUPPORTED_HOST_FUNCTION;
+                        goto write_response;
+                    }
+
+                    if (!qdma_function_set_queues(dev->bar2, host_id, qf,
+                                                  func.base_queue(), func.num_queues())) {
+                        err = ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
+                        goto write_response;
+                    }
                 }
             }
 
-            for (auto func : dma.functions()) {
-                enum qdma_function qf;
-                if (!convert_to_driver_qdma_function(func.func_id(), qf)) {
-                    err = ErrorCode::EC_UNSUPPORTED_HOST_FUNCTION;
-                    goto write_response;
-                }
+            if (config.has_flow_control()) {
+                auto fc = config.flow_control();
+                auto et = fc.egress_threshold();
 
-                if (!qdma_function_set_queues(dev->bar2, host_id, qf,
-                                              func.base_queue(), func.num_queues())) {
-                    err = ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
+                struct fc_interface intf = {
+                    .type = fc_interface_type_HOST,
+                    .index = (unsigned int)host_id,
+                };
+                uint32_t threshold = et < 0 ? FC_THRESHOLD_UNLIMITED : et;
+                if (!fc_set_egress_threshold(&dev->bar2->smartnic_regs, &intf, threshold)) {
+                    err = ErrorCode::EC_FAILED_SET_HOST_FC_EGR_THRESHOLD;
                     goto write_response;
                 }
             }

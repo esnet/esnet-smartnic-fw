@@ -21,7 +21,7 @@ from sn_cfg_proto import (
 
 from .device import device_id_option
 from .error import error_code_str
-from .utils import apply_options, format_timestamp, natural_sort_key
+from .utils import apply_options, FLOW_CONTROL_THRESHOLD, format_timestamp, natural_sort_key
 
 HEADER_SEP = '-' * 40
 
@@ -46,6 +46,10 @@ def host_config_req(dev_id, host_id, **config_kargs):
             f.func_id.index = func_index
             f.base_queue = base_queue
             f.num_queues = num_queues
+
+        threshold = config_kargs.get('fc_egress_threshold')
+        if threshold is not None:
+            config.flow_control.egress_threshold = threshold
 
     return HostConfigRequest(**req_kargs)
 
@@ -95,6 +99,11 @@ def _show_host_config(dev_id, host_id, config):
                 rows.append(f'    {func}:')
                 rows.append(f'        Base queue:       {f.base_queue}')
                 rows.append(f'        Number of Queues: {f.num_queues}')
+
+    fc = config.flow_control
+    rows.append('Flow Control:')
+    threshold = 'unlimited' if fc.egress_threshold < 0 else fc.egress_threshold
+    rows.append(f'    Egress Threshold: {threshold}')
 
     click.echo('\n'.join(rows))
 
@@ -325,6 +334,14 @@ def configure_host_options(fn):
             is_flag=True,
             help='''
             Reset DMA queue configuration for all subchannels before applying new settings (if any).
+            ''',
+        ),
+        click.option(
+            '--fc-egress-threshold', '-e',
+            type=FLOW_CONTROL_THRESHOLD,
+            help='''
+            FIFO fill level threshold at which to assert egress flow control. Specified as an
+            integer in units of 64 byte words or "unlimited" to disable flow control.
             ''',
         ),
     )

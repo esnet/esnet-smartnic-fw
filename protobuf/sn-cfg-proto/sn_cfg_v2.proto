@@ -23,11 +23,12 @@ enum ErrorCode {
     // Host configuration error codes.
     EC_INVALID_HOST_ID = 300;
     EC_MISSING_HOST_CONFIG = 301;
-    EC_MISSING_HOST_DMA_CONFIG = 302;
-    EC_UNSUPPORTED_HOST_ID = 303;
-    EC_UNSUPPORTED_HOST_FUNCTION = 304;
-    EC_FAILED_GET_HOST_FUNCTION_DMA_QUEUES = 305;
-    EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES = 306;
+    EC_UNSUPPORTED_HOST_ID = 302;
+    EC_UNSUPPORTED_HOST_FUNCTION = 303;
+    EC_FAILED_GET_HOST_FUNCTION_DMA_QUEUES = 304;
+    EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES = 305;
+    EC_FAILED_GET_HOST_FC_EGR_THRESHOLD = 306;
+    EC_FAILED_SET_HOST_FC_EGR_THRESHOLD = 307;
 
     // Port configuration error codes.
     EC_INVALID_PORT_ID = 400;
@@ -36,6 +37,8 @@ enum ErrorCode {
     EC_UNSUPPORTED_PORT_STATE = 403;
     EC_UNSUPPORTED_PORT_FEC = 404;
     EC_UNSUPPORTED_PORT_LOOPBACK = 405;
+    EC_FAILED_GET_PORT_FC_EGR_THRESHOLD = 406;
+    EC_FAILED_SET_PORT_FC_EGR_THRESHOLD = 407;
 
     // Switch configuration error codes.
     EC_MISSING_SWITCH_CONFIG = 500;
@@ -254,8 +257,14 @@ message HostDmaConfig {
     bool reset = 2; // Reset all function DMA configuration prior to applying new settings (if any).
 }
 
+message HostFlowControl {
+    sint32 egress_threshold = 1; // FIFO fill level threshold at which to assert egress flow control.
+                                 // Set to -1 for unlimited.
+}
+
 message HostConfig {
     HostDmaConfig dma = 1;
+    HostFlowControl flow_control = 2;
 }
 
 message HostConfigRequest {
@@ -460,10 +469,16 @@ enum PortLoopback {
     PORT_LOOPBACK_NEAR_END_PMA = 2;
 }
 
+message PortFlowControl {
+    sint32 egress_threshold = 1; // FIFO fill level threshold at which to assert egress flow control.
+                                 // Set to -1 for unlimited.
+}
+
 message PortConfig {
     PortState state = 1;
     PortFec fec = 2;
     PortLoopback loopback = 3;
+    PortFlowControl flow_control = 4;
 }
 
 message PortConfigRequest {

@@ -21,11 +21,12 @@ ERROR_MAP = {
     # Host configuration error codes.
     ErrorCode.EC_INVALID_HOST_ID: 'invalid-host-id',
     ErrorCode.EC_MISSING_HOST_CONFIG: 'missing-host-config',
-    ErrorCode.EC_MISSING_HOST_DMA_CONFIG: 'missing-host-dma-config',
     ErrorCode.EC_UNSUPPORTED_HOST_ID: 'unsupported-host-id',
     ErrorCode.EC_UNSUPPORTED_HOST_FUNCTION: 'unsupported-host-function',
     ErrorCode.EC_FAILED_GET_HOST_FUNCTION_DMA_QUEUES: 'failed-get-host-function-dma-queues',
     ErrorCode.EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES: 'failed-set-host-function-dma-queues',
+    ErrorCode.EC_FAILED_GET_HOST_FC_EGR_THRESHOLD: 'failed-get-host-flow-control-egress-threshold',
+    ErrorCode.EC_FAILED_SET_HOST_FC_EGR_THRESHOLD: 'failed-set-host-flow-control-egress-threshold',
 
     # Port configuration error codes.
     ErrorCode.EC_INVALID_PORT_ID: 'invalid-port-id',
@@ -34,6 +35,8 @@ ERROR_MAP = {
     ErrorCode.EC_UNSUPPORTED_PORT_STATE: 'unsupported-port-state',
     ErrorCode.EC_UNSUPPORTED_PORT_FEC: 'unsupported-port-fec',
     ErrorCode.EC_UNSUPPORTED_PORT_LOOPBACK: 'unsupported-port-loopback',
+    ErrorCode.EC_FAILED_GET_PORT_FC_EGR_THRESHOLD: 'failed-get-port-flow-control-egress-threshold',
+    ErrorCode.EC_FAILED_SET_PORT_FC_EGR_THRESHOLD: 'failed-set-port-flow-control-egress-threshold',
 
     # Switch configuration error codes.
     ErrorCode.EC_MISSING_SWITCH_CONFIG: 'missing-switch-config',
