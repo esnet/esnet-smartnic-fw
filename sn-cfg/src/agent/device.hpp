@@ -41,7 +41,6 @@ struct Device {
 
     unsigned int nhosts;
     unsigned int nports;
-    unsigned int napps;
 
     struct {
         struct stats_domain* domains[DeviceStatsDomain::NDOMAINS];

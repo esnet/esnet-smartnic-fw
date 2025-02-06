@@ -13,10 +13,11 @@ from sn_cfg_proto import (
     BatchRequest,
     ErrorCode,
     StatsFilters,
+    SwitchBypassMode,
     SwitchConfig,
     SwitchConfigRequest,
-    SwitchInterfaceType,
-    SwitchProcessorType,
+    SwitchDestination,
+    SwitchInterface,
     SwitchStatsRequest,
 )
 
@@ -27,66 +28,34 @@ from .utils import apply_options, ChoiceFields, format_timestamp, natural_sort_k
 HEADER_SEP = '-' * 40
 
 #---------------------------------------------------------------------------------------------------
-INTF_TYPE_MAP = {
-    SwitchInterfaceType.SW_INTF_PORT: 'port',
-    SwitchInterfaceType.SW_INTF_HOST: 'host',
+INTF_MAP = {
+    SwitchInterface.SW_INTF_PHYSICAL: 'physical',
+    SwitchInterface.SW_INTF_TEST: 'test',
 }
-INTF_TYPE_RMAP = dict((name, enum) for enum, name in INTF_TYPE_MAP.items())
-
-# TODO: How to discover these? Query from server? Load from config file?
-INTF_TYPE_RANGES = {
-    'port': range(2),
-    'host': range(2),
-}
-
-INTF_CHOICES = tuple(sorted(
-    f'{ty}{idx}'
-    for ty in INTF_TYPE_RMAP
-    for idx in INTF_TYPE_RANGES[ty]
-))
-
-def intf_id_to_name(intf):
-    name = INTF_TYPE_MAP[intf.itype]
-    if isinstance(INTF_TYPE_RANGES[name], range):
-        name += str(intf.index)
-    return name
+INTF_RMAP = dict((name, enum) for enum, name in INTF_MAP.items())
+INTF_CHOICES = tuple(sorted(INTF_RMAP))
 
 #---------------------------------------------------------------------------------------------------
-PROC_TYPE_MAP = {
-    SwitchProcessorType.SW_PROC_BYPASS: 'bypass',
-    SwitchProcessorType.SW_PROC_DROP: 'drop',
-    SwitchProcessorType.SW_PROC_APP: 'app',
+DEST_MAP = {
+    SwitchDestination.SW_DEST_BYPASS: 'bypass',
+    SwitchDestination.SW_DEST_DROP: 'drop',
+    SwitchDestination.SW_DEST_APP: 'app',
 }
-PROC_TYPE_RMAP = dict((name, enum) for enum, name in PROC_TYPE_MAP.items())
-
-# TODO: How to discover these? Query from server? Load from config file?
-PROC_TYPE_RANGES = {
-    'bypass': ('',),
-    'drop': ('',),
-    'app': range(2),
-}
-
-TO_PROC_CHOICES = tuple(sorted(
-    f'{ty}{idx}'
-    for ty in PROC_TYPE_RMAP
-    for idx in PROC_TYPE_RANGES[ty]
-))
-
-ON_PROC_CHOICES = tuple(filter(lambda p: not p.startswith('drop'), TO_PROC_CHOICES))
-
-def proc_id_to_name(proc):
-    name = PROC_TYPE_MAP[proc.ptype]
-    if isinstance(PROC_TYPE_RANGES[name], range):
-        name += str(proc.index)
-    return name
+DEST_RMAP = dict((name, enum) for enum, name in DEST_MAP.items())
+DEST_CHOICES = tuple(sorted(DEST_RMAP))
 
 #---------------------------------------------------------------------------------------------------
-CHOICE_FIELD_RE = re.compile(r'^(?P<type>.+?)(?P<index>\d*)$')
-def choice_field_convert(value, param, ctx):
-    match = CHOICE_FIELD_RE.match(value)
-    index = match['index']
-    index = int(index) if index else 0
-    return types.SimpleNamespace(type=match['type'], index=index)
+BYPASS_MODE_MAP = {
+    SwitchBypassMode.SW_BYPASS_STRAIGHT: 'straight',
+    SwitchBypassMode.SW_BYPASS_SWAP: 'swap',
+}
+BYPASS_MODE_RMAP = dict((name, enum) for enum, name in BYPASS_MODE_MAP.items())
+BYPASS_MODE_CHOICES = tuple(sorted(BYPASS_MODE_RMAP))
+
+#---------------------------------------------------------------------------------------------------
+INDEX_CHOICES = tuple(str(i) for i in range(2))
+def index_choice_field_convert(value, param, ctx):
+    return int(value)
 
 #---------------------------------------------------------------------------------------------------
 def switch_config_req(dev_id, **config_kargs):
@@ -96,31 +65,20 @@ def switch_config_req(dev_id, **config_kargs):
         config = SwitchConfig()
         req_kargs['config'] = config
 
-        # Attach an ingress source mapping for each pair.
-        for fi, ti in config_kargs.get('ingress_source', ()):
-            src = config.ingress_sources.add()
-            src.from_intf.itype = INTF_TYPE_RMAP[fi.type]
-            src.from_intf.index = fi.index
-            src.to_intf.itype = INTF_TYPE_RMAP[ti.type]
-            src.to_intf.index = ti.index
+        for index, intf, dest in config_kargs.get('ingress_selector', ()):
+            sel = config.ingress_selectors.add()
+            sel.index = index
+            sel.intf = INTF_RMAP[intf]
+            sel.dest = DEST_RMAP[dest]
 
-        # Attach an ingress connection mapping for each pair.
-        for fi, tp in config_kargs.get('ingress_conn', ()):
-            conn = config.ingress_connections.add()
-            conn.from_intf.itype = INTF_TYPE_RMAP[fi.type]
-            conn.from_intf.index = fi.index
-            conn.to_proc.ptype = PROC_TYPE_RMAP[tp.type]
-            conn.to_proc.index = tp.index
+        for index, intf in config_kargs.get('egress_selector', ()):
+            sel = config.egress_selectors.add()
+            sel.index = index
+            sel.intf = INTF_RMAP[intf]
 
-        # Attach an egress connection mapping for each triplet.
-        for op, fi, ti in config_kargs.get('egress_conn', ()):
-            conn = config.egress_connections.add()
-            conn.on_proc.ptype = PROC_TYPE_RMAP[op.type]
-            conn.on_proc.index = op.index
-            conn.from_intf.itype = INTF_TYPE_RMAP[fi.type]
-            conn.from_intf.index = fi.index
-            conn.to_intf.itype = INTF_TYPE_RMAP[ti.type]
-            conn.to_intf.index = ti.index
+        bmode = config_kargs.get('bypass_mode')
+        if bmode is not None:
+            config.bypass_mode = BYPASS_MODE_RMAP[bmode]
 
     return SwitchConfigRequest(**req_kargs)
 
@@ -155,24 +113,18 @@ def _show_switch_config(dev_id, config):
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
-    rows.append('Ingress Sources:')
-    for src in config.ingress_sources:
-        from_intf = intf_id_to_name(src.from_intf)
-        to_intf = intf_id_to_name(src.to_intf)
-        rows.append(f'    {from_intf} --> {to_intf}')
+    rows.append('Ingress Selectors:')
+    for sel in config.ingress_selectors:
+        rows.append(f'    Port {sel.index}:')
+        rows.append(f'        Interface:   {INTF_MAP[sel.intf]}')
+        rows.append(f'        Destination: {DEST_MAP[sel.dest]}')
 
-    rows.append('Ingress Connections:')
-    for conn in config.ingress_connections:
-        from_intf = intf_id_to_name(conn.from_intf)
-        to_proc = proc_id_to_name(conn.to_proc)
-        rows.append(f'    {from_intf} --> {to_proc}')
+    rows.append('Egress Selectors:')
+    for sel in config.egress_selectors:
+        rows.append(f'    Port {sel.index}:')
+        rows.append(f'        Interface: {INTF_MAP[sel.intf]}')
 
-    rows.append('Egress Connections:')
-    for conn in config.egress_connections:
-        on_proc = proc_id_to_name(conn.on_proc)
-        from_intf = intf_id_to_name(conn.from_intf)
-        to_intf = intf_id_to_name(conn.to_intf)
-        rows.append(f'    {on_proc}: {from_intf} --> {to_intf}')
+    rows.append(f'Bypass Mode: {BYPASS_MODE_MAP[config.bypass_mode]}')
 
     click.echo('\n'.join(rows))
 
@@ -328,46 +280,46 @@ def configure_switch_options(fn):
     options = (
         device_id_option,
         click.option(
-            '--ingress-source', '-s',
+            '--ingress-selector', '-i',
             type=ChoiceFields(
                 ':',
-                ('from-intf', INTF_CHOICES, choice_field_convert),
-                ('to-intf', INTF_CHOICES, choice_field_convert),
+                ('index', INDEX_CHOICES, index_choice_field_convert),
+                ('intf', INTF_CHOICES, None),
+                ('dest', DEST_CHOICES, None),
             ),
             multiple=True,
             help='''
-            A pair of ingress interface names, of the form <from-intf>:<to-intf>, where the actual
-            ingress <from-intf> interface is re-labelled to appear as if ingress occurred on the
-            <to-intf> interface.
+            Selects where packets are received from and how they are processed. A selector is
+            specified as a triplet of the form <index>:<intf>:<dest>, where <index> is a 0-based
+            port index on the switch, <intf> indicates whether packets are to be received from the
+            physical interface or the test interface (from host via QDMA), and <dest> is how the
+            packets are to be processed.
             ''',
         ),
         click.option(
-            '--ingress-conn', '-i',
+            '--egress-selector', '-e',
             type=ChoiceFields(
                 ':',
-                ('from-intf', INTF_CHOICES, choice_field_convert),
-                ('to-proc', TO_PROC_CHOICES, choice_field_convert),
+                ('index', INDEX_CHOICES, index_choice_field_convert),
+                ('intf', INTF_CHOICES, None),
             ),
             multiple=True,
             help='''
-            A pair of ingress interface and processor names, of the form <from-intf>:<to-proc>,
-            where the ingress <from-intf> interface is connected to the <to-proc> P4 processor.
+            Selects how processed packets are to be transmitted. A selector is specified as a pair
+            of the form <index>:<intf>, where <index> is a 0-based port index on the switch and
+            <intf> indicates whether packets are to be transmitted by the physical interface or the
+            test interface (to host via QDMA).
             ''',
         ),
         click.option(
-            '--egress-conn', '-e',
-            type=ChoiceFields(
-                ':',
-                ('on-proc', ON_PROC_CHOICES, choice_field_convert),
-                ('from-intf', INTF_CHOICES, choice_field_convert),
-                ('to-intf', INTF_CHOICES, choice_field_convert),
-            ),
-            multiple=True,
+            '--bypass-mode', '-b',
+            type=click.Choice(BYPASS_MODE_CHOICES),
             help='''
-            A triplet of processor, ingress and egress interface names, of the form
-            <on-proc>:<from-intf>:<to-intf>, where traffic that ingressed on the <from-intf>
-            interface and processed by the <on-proc> P4 processor should egress the <to-intf>
-            interface.
+            When at least one of the ingress selectors has a destination of "bypass", this option
+            determines how the ingress ports map to the egress ports.  The "straight" mode is a
+            one-to-one mapping of the port (such that ingress-port0 --> egress-port0, ingress-port1
+            --> egress-port1), whereas the "swap" mode reverses the mapping (such that ingress-port0
+            --> egress-port1, ingress-port1 --> egress-port0).
             ''',
         ),
     )
