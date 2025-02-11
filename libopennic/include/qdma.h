@@ -10,6 +10,11 @@ extern "C" {
 #endif
 
 //--------------------------------------------------------------------------------------------------
+bool qdma_channel_get_queues(volatile struct esnet_smartnic_bar2* bar2, unsigned int channel,
+                             unsigned int* base_queue, unsigned int* num_queues);
+bool qdma_channel_set_queues(volatile struct esnet_smartnic_bar2* bar2, unsigned int channel,
+                             unsigned int base_queue, unsigned int num_queues);
+
 #define QDMA_CHANNEL_MAX 2
 enum qdma_function {
     qdma_function_MIN,

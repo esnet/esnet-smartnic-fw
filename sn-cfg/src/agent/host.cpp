@@ -292,6 +292,9 @@ void SmartnicConfigImpl::set_host_config(
                     for (auto qf = qdma_function_MIN; qf < qdma_function_MAX; ++qf) {
                         qdma_function_set_queues(dev->bar2, host_id, qf, 0, 0);
                     }
+#ifdef SN_CFG_HOST_SET_QDMA_CHANNEL
+                    qdma_channel_set_queues(dev->bar2, host_id, 0, 0);
+#endif
                 }
 
                 for (auto func : dma.functions()) {
@@ -307,6 +310,29 @@ void SmartnicConfigImpl::set_host_config(
                         goto write_response;
                     }
                 }
+
+#ifdef SN_CFG_HOST_SET_QDMA_CHANNEL
+                unsigned int chan_base = UINT_MAX;
+                unsigned int chan_queues = 0;
+                for (auto qf = qdma_function_MIN; qf < qdma_function_MAX; ++qf) {
+                    unsigned int func_base;
+                    unsigned int func_queues;
+                    if (!qdma_function_get_queues(dev->bar2, host_id, qf,
+                                                  &func_base, &func_queues)) {
+                        err = ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
+                        goto write_response;
+                    }
+
+                    if (func_queues > 0) {
+                        chan_base = min(chan_base, func_base);
+                        chan_queues += func_queues;
+                    }
+                }
+
+                if (chan_queues > 0) {
+                    qdma_channel_set_queues(dev->bar2, host_id, chan_base, chan_queues);
+                }
+#endif
             }
 
             if (config.has_flow_control()) {

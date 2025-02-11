@@ -8,6 +8,53 @@
 #include "unused.h"
 
 //--------------------------------------------------------------------------------------------------
+bool qdma_channel_get_queues(volatile struct esnet_smartnic_bar2* bar2, unsigned int channel,
+                             unsigned int* base_queue, unsigned int* num_queues) {
+    volatile struct qdma_function_block* qdma;
+    switch (channel) {
+#define CASE(_chan) case _chan: qdma = &bar2->qdma_func##_chan; break
+
+    CASE(0);
+    CASE(1);
+    default:
+        return false;
+
+#undef CASE
+    }
+
+    union qdma_function_qconf qconf = {._v = qdma->qconf._v};
+    *base_queue = qconf.qbase;
+    *num_queues = qconf.numq;
+
+    return true;
+}
+
+//--------------------------------------------------------------------------------------------------
+bool qdma_channel_set_queues(volatile struct esnet_smartnic_bar2* bar2, unsigned int channel,
+                             unsigned int base_queue, unsigned int num_queues) {
+    volatile struct qdma_function_block* qdma;
+    switch (channel) {
+#define CASE(_chan) case _chan: qdma = &bar2->qdma_func##_chan; break
+
+    CASE(0);
+    CASE(1);
+    default:
+        return false;
+
+#undef CASE
+    }
+
+    union qdma_function_qconf qconf = {
+        .qbase = base_queue,
+        .numq = num_queues,
+    };
+    qdma->qconf._v = qconf._v;
+    barrier();
+
+    return true;
+}
+
+//--------------------------------------------------------------------------------------------------
 bool qdma_function_get_queues(volatile struct esnet_smartnic_bar2* bar2,
                               unsigned int channel, enum qdma_function func,
                               unsigned int* base_queue, unsigned int* num_queues) {

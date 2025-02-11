@@ -33,6 +33,9 @@ executable(
         libsn_cfg_proto_dep,
         regmap_dep,
     ],
+    cpp_args: [
+        '-DSN_CFG_HOST_SET_QDMA_CHANNEL',
+    ],
     # Force linking all libs so that the unreferenced grpc++_reflection lib gets linked
     link_args: '-Wl,--no-as-needed',
     install: true,

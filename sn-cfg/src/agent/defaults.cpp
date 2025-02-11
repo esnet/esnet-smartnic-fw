@@ -42,6 +42,12 @@ static ErrorCode set_defaults_one_to_one(const Device& dev) {
                                       index * NUM_QUEUES, NUM_QUEUES)) {
             return ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
         }
+
+#ifdef SN_CFG_HOST_SET_QDMA_CHANNEL
+        if (!qdma_channel_set_queues(dev.bar2, index, index * NUM_QUEUES, NUM_QUEUES)) {
+            return ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
+        }
+#endif
 #undef NUM_QUEUES
     }
 
