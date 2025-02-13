@@ -181,7 +181,7 @@ services:
           sleep 1
         done
         file /bitfiles/esnet-smartnic.bit
-        printf "\n" | xbflash2 program --spi --image /bitfiles/esnet-smartnic.mcs -d $${FPGA_PCIE_DEV}.0 -b 2 -s 0x340000
+        printf "\n" | xbflash2 program --spi --image /bitfiles/esnet-smartnic.mcs -d $${FPGA_PCIE_DEV}.0 -b 2 -s 0x20000
         if [ $$? ] ; then
           # Flash update has succeeded, all OK
           echo "Flash Update Successful"
@@ -211,7 +211,7 @@ services:
       - pipefail
       - -x
       - |
-        printf "\n" | xbflash2 program --spi --revert-to-golden -d $${FPGA_PCIE_DEV}.0 -b 2 -s 0x340000
+        printf "\n" | xbflash2 program --spi --revert-to-golden -d $${FPGA_PCIE_DEV}.0 -b 2 -s 0x20000
         if [ $$? ] ; then
           # Flash update has succeeded, all OK
           echo "Card Successfully Reverted to Golden Image"
