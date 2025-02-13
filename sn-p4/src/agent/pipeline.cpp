@@ -464,12 +464,14 @@ void SmartnicP4Impl::get_or_clear_pipeline_stats(
             auto pipeline = dev->pipelines[pipeline_id];
             PipelineStatsResponse resp;
 
-            if (do_clear) {
-                stats_zone_clear_metrics(pipeline->stats.counters->zone);
-            } else {
-                ctx.stats = resp.mutable_stats();
-                stats_zone_for_each_metric(
-                    pipeline->stats.counters->zone, get_stats_for_each_metric, &ctx);
+            if (pipeline->stats.counters != NULL) {
+                if (do_clear) {
+                    stats_zone_clear_metrics(pipeline->stats.counters->zone);
+                } else {
+                    ctx.stats = resp.mutable_stats();
+                    stats_zone_for_each_metric(
+                        pipeline->stats.counters->zone, get_stats_for_each_metric, &ctx);
+                }
             }
 
             resp.set_error_code(ErrorCode::EC_OK);
