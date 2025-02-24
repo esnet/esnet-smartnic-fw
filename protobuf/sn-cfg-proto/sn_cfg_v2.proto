@@ -1,7 +1,7 @@
 //--------------------------------------------------------------------------------------------------
 syntax = "proto3";
 
-package sn_cfg.v1;
+package sn_cfg.v2;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
@@ -23,10 +23,12 @@ enum ErrorCode {
     // Host configuration error codes.
     EC_INVALID_HOST_ID = 300;
     EC_MISSING_HOST_CONFIG = 301;
-    EC_MISSING_HOST_DMA_CONFIG = 302;
-    EC_UNSUPPORTED_HOST_ID = 303;
-    EC_FAILED_GET_DMA_QUEUES = 304;
-    EC_FAILED_SET_DMA_QUEUES = 305;
+    EC_UNSUPPORTED_HOST_ID = 302;
+    EC_UNSUPPORTED_HOST_FUNCTION = 303;
+    EC_FAILED_GET_HOST_FUNCTION_DMA_QUEUES = 304;
+    EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES = 305;
+    EC_FAILED_GET_HOST_FC_EGR_THRESHOLD = 306;
+    EC_FAILED_SET_HOST_FC_EGR_THRESHOLD = 307;
 
     // Port configuration error codes.
     EC_INVALID_PORT_ID = 400;
@@ -35,29 +37,21 @@ enum ErrorCode {
     EC_UNSUPPORTED_PORT_STATE = 403;
     EC_UNSUPPORTED_PORT_FEC = 404;
     EC_UNSUPPORTED_PORT_LOOPBACK = 405;
+    EC_FAILED_GET_PORT_FC_EGR_THRESHOLD = 406;
+    EC_FAILED_SET_PORT_FC_EGR_THRESHOLD = 407;
 
     // Switch configuration error codes.
     EC_MISSING_SWITCH_CONFIG = 500;
-    EC_MISSING_IGR_SRC_FROM_INTF = 501;
-    EC_MISSING_IGR_SRC_TO_INTF = 502;
-    EC_UNSUPPORTED_IGR_SRC_FROM_INTF = 503;
-    EC_UNSUPPORTED_IGR_SRC_TO_INTF = 504;
-    EC_FAILED_GET_IGR_SRC = 505;
-    EC_FAILED_SET_IGR_SRC = 506;
-    EC_MISSING_IGR_CONN_FROM_INTF = 507;
-    EC_MISSING_IGR_CONN_TO_PROC = 508;
-    EC_UNSUPPORTED_IGR_CONN_FROM_INTF = 509;
-    EC_UNSUPPORTED_IGR_CONN_TO_PROC = 510;
-    EC_FAILED_GET_IGR_CONN = 511;
-    EC_FAILED_SET_IGR_CONN = 512;
-    EC_MISSING_EGR_CONN_ON_PROC = 513;
-    EC_MISSING_EGR_CONN_FROM_INTF = 514;
-    EC_MISSING_EGR_CONN_TO_INTF = 515;
-    EC_UNSUPPORTED_EGR_CONN_ON_PROC = 516;
-    EC_UNSUPPORTED_EGR_CONN_FROM_INTF = 517;
-    EC_UNSUPPORTED_EGR_CONN_TO_INTF = 518;
-    EC_FAILED_GET_EGR_CONN = 519;
-    EC_FAILED_SET_EGR_CONN = 520;
+    EC_UNSUPPORTED_IGR_SEL_INTF = 501;
+    EC_UNSUPPORTED_IGR_SEL_DEST = 502;
+    EC_FAILED_GET_IGR_SEL = 503;
+    EC_FAILED_SET_IGR_SEL = 504;
+    EC_UNSUPPORTED_EGR_SEL_INTF = 505;
+    EC_FAILED_GET_EGR_SEL = 506;
+    EC_FAILED_SET_EGR_SEL = 507;
+    EC_UNSUPPORTED_BYPASS_MODE = 508;
+    EC_FAILED_GET_BYPASS_MODE = 509;
+    EC_FAILED_SET_BYPASS_MODE = 510;
 
     // Defaults configuration error codes.
     EC_UNKNOWN_DEFAULTS_PROFILE = 600;
@@ -241,13 +235,36 @@ message DeviceStatusResponse {
 }
 
 //--------------------------------------------------------------------------------------------------
+enum HostFunctionType {
+    HOST_FUNC_UNKNOWN = 0;
+    HOST_FUNC_PHYSICAL = 1;
+    HOST_FUNC_VIRTUAL = 2;
+}
+
+message HostFunctionId {
+    HostFunctionType ftype = 1;
+    uint32 index = 2;
+}
+
+message HostFunctionDmaConfig {
+    HostFunctionId func_id = 1;
+    uint32 base_queue = 2;
+    uint32 num_queues = 3;
+}
+
 message HostDmaConfig {
-    uint32 base_queue = 1;
-    uint32 num_queues = 2;
+    repeated HostFunctionDmaConfig functions = 1;
+    bool reset = 2; // Reset all function DMA configuration prior to applying new settings (if any).
+}
+
+message HostFlowControl {
+    sint32 egress_threshold = 1; // FIFO fill level threshold at which to assert egress flow control.
+                                 // Set to -1 for unlimited.
 }
 
 message HostConfig {
     HostDmaConfig dma = 1;
+    HostFlowControl flow_control = 2;
 }
 
 message HostConfigRequest {
@@ -452,10 +469,16 @@ enum PortLoopback {
     PORT_LOOPBACK_NEAR_END_PMA = 2;
 }
 
+message PortFlowControl {
+    sint32 egress_threshold = 1; // FIFO fill level threshold at which to assert egress flow control.
+                                 // Set to -1 for unlimited.
+}
+
 message PortConfig {
     PortState state = 1;
     PortFec fec = 2;
     PortLoopback loopback = 3;
+    PortFlowControl flow_control = 4;
 }
 
 message PortConfigRequest {
@@ -512,55 +535,44 @@ message PortStatsResponse {
 }
 
 //--------------------------------------------------------------------------------------------------
-enum SwitchInterfaceType {
+enum SwitchInterface {
     SW_INTF_UNKNOWN = 0; // Field is unset.
-    SW_INTF_PORT = 1;
-    SW_INTF_HOST = 2;
+    SW_INTF_PHYSICAL = 1;
+    SW_INTF_TEST = 2;
 }
 
-message SwitchInterfaceId {
-    SwitchInterfaceType itype = 1;
-    uint32 index = 2;
+enum SwitchDestination {
+    SW_DEST_UNKNOWN = 0; // Field is unset.
+    SW_DEST_BYPASS = 1;
+    SW_DEST_DROP = 2;
+    SW_DEST_APP = 3;
 }
 
-// TODO: Should Processor be Pipeline instead? For consistency with the sn-p4 protobuf?
-enum SwitchProcessorType {
-    SW_PROC_UNKNOWN = 0; // Field is unset.
-    SW_PROC_BYPASS = 1;
-    SW_PROC_DROP = 2;
-    SW_PROC_APP = 3;
+message SwitchIngressSelector {
+    uint32 index = 1; // 0-based port index.
+    SwitchInterface intf = 2;
+    SwitchDestination dest = 3;
 }
 
-message SwitchProcessorId {
-    SwitchProcessorType ptype = 1;
-    uint32 index = 2;
+message SwitchEgressSelector {
+    uint32 index = 1; // 0-based port index.
+    SwitchInterface intf = 2;
 }
 
-message SwitchIngressSource {
-    SwitchInterfaceId from_intf = 1;
-    SwitchInterfaceId to_intf = 2;
-}
-
-message SwitchIngressConnection {
-    SwitchInterfaceId from_intf = 1;
-    SwitchProcessorId to_proc = 2;
-}
-
-message SwitchEgressConnection {
-    SwitchProcessorId on_proc = 1;
-    SwitchInterfaceId from_intf = 2;
-    SwitchInterfaceId to_intf = 3;
+enum SwitchBypassMode {
+    SW_BYPASS_UNKNOWN = 0; // Field is unset.
+    SW_BYPASS_STRAIGHT = 1;
+    SW_BYPASS_SWAP = 2;
 }
 
 message SwitchConfig {
-    // Array containing one source mapping per ingress interface.
-    repeated SwitchIngressSource ingress_sources = 1;
+    // Array containing one selector per ingress port.
+    repeated SwitchIngressSelector ingress_selectors = 1;
 
-    // Array containing one connection mapping per ingress interface.
-    repeated SwitchIngressConnection ingress_connections = 2;
+    // Array containing one selector per egress port.
+    repeated SwitchEgressSelector egress_selectors = 2;
 
-    // Array containing one connection mapping per egress interface on each processor.
-    repeated SwitchEgressConnection egress_connections = 3;
+    SwitchBypassMode bypass_mode = 3;
 }
 
 message SwitchConfigRequest {

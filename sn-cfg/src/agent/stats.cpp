@@ -6,10 +6,10 @@
 #include <cstdlib>
 
 #include <grpc/grpc.h>
-#include "sn_cfg_v1.grpc.pb.h"
+#include "sn_cfg_v2.grpc.pb.h"
 
 using namespace grpc;
-using namespace sn_cfg::v1;
+using namespace sn_cfg::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------

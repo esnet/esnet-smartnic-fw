@@ -412,14 +412,24 @@ More detailed status can also be queried directly from the QSFP module using the
 Inspecting and Configuring the Host PCIe Queue DMA (QDMA) block with the "show/configure host" subcommands
 ----------------------------------------------------------------------------------------------------------
 
-The QDMA block is responsible for managing all DMA queues used for transferring packets and/or events bidirectionally between the U280 card and the Host CPU over the PCIe bus.  In order for any DMA transfers to be allowed on either of the PCIe Physical Functions (PF), an appropriate number of DMA Queue IDs must be provisioned.  This can be done using the `configure host` subcommand.
+The QDMA block is responsible for managing all DMA queues used for transferring packets and/or events bidirectionally between the U280 card and the Host CPU over the PCIe bus.  In order for any DMA transfers to be allowed on either of the PCIe Physical Functions (PF), an appropriate number of DMA Queue IDs within a contiguous set must be provisioned.
 
-Configure the number of queues allocated to each of the PCIe Physical Functions
+As an intermediate development step towards providing future access to PCIe Virtual Functions (VF) via SR-IOV, the DMA channel associated with each PF has been further divided into subchannels.  A DMA subchannel consists of a range within the contiguous set of queue IDs allocated to the parent PF.  There are currently four DMA subchannels, one for the PF itself and the remaining three for the future VFs (named VF0, VF1 and VF2).  Each of the subchannels has a unique purpose within the smartnic datapath and are tied into it at differing points.  Please refer to the datapath diagrams provided in the FPGA repository (https://github.com/esnet/esnet-smartnic-hw/tree/main/docs) for details.
+
+Configuration of the DMA queues for any subchannel can be done using the `configure host` subcommand as follows:
 ```
-sn-cfg configure host --host-id 0 --dma-base-queue 0 --dma-num-queues 1
-sn-cfg configure host --host-id 1 --dma-base-queue 1 --dma-num-queues 1
+sn-cfg configure host --host-id 0 --reset-dma-queues --dma-queues pf:0:1
+sn-cfg configure host --host-id 1 --reset-dma-queues --dma-queues pf:1:1
 ```
-This assigns 1 QID to Host PF0 and 1 QID to Host PF1.  The `configure host` subcommand also takes care of configuring the RSS entropy -> QID map with an equal weighted distribution of all allocated queues.  If you're unsure of how many QIDs to allocate, using `--dma-num-queues 1` here is your best choice.
+This assigns 1 QID to the PF subchannel of host PF0 and 1 QID to the PF subchannel of host PF1.  Any prior settings for all other subchannels are reset.  The `configure host` subcommand also takes care of configuring the RSS entropy -> QID map with an equal weighted distribution of all allocated queues.  If you're unsure of how many QIDs to allocate, using `<subchannel>:<base-queue>:1` here is your best choice.
+
+Queues can be allocated to any combination of subchannels by prefixing the number of queues with the subchannel name (one of `pf`, `vf0`, `vf1` or `vf2`), a colon `:` and then finally the number of queues.  For example, assigning queues to both the PF and VF2 subchannels can be done as follows (using abbreviated option syntax):
+```
+sn-cfg configure host -i 0 -r -d pf:0:1 -d vf2:1:1
+sn-cfg configure host -i 1 -r -d pf:2:1 -d vf2:3:1
+```
+This assigns 2 QIDs to each host PF and distributes them equally between the PF and VF2 subchannels.
+
 
 Inspect the configuration of the QDMA block
 ```
@@ -442,87 +452,52 @@ sn-cfg show switch stats
 ```
 Refer to the `esnet-smartnic-hw` documentation for an explanation of exactly where in the FPGA design these statistics are measured.
 
-Configuring the smartnic platform ingress/egress/bypass switch port remapping functions with the "configure switch" subcommand
-------------------------------------------------------------------------------------------------------------------------------
+Configuring packet ingress/egress for the smartnic platform with the "configure switch" subcommand
+--------------------------------------------------------------------------------------------------
 
-The smartnic platform implements reconfigurable ingress and egress port remapping, connections and redirecting.  You can inspect and modify these configuration points using the "configure switch" subcommand.
+The smartnic platform supports a simple switch for steering packets into the user application and back out.  You can modify this configuration using the `configure switch` subcommand.
 
-Most of the `configure switch` subcommands take one or more port bindings as parameters.  The port bindings are of the form:
-```
-<port>:<port-connector>
-```
-Where:
-* `<port>` is one of
-  * port0  -- 100G port 0
-  * port1  -- 100G port 1
-  * host0  -- DMA over PCIe Physical Function 0 (PF0)
-  * host1  -- DMA over PCIe Physical Function 1 (PF1)
-* `<port-connector>` is context dependent and is one of
-  * port0
-  * port1
-  * host0
-  * host1
-  * bypass -- a high bandwidth channel through the smartnic which does **NOT** pass through the user's application
-  * app0   -- user application port 0 (typically a p4 program ingress)
-  * app1   -- user application port 1 (only available when user implements it in verilog)
-  * drop   -- infinite blackhole that discards all packets sent to it
+An ingress selector is used to specify which interface to receive packets from and where to direct them for processing.  The selector is a triplet of the form <port-index>:<interface>:<destination> (see below).
+
+An egress selector is used to specify which interface to transmit packets to after they've been processed.  The selector is a pair of the form <port-index>:<interface> (see below).
+
+The port index in the selectors represent user application ports, one for each physical port supported by the FPGA card's hardware.
+
+Interfaces are how packets are received and transmitted.  Each port supported by the user application can be independently mapped to an interface.  The supported interfaces are:
+* physical: A 100G pluggable module.
+* test: A DMA channel over PCIe to host software.
+
+A processing destination specifies the path ingressing packets should take.  The available destinations are:
+* app: User application processes each packet and decides what to do with it.  Processing occurs in a chain as follows:
+  * Ingress P4 program.
+  * Ingress custom RTL.
+  * Egress custom RTL.
+  * Egress P4 program.
+* bypass: Simple wire path (no processing involved).  Packets are simply queued as-is for egress.
+* drop: All packets are discarded (no ingress).
+
+When using the `bypass` destination, an extra configuration option is available to specify how the ingress ports map to the egress ports.  This option does nothing unless at least one of the ingress selectors has been set to the `bypass` destination. The supported bypass modes are:
+* straight: This is a one-to-one mapping of ingress and egress ports, such that:
+  * ingress-port0 --> egress-port0
+  * ingress-port1 --> egress-port1
+* swap: This reverses the one-to-one mapping of ingress and egress ports, such that:
+  * ingress-port0 --> egress-port1
+  * ingress-port1 --> egress-port0
+
 
 The following configuration settings provide you with a normal operating mode.  You almost certainly want to apply exactly these settings on startup.
 ```
-# 1:1 Source port setting: packets all appear to be coming from their actual source ports, normal mode, no fakery (you want this)
-sn-cfg configure switch -s host0:host0 \
-                        -s host1:host1 \
-			-s port0:port0 \
-			-s port1:port1
+# All egress packets are transmitted by the 100G pluggable module associated with each port.
+sn-cfg configure switch -e 0:physical \
+                        -e 1:physical
 
-# 1:1 Egress port setting: destination ports selected by the application pipeline are mapped normally, normal mode, no fakery (you want this)
-
-# app0 = user's P4 program (you definitely have an app0) (you want this)
-sn-cfg configure switch -e app0:host0:host0 \
-                        -e app0:host1:host1 \
-			-e app0:port0:port0 \
-			-e app0:port1:port1
-# app1 = user's custom RTL (you only have an app1 if you have written custom FPGA code as part of the HW build step) (you want this even if you don't have an app1 in your design, it's safe)
-sn-cfg configure switch -e app1:host0:host0 \
-                        -e app1:host1:host1 \
-			-e app1:port0:port0 \
-			-e app1:port1:port1
-
-# Bypass path switching: when connected to the bypass, "wire" host0 <-> port0 and "wire" host1 <-> port1 (you probably want this, it only gets used if you connect ingress ports to bypass)
-sn-cfg configure switch -e bypass:host0:port0 \
-                        -e bypass:host1:port1 \
-			-e bypass:port0:host0 \
-			-e bypass:port1:host1
-
-# Ingress port connectivity:
-#   * connect 100G port0/1 directly into your P4 program so that your p4 program handles all 100G Rx packets
-#   * connect host0/1 to the bypass path so host software sends directly out of each 100G port via the bypass (useful for injecting LLDP)
-sn-cfg configure switch -i host0:bypass \
-                        -i host1:bypass \
-			-i port0:app0 \
-			-i port1:app0
+# Receive packets from the 100G pluggable module associated with each port and direct them to the user application for processing.
+sn-cfg configure switch -i 0:physical:app \
+			-i 1:physical:app \
+                        -b straight
 ```
 
-Skipping the p4 program and wiring the host ports to 100G ports for debugging
------------------------------------------------------------------------------
-
-This **optional** configuration snippet allows you to *entirely bypass the p4 program* contained in the smartnic and deliver all packets directly to the host software.  This is often useful for debug if you have reason to think your p4 program is mishandling the packets.
-
-```
-# Bypass path switching: when connected to the bypass, "wire" host0 <-> port0 and "wire" host1 <-> port1
-sn-cfg configure switch -e bypass:host0:port0 \
-                        -e bypass:host1:port1 \
-			-e bypass:port0:host0 \
-			-e bypass:port1:host1
-
-# Ingress port connections: connect all ingress ports to the bypass path (THIS ENTIRELY SKIPS YOUR P4 PROGRAM and is only for debug/testing that packets are flowing)
-sn-cfg configure switch -i host0:bypass \
-                        -i host1:bypass \
-			-i port0:bypass \
-			-i port1:bypass
-```
-
-**NOTE** Don't forget to restore these settings after you're finished debugging.  Any packets that follow the bypass path will not be processed by the user's p4 program.
+**NOTE** Don't forget to restore these settings after you're finished debugging.  Any packets that follow the bypass path will not be processed by the user application.
 
 Display the current configuration status
 ----------------------------------------
@@ -705,8 +680,8 @@ Configure the Queue mappings for host PF0 and PF1 interfaces and bring up the ph
 
 ```
 $ docker compose exec smartnic-fw bash
-root@smartnic-fw:/# sn-cfg configure host --host-id 0 --dma-base-queue 0 --dma-num-queues 1
-root@smartnic-fw:/# sn-cfg configure host --host-id 1 --dma-base-queue 1 --dma-num-queues 1
+root@smartnic-fw:/# sn-cfg configure host --host-id 0 --reset-dma-queues --dma-queues pf:0:1
+root@smartnic-fw:/# sn-cfg configure host --host-id 1 --reset-dma-queues --dma-queues pf:1:1
 root@smartnic-fw:/# sn-cfg show host config
 root@smartnic-fw:/# sn-cfg configure port --state enable
 root@smartnic-fw:/# sn-cfg show port status

@@ -23,7 +23,7 @@ from sn_cfg_proto import (
 
 from .device import device_id_option
 from .error import error_code_str
-from .utils import apply_options, format_timestamp, natural_sort_key
+from .utils import apply_options, FLOW_CONTROL_THRESHOLD, format_timestamp, natural_sort_key
 
 HEADER_SEP = '-' * 40
 
@@ -56,11 +56,18 @@ LINK_RMAP = dict((name, enum) for enum, name in LINK_MAP.items())
 def port_config_req(dev_id, port_id, **config_kargs):
     req_kargs = {'dev_id': dev_id, 'port_id': port_id}
     if config_kargs:
+        config = PortConfig()
+        req_kargs['config'] = config
+
         for key, rmap in (('state', STATE_RMAP), ('fec', FEC_RMAP), ('loopback', LOOPBACK_RMAP)):
             value = config_kargs.get(key)
             if value is not None:
-                config_kargs[key] = rmap[value]
-        req_kargs['config'] = PortConfig(**config_kargs)
+                setattr(config, key, rmap[value])
+
+        threshold = config_kargs.get('fc_egress_threshold')
+        if threshold is not None:
+            config.flow_control.egress_threshold = threshold
+
     return PortConfigRequest(**req_kargs)
 
 #---------------------------------------------------------------------------------------------------
@@ -94,9 +101,14 @@ def _show_port_config(dev_id, port_id, config):
     rows.append(f'Port ID: {port_id} on device ID {dev_id}')
     rows.append(HEADER_SEP)
 
-    rows.append(f'State:    {STATE_MAP[config.state]}')
-    rows.append(f'FEC:      {FEC_MAP[config.fec]}')
-    rows.append(f'Loopback: {LOOPBACK_MAP[config.loopback]}')
+    rows.append(f'State:                {STATE_MAP[config.state]}')
+    rows.append(f'FEC:                  {FEC_MAP[config.fec]}')
+    rows.append(f'Loopback:             {LOOPBACK_MAP[config.loopback]}')
+
+    fc = config.flow_control
+    rows.append('Flow Control:')
+    threshold = 'unlimited' if fc.egress_threshold < 0 else fc.egress_threshold
+    rows.append(f'    Egress Threshold: {threshold}')
 
     click.echo('\n'.join(rows))
 
@@ -339,6 +351,14 @@ def configure_port_options(fn):
             '--loopback', '-l',
             type=click.Choice(sorted(name for name in LOOPBACK_RMAP)),
             help='Type of loopback to apply to the port.',
+        ),
+        click.option(
+            '--fc-egress-threshold', '-e',
+            type=FLOW_CONTROL_THRESHOLD,
+            help='''
+            FIFO fill level threshold at which to assert egress flow control. Specified as an
+            integer in units of 64 byte words or "unlimited" to disable flow control.
+            ''',
         ),
     )
     return apply_options(options, fn)

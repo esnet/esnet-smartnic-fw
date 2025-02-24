@@ -1,7 +1,7 @@
 #include "agent.hpp"
 
 #include <grpc/grpc.h>
-#include "sn_cfg_v1.grpc.pb.h"
+#include "sn_cfg_v2.grpc.pb.h"
 
 #include "esnet_smartnic_toplevel.h"
 #include "cmac.h"
@@ -11,7 +11,7 @@
 #include <unistd.h>
 
 using namespace grpc;
-using namespace sn_cfg::v1;
+using namespace sn_cfg::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
@@ -37,19 +37,18 @@ static ErrorCode set_defaults_one_to_one(const Device& dev) {
 
     // Default the host interfaces.
     for (unsigned int index = 0; index < dev.nhosts; ++index) {
-        volatile typeof(dev.bar2->qdma_func0)* qdma;
-        switch (index) {
-        case 0: qdma = &dev.bar2->qdma_func0; break;
-        case 1: qdma = &dev.bar2->qdma_func1; break;
-        default:
-            return ErrorCode::EC_UNSUPPORTED_HOST_ID;
+#define NUM_QUEUES 1
+        if (!qdma_function_set_queues(dev.bar2, index, qdma_function_PF,
+                                      index * NUM_QUEUES, NUM_QUEUES)) {
+            return ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
         }
 
-        #define N_QUEUES 1
-        if (!qdma_set_queues(qdma, index * N_QUEUES, N_QUEUES)) {
-            return ErrorCode::EC_FAILED_SET_DMA_QUEUES;
+#ifdef SN_CFG_HOST_SET_QDMA_CHANNEL
+        if (!qdma_channel_set_queues(dev.bar2, index, index * NUM_QUEUES, NUM_QUEUES)) {
+            return ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
         }
-        #undef N_QUEUES
+#endif
+#undef NUM_QUEUES
     }
 
     // Enable the ports.

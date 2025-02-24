@@ -10,8 +10,6 @@ extern "C"
 #include <stdint.h>		/* uint* */
 #include "esnet_smartnic_toplevel.h" /* ESNET_SMARTNIC_* */
 
-#include "smartnic-block-compat.h"
-
 volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_fd(int fd);
 volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_path(const char *path, bool create);
 volatile struct esnet_smartnic_bar2 * smartnic_map_bar2_by_pciaddr(const char *addr);

@@ -6,13 +6,14 @@
 #include <sstream>
 
 #include <grpc/grpc.h>
-#include "sn_cfg_v1.grpc.pb.h"
+#include "sn_cfg_v2.grpc.pb.h"
 
 #include "cmac.h"
 #include "esnet_smartnic_toplevel.h"
+#include "flow_control.h"
 
 using namespace grpc;
-using namespace sn_cfg::v1;
+using namespace sn_cfg::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
@@ -118,6 +119,21 @@ void SmartnicConfigImpl::get_port_config(
                 config->set_loopback(cmac_loopback_is_enabled(cmac) ?
                                      PortLoopback::PORT_LOOPBACK_NEAR_END_PMA :
                                      PortLoopback::PORT_LOOPBACK_NONE);
+
+                struct fc_interface intf = {
+                    .type = fc_interface_type_PORT,
+                    .index = (unsigned int)port_id,
+                };
+                uint32_t threshold;
+                if (!fc_get_egress_threshold(&dev->bar2->smartnic_regs, &intf, &threshold)) {
+                    err = ErrorCode::EC_FAILED_GET_PORT_FC_EGR_THRESHOLD;
+                    goto write_response;
+                }
+
+                {
+                    auto fc = config->mutable_flow_control();
+                    fc->set_egress_threshold(threshold == FC_THRESHOLD_UNLIMITED ? -1 : threshold);
+                }
             }
 
         write_response:
@@ -264,6 +280,21 @@ void SmartnicConfigImpl::set_port_config(
             default:
                 err = ErrorCode::EC_UNSUPPORTED_PORT_LOOPBACK;
                 goto write_response;
+            }
+
+            if (config.has_flow_control()) {
+                auto fc = config.flow_control();
+                auto et = fc.egress_threshold();
+
+                struct fc_interface intf = {
+                    .type = fc_interface_type_PORT,
+                    .index = (unsigned int)port_id,
+                };
+                uint32_t threshold = et < 0 ? FC_THRESHOLD_UNLIMITED : et;
+                if (!fc_set_egress_threshold(&dev->bar2->smartnic_regs, &intf, threshold)) {
+                    err = ErrorCode::EC_FAILED_SET_PORT_FC_EGR_THRESHOLD;
+                    goto write_response;
+                }
             }
 
         write_response:

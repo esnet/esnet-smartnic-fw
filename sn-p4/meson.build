@@ -32,11 +32,59 @@ executable(
         libprom_dep,
         libpromhttp_dep,
         libsnp4_dep,
-        sn_p4_v2_proto_cpp,
+        libsn_p4_proto_dep,
         regmap_dep,
     ],
     # Force linking all libs so that the unreferenced grpc++_reflection lib gets linked
     link_args: '-Wl,--no-as-needed',
+    install: true,
+)
+
+ext_incdir = include_directories('include')
+libsn_p4_client = shared_library(
+    'sn_p4_client',
+    'src/client/client.cpp',
+    dependencies: [
+        libsn_p4_proto_dep,
+    ],
+    include_directories: [
+        ext_incdir,
+    ],
+    install: true,
+    soversion: 1,
+)
+
+pkg = import('pkgconfig')
+pkg.generate(
+    libsn_p4_client,
+    subdirs: 'esnet-smartnic',
+)
+
+libsn_p4_client_dep = declare_dependency(
+    include_directories: [ext_incdir],
+    link_with: [
+        libsn_p4_client,
+    ],
+    dependencies: [
+        libsn_p4_proto_dep,
+    ],
+)
+
+install_headers(
+    [
+        'include/sn_p4_client.hpp',
+    ],
+    subdir: 'esnet-smartnic'
+)
+
+executable(
+    'sn-p4-client-test',
+    files([
+        'src/client/client_test.cpp',
+    ]),
+    dependencies: [
+        libsn_p4_client_dep,
+    ],
     install: true,
 )
 

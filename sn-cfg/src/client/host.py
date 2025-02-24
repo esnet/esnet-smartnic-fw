@@ -4,7 +4,9 @@ __all__ = (
 )
 
 import click
+import gettext
 import grpc
+import re
 
 from sn_cfg_proto import (
     BatchOperation,
@@ -12,29 +14,43 @@ from sn_cfg_proto import (
     ErrorCode,
     HostConfig,
     HostConfigRequest,
-    HostDmaConfig,
+    HostFunctionType,
     HostStatsRequest,
     StatsFilters,
 )
 
 from .device import device_id_option
 from .error import error_code_str
-from .utils import apply_options, format_timestamp, natural_sort_key
+from .utils import apply_options, FLOW_CONTROL_THRESHOLD, format_timestamp, natural_sort_key
 
 HEADER_SEP = '-' * 40
+
+#---------------------------------------------------------------------------------------------------
+FUNC_TYPE_MAP = {
+    HostFunctionType.HOST_FUNC_PHYSICAL: 'pf',
+    HostFunctionType.HOST_FUNC_VIRTUAL: 'vf',
+}
+FUNC_TYPE_RMAP = dict((name, enum) for enum, name in FUNC_TYPE_MAP.items())
 
 #---------------------------------------------------------------------------------------------------
 def host_config_req(dev_id, host_id, **config_kargs):
     req_kargs = {'dev_id': dev_id, 'host_id': host_id}
     if config_kargs:
-        prefix = 'dma_'
-        dma_kargs = dict(
-            (k[len(prefix):], v)
-            for k, v in config_kargs.items()
-            if k.startswith(prefix)
-        )
-        dma = HostDmaConfig(**dma_kargs)
-        req_kargs['config'] = HostConfig(dma=dma)
+        config = HostConfig()
+        req_kargs['config'] = config
+
+        config.dma.reset = config_kargs.get('reset_dma_queues', False)
+        for func_type, func_index, base_queue, num_queues in config_kargs.get('dma_queues', ()):
+            f = config.dma.functions.add()
+            f.func_id.ftype = FUNC_TYPE_RMAP[func_type]
+            f.func_id.index = func_index
+            f.base_queue = base_queue
+            f.num_queues = num_queues
+
+        threshold = config_kargs.get('fc_egress_threshold')
+        if threshold is not None:
+            config.flow_control.egress_threshold = threshold
+
     return HostConfigRequest(**req_kargs)
 
 #---------------------------------------------------------------------------------------------------
@@ -68,9 +84,26 @@ def _show_host_config(dev_id, host_id, config):
     rows.append(f'Host ID: {host_id} on device ID {dev_id}')
     rows.append(HEADER_SEP)
 
-    rows.append(f'DMA:')
-    rows.append(f'    Base queue:       {config.dma.base_queue}')
-    rows.append(f'    Number of queues: {config.dma.num_queues}')
+    dma = config.dma
+    total_queues = sum(map(lambda f: f.num_queues, dma.functions))
+    if total_queues > 0:
+        rows.append(f'DMA:')
+        rows.append(f'    Total Queues:         {total_queues}')
+
+        for f in dma.functions:
+            if f.num_queues > 0:
+                func = FUNC_TYPE_MAP[f.func_id.ftype].upper()
+                if func != 'PF':
+                    func += str(f.func_id.index)
+
+                rows.append(f'    {func}:')
+                rows.append(f'        Base queue:       {f.base_queue}')
+                rows.append(f'        Number of Queues: {f.num_queues}')
+
+    fc = config.flow_control
+    rows.append('Flow Control:')
+    threshold = 'unlimited' if fc.egress_threshold < 0 else fc.egress_threshold
+    rows.append(f'    Egress Threshold: {threshold}')
 
     click.echo('\n'.join(rows))
 
@@ -233,21 +266,83 @@ def clear_host_stats_options(fn):
     )
     return apply_options(options, fn)
 
+class DmaQueues(click.ParamType):
+    # Needed for auto-generated help (or implement get_metavar method instead).
+    name = 'dma_queues'
+
+    FUNC_RE = re.compile(r'^(?P<type>' + '|'.join(FUNC_TYPE_RMAP) + r')(?P<index>\d*)$')
+
+    def convert(self, value, param, ctx):
+        spec = value.split(':')
+        if len(spec) != 3:
+            msg = gettext.gettext(f'"{value}" is not a known format.')
+            self.fail(msg, param, ctx)
+
+        func = spec[0]
+        match = self.FUNC_RE.match(func)
+        if match is None:
+            msg = gettext.gettext(f'"{func}" is not a known function format.')
+            self.fail(msg, param, ctx)
+
+        func_type = match['type']
+        index = match['index']
+        if func_type == 'pf' and index:
+            msg = gettext.gettext(f'Cannot specify an index for physical function "{func}".')
+            self.fail(msg, param, ctx)
+        elif func_type == 'vf' and not index:
+            msg = gettext.gettext(f'Missing index for virtual function "{func}".')
+            self.fail(msg, param, ctx)
+
+        func_index = int(index) if index else 0
+        base_queue = spec[1]
+        num_queues = spec[2]
+
+        try:
+            base_queue = int(base_queue)
+        except ValueError:
+            msg = gettext.gettext(
+                f'Unable to convert field for base queue ID "{base_queue}" as an integer.')
+            self.fail(msg, param, ctx)
+
+        try:
+            num_queues = int(num_queues)
+        except ValueError:
+            msg = gettext.gettext(
+                f'Unable to convert field for number of queues "{num_queues}" as an integer.')
+            self.fail(msg, param, ctx)
+
+        return func_type, func_index, base_queue, num_queues
+
 def configure_host_options(fn):
     options = (
         device_id_option,
         host_id_option,
         click.option(
-            '--dma-base-queue', '-b',
-            type=click.INT,
+            '--dma-queues', '-d',
+            type=DmaQueues(),
+            multiple=True,
             help='''
-            The base queue from which all DMA queues allocated to the host interface are relative.
+            Allocates a contiguous range of queues to a host DMA subchannel. Specified as a triplet
+            of the form <subchannel>:<base-queue>:<num-queues>, where <subchannel> is "pf" for the
+            host physical function's subchannel or "vf<index>" for the subchannels of future host
+            virtual functions (with 0-based <index>), <base-queue> is the integer ID of the first
+            queue in the range and <num-queues> is the integer size of the range.
             ''',
         ),
         click.option(
-            '--dma-num-queues', '-n',
-            type=click.INT,
-            help='Number of DMA queues to allocate to the host interface.',
+            '--reset-dma-queues', '-r',
+            is_flag=True,
+            help='''
+            Reset DMA queue configuration for all subchannels before applying new settings (if any).
+            ''',
+        ),
+        click.option(
+            '--fc-egress-threshold', '-e',
+            type=FLOW_CONTROL_THRESHOLD,
+            help='''
+            FIFO fill level threshold at which to assert egress flow control. Specified as an
+            integer in units of 64 byte words or "unlimited" to disable flow control.
+            ''',
         ),
     )
     return apply_options(options, fn)

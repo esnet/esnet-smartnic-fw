@@ -2,17 +2,20 @@
 #include "device.hpp"
 #include "stats.hpp"
 
+#include <algorithm>
+#include <climits>
 #include <cstdlib>
 #include <sstream>
 
 #include <grpc/grpc.h>
-#include "sn_cfg_v1.grpc.pb.h"
+#include "sn_cfg_v2.grpc.pb.h"
 
 #include "esnet_smartnic_toplevel.h"
+#include "flow_control.h"
 #include "qdma.h"
 
 using namespace grpc;
-using namespace sn_cfg::v1;
+using namespace sn_cfg::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
@@ -54,6 +57,59 @@ void SmartnicConfigImpl::deinit_host(Device* dev) {
         zones->pop_back();
         delete stats;
     }
+}
+
+//--------------------------------------------------------------------------------------------------
+enum qdma_function& operator++(enum qdma_function& func) { // Prefix ++ for convenience.
+    func = static_cast<enum qdma_function>(func + 1);
+    return func;
+}
+
+//--------------------------------------------------------------------------------------------------
+static bool convert_to_driver_qdma_function(const HostFunctionId& id, enum qdma_function& func) {
+    switch (id.ftype()) {
+    case HostFunctionType::HOST_FUNC_PHYSICAL:
+        if (id.index() != 0) {
+            return false;
+        }
+        func = qdma_function_PF;
+        break;
+
+    case HostFunctionType::HOST_FUNC_VIRTUAL:
+        func = static_cast<typeof(func)>(qdma_function_VF_MIN + id.index());
+        if (func >= qdma_function_VF_MAX) {
+            return false;
+        }
+        break;
+
+    case HostFunctionType::HOST_FUNC_UNKNOWN:
+    default:
+        return false;
+    }
+
+    return true;
+}
+
+//--------------------------------------------------------------------------------------------------
+static bool convert_from_driver_qdma_function(HostFunctionId& id, enum qdma_function& func) {
+    switch (func) {
+    case qdma_function_PF:
+        id.set_ftype(HostFunctionType::HOST_FUNC_PHYSICAL);
+        id.set_index(0);
+        break;
+
+    case qdma_function_VF0:
+    case qdma_function_VF1:
+    case qdma_function_VF2:
+        id.set_ftype(HostFunctionType::HOST_FUNC_VIRTUAL);
+        id.set_index(func - qdma_function_VF_MIN);
+        break;
+
+    default:
+        return false;
+    }
+
+    return true;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -99,27 +155,47 @@ void SmartnicConfigImpl::get_host_config(
             HostConfigResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            volatile typeof(dev->bar2->qdma_func0)* qdma;
-            switch (host_id) {
-            case 0: qdma = &dev->bar2->qdma_func0; break;
-            case 1: qdma = &dev->bar2->qdma_func1; break;
-            default:
-                err = ErrorCode::EC_UNSUPPORTED_HOST_ID;
-                goto write_response;
-            }
+            auto config = resp.mutable_config();
+            auto dma = config->mutable_dma();
 
-            unsigned int base_queue;
-            unsigned int num_queues;
-            if (!qdma_get_queues(qdma, &base_queue, &num_queues)) {
-                err = ErrorCode::EC_FAILED_GET_DMA_QUEUES;
-                goto write_response;
-            }
+            for (auto qf = qdma_function_MIN; qf < qdma_function_MAX; ++qf) {
+                unsigned int base_queue;
+                unsigned int num_queues;
+                if (!qdma_function_get_queues(dev->bar2, host_id, qf,
+                                              &base_queue, &num_queues)) {
+                    err = ErrorCode::EC_FAILED_GET_HOST_FUNCTION_DMA_QUEUES;
+                    goto write_response;
+                }
 
-            {
-                auto config = resp.mutable_config();
-                auto dma = config->mutable_dma();
-                dma->set_base_queue(base_queue);
-                dma->set_num_queues(num_queues);
+                {
+                    auto func = dma->add_functions();
+                    auto func_id = func->mutable_func_id();
+                    if (!convert_from_driver_qdma_function(*func_id, qf)) {
+                        err = ErrorCode::EC_UNSUPPORTED_HOST_FUNCTION;
+                        goto write_response;
+                    }
+
+                    func->set_base_queue(base_queue);
+                    func->set_num_queues(num_queues);
+                }
+
+                {
+                    struct fc_interface intf = {
+                        .type = fc_interface_type_HOST,
+                        .index = (unsigned int)host_id,
+                    };
+                    uint32_t threshold;
+                    if (!fc_get_egress_threshold(&dev->bar2->smartnic_regs, &intf, &threshold)) {
+                        err = ErrorCode::EC_FAILED_GET_HOST_FC_EGR_THRESHOLD;
+                        goto write_response;
+                    }
+
+                    {
+                        auto fc = config->mutable_flow_control();
+                        fc->set_egress_threshold(
+                            threshold == FC_THRESHOLD_UNLIMITED ? -1 : threshold);
+                    }
+                }
             }
 
         write_response:
@@ -185,14 +261,6 @@ void SmartnicConfigImpl::set_host_config(
     }
     auto config = req.config();
 
-    if (!config.has_dma()) {
-        HostConfigResponse resp;
-        resp.set_error_code(ErrorCode::EC_MISSING_HOST_DMA_CONFIG);
-        write_resp(resp);
-        return;
-    }
-    auto dma = config.dma();
-
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
 
@@ -216,17 +284,70 @@ void SmartnicConfigImpl::set_host_config(
             HostConfigResponse resp;
             auto err = ErrorCode::EC_OK;
 
-            volatile typeof(dev->bar2->qdma_func0)* qdma;
-            switch (host_id) {
-            case 0: qdma = &dev->bar2->qdma_func0; break;
-            case 1: qdma = &dev->bar2->qdma_func1; break;
-            default:
-                err = ErrorCode::EC_UNSUPPORTED_HOST_ID;
-                goto write_response;
+            if (config.has_dma()) {
+                auto dma = config.dma();
+
+                if (dma.reset()) {
+                    // Reset the queue configuration for all functions.
+                    for (auto qf = qdma_function_MIN; qf < qdma_function_MAX; ++qf) {
+                        qdma_function_set_queues(dev->bar2, host_id, qf, 0, 0);
+                    }
+#ifdef SN_CFG_HOST_SET_QDMA_CHANNEL
+                    qdma_channel_set_queues(dev->bar2, host_id, 0, 0);
+#endif
+                }
+
+                for (auto func : dma.functions()) {
+                    enum qdma_function qf;
+                    if (!convert_to_driver_qdma_function(func.func_id(), qf)) {
+                        err = ErrorCode::EC_UNSUPPORTED_HOST_FUNCTION;
+                        goto write_response;
+                    }
+
+                    if (!qdma_function_set_queues(dev->bar2, host_id, qf,
+                                                  func.base_queue(), func.num_queues())) {
+                        err = ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
+                        goto write_response;
+                    }
+                }
+
+#ifdef SN_CFG_HOST_SET_QDMA_CHANNEL
+                unsigned int chan_base = UINT_MAX;
+                unsigned int chan_queues = 0;
+                for (auto qf = qdma_function_MIN; qf < qdma_function_MAX; ++qf) {
+                    unsigned int func_base;
+                    unsigned int func_queues;
+                    if (!qdma_function_get_queues(dev->bar2, host_id, qf,
+                                                  &func_base, &func_queues)) {
+                        err = ErrorCode::EC_FAILED_SET_HOST_FUNCTION_DMA_QUEUES;
+                        goto write_response;
+                    }
+
+                    if (func_queues > 0) {
+                        chan_base = min(chan_base, func_base);
+                        chan_queues += func_queues;
+                    }
+                }
+
+                if (chan_queues > 0) {
+                    qdma_channel_set_queues(dev->bar2, host_id, chan_base, chan_queues);
+                }
+#endif
             }
 
-            if (!qdma_set_queues(qdma, dma.base_queue(), dma.num_queues())) {
-                err = ErrorCode::EC_FAILED_SET_DMA_QUEUES;
+            if (config.has_flow_control()) {
+                auto fc = config.flow_control();
+                auto et = fc.egress_threshold();
+
+                struct fc_interface intf = {
+                    .type = fc_interface_type_HOST,
+                    .index = (unsigned int)host_id,
+                };
+                uint32_t threshold = et < 0 ? FC_THRESHOLD_UNLIMITED : et;
+                if (!fc_set_egress_threshold(&dev->bar2->smartnic_regs, &intf, threshold)) {
+                    err = ErrorCode::EC_FAILED_SET_HOST_FC_EGR_THRESHOLD;
+                    goto write_response;
+                }
             }
 
         write_response:

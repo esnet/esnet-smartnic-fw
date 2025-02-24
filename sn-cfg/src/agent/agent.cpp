@@ -118,7 +118,6 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
 
             .nhosts = 2,
             .nports = 2,
-            .napps = 2,
 
             .stats = {},
         };

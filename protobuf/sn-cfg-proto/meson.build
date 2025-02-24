@@ -1,18 +1,74 @@
 #---------------------------------------------------------------------------------------------------
+ver = 'v2'
 base_name = 'sn_cfg'
-v1_proto_file = base_name + '_v1.proto'
+base_name_ver = base_name + '_' + ver
+proto_file = base_name_ver + '.proto'
 py_pkg_name = base_name + '_proto'
 py_pkg_ver = '0.1.0'
 py_pkg_stem = py_pkg_name + '-' + py_pkg_ver
 py_pkg_desc = 'SmartNIC Configuration'
 
 #---------------------------------------------------------------------------------------------------
-# C++ generetor.
-sn_cfg_proto_cpp = declare_dependency(
-    sources: protoc_cpp_gen.process(v1_proto_file),
+# C++ library.
+sn_cfg_proto = custom_target(
+    base_name_ver,
+    input: [
+        proto_file,
+    ],
+    output: [
+        base_name_ver + '.pb.cc',
+        base_name_ver + '.grpc.pb.cc',
+
+        base_name_ver + '.pb.h',
+        base_name_ver + '.grpc.pb.h',
+    ],
+    command: [
+        protoc.full_path(),
+        '--proto_path=@CURRENT_SOURCE_DIR@',
+        '--cpp_out=@OUTDIR@',
+        '--grpc_out=@OUTDIR@',
+        '--plugin=protoc-gen-grpc=@0@'.format(grpc_cpp_plugin.path()),
+        '@INPUT@',
+    ],
+    install: true,
+    install_dir: 'include/esnet-smartnic',
+)
+sn_cfg_proto_dep = declare_dependency(
+    sources: [
+        sn_cfg_proto[2],
+        sn_cfg_proto[3],
+    ],
+)
+
+libsn_cfg_proto = shared_library(
+    'sn_cfg_proto',
+    [
+        sn_cfg_proto[0],
+        sn_cfg_proto[1],
+    ],
     dependencies: [
         libgrpcpp,
         libprotobuf,
+        sn_cfg_proto_dep,
+    ],
+    install: true,
+    soversion: 1,
+)
+
+pkg = import('pkgconfig')
+pkg.generate(
+    libsn_cfg_proto,
+    subdirs: 'esnet-smartnic',
+)
+
+libsn_cfg_proto_dep = declare_dependency(
+    link_with: [
+        libsn_cfg_proto,
+    ],
+    dependencies: [
+        libgrpcpp,
+        libprotobuf,
+        sn_cfg_proto_dep,
     ],
 )
 
@@ -23,8 +79,8 @@ custom_target(
     py_pkg_name,
     input: [
         src_dir + '__init__.py',
-        src_dir + 'v1/__init__.py',
-        protoc_py_gen.process(v1_proto_file),
+        src_dir + ver + '/__init__.py',
+        protoc_py_gen.process(proto_file),
     ],
     output: [
         py_pkg_stem + '-py3-none-any.whl',

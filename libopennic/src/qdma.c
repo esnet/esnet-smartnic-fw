@@ -3,16 +3,26 @@
 #include "array_size.h"
 #include "cmac_adapter_block.h"
 #include "memory-barriers.h"
-#include "qdma_function_block.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include "unused.h"
 
 //--------------------------------------------------------------------------------------------------
-bool qdma_get_queues(volatile struct qdma_function_block* qdma,
-                     unsigned int* base_queue, unsigned int* num_queues) {
-    union qdma_function_qconf qconf = {._v = qdma->qconf._v};
+bool qdma_channel_get_queues(volatile struct esnet_smartnic_bar2* bar2, unsigned int channel,
+                             unsigned int* base_queue, unsigned int* num_queues) {
+    volatile struct qdma_function_block* qdma;
+    switch (channel) {
+#define CASE(_chan) case _chan: qdma = &bar2->qdma_func##_chan; break
 
+    CASE(0);
+    CASE(1);
+    default:
+        return false;
+
+#undef CASE
+    }
+
+    union qdma_function_qconf qconf = {._v = qdma->qconf._v};
     *base_queue = qconf.qbase;
     *num_queues = qconf.numq;
 
@@ -20,31 +30,115 @@ bool qdma_get_queues(volatile struct qdma_function_block* qdma,
 }
 
 //--------------------------------------------------------------------------------------------------
-bool qdma_set_queues(volatile struct qdma_function_block* qdma,
-                     unsigned int base_queue, unsigned int num_queues) {
-#define FUNCTION_QUEUES ARRAY_SIZE(qdma->indir_table)
-#define MAX_QUEUES (2 * FUNCTION_QUEUES) // TODO: what is the actual total?
+bool qdma_channel_set_queues(volatile struct esnet_smartnic_bar2* bar2, unsigned int channel,
+                             unsigned int base_queue, unsigned int num_queues) {
+    volatile struct qdma_function_block* qdma;
+    switch (channel) {
+#define CASE(_chan) case _chan: qdma = &bar2->qdma_func##_chan; break
 
-    if (num_queues > FUNCTION_QUEUES || base_queue + num_queues > MAX_QUEUES) {
+    CASE(0);
+    CASE(1);
+    default:
         return false;
-    }
 
-    unsigned int spread = num_queues == 0 ? 1 : num_queues;
-    for (unsigned int q = 0; q < FUNCTION_QUEUES; ++q) {
-        qdma->indir_table[q] = q % spread;
+#undef CASE
     }
-    barrier();
 
     union qdma_function_qconf qconf = {
         .qbase = base_queue,
         .numq = num_queues,
     };
     qdma->qconf._v = qconf._v;
+    barrier();
 
     return true;
+}
 
-#undef MAX_QUEUES
-#undef FUNCTION_QUEUES
+//--------------------------------------------------------------------------------------------------
+bool qdma_function_get_queues(volatile struct esnet_smartnic_bar2* bar2,
+                              unsigned int channel, enum qdma_function func,
+                              unsigned int* base_queue, unsigned int* num_queues) {
+    if (channel >= QDMA_CHANNEL_MAX || func >= qdma_function_MAX) {
+        return false;
+    }
+
+    volatile struct smartnic_block* sn = &bar2->smartnic_regs;
+    switch (channel) {
+#define CASE(_chan) \
+    case _chan: { \
+        union smartnic_igr_q_config_##_chan qconf = {._v = sn->igr_q_config_##_chan[func]._v}; \
+        *base_queue = qconf.base; \
+        *num_queues = qconf.num_q; \
+        break; \
+    }
+
+    CASE(0);
+    CASE(1);
+    default:
+        return false;
+
+#undef CASE
+    }
+
+    return true;
+}
+
+//--------------------------------------------------------------------------------------------------
+bool qdma_function_set_queues(volatile struct esnet_smartnic_bar2* bar2,
+                              unsigned int channel, enum qdma_function func,
+                              unsigned int base_queue, unsigned int num_queues) {
+    if (channel >= QDMA_CHANNEL_MAX || func >= qdma_function_MAX) {
+        return false;
+    }
+
+    volatile struct smartnic_block* sn = &bar2->smartnic_regs;
+    unsigned int spread = num_queues > 0 ? num_queues : 1;
+    switch (channel) {
+#define CASE_H2Q(_func, _name) \
+    case qdma_function_##_func: { \
+        if (num_queues > ARRAY_SIZE(h2q->_name##_table)) { \
+            return false; \
+        }\
+        for (unsigned int q = 0; q < ARRAY_SIZE(h2q->_name##_table); ++q) { \
+            union smartnic_hash2qid_##_name##_table table = {.value = q % spread}; \
+            h2q->_name##_table[q]._v = table._v; \
+        } \
+        break; \
+    }
+#define CASE(_chan) \
+    case _chan: { \
+        volatile struct smartnic_hash2qid_block* h2q = &bar2->smartnic_hash2qid_##_chan; \
+        union smartnic_hash2qid_q_config q_config = {.base = base_queue}; \
+        h2q->q_config[func]._v = q_config._v; \
+        barrier(); \
+        \
+        switch (func) { \
+        CASE_H2Q(PF, pf); \
+        CASE_H2Q(VF0, vf0); \
+        CASE_H2Q(VF1, vf1); \
+        CASE_H2Q(VF2, vf2); \
+        default: return false; \
+        } \
+        barrier(); \
+        \
+        union smartnic_igr_q_config_##_chan qconf = { \
+            .base = base_queue, \
+            .num_q = num_queues, \
+        }; \
+        sn->igr_q_config_##_chan[func]._v = qconf._v; \
+        break; \
+    }
+
+    CASE(0);
+    CASE(1);
+    default:
+        return false;
+
+#undef CASE
+#undef CASE_H2Q
+    }
+
+    return true;
 }
 
 //--------------------------------------------------------------------------------------------------

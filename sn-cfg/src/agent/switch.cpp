@@ -5,13 +5,13 @@
 #include <cstdlib>
 
 #include <grpc/grpc.h>
-#include "sn_cfg_v1.grpc.pb.h"
+#include "sn_cfg_v2.grpc.pb.h"
 
 #include "esnet_smartnic_toplevel.h"
 #include "switch.h"
 
 using namespace grpc;
-using namespace sn_cfg::v1;
+using namespace sn_cfg::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
@@ -41,26 +41,18 @@ void SmartnicConfigImpl::deinit_switch(Device* dev) {
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool interface_to_switch_id(const Device& dev,
-                                   const SwitchInterfaceId& id,
-                                   struct switch_interface_id& intf) {
-    intf.index = id.index();
-    switch (id.itype()) {
-    case SwitchInterfaceType::SW_INTF_PORT:
-        if (intf.index >= dev.nports) {
-            return false;
-        }
-        intf.type = switch_interface_type_PORT;
+template<typename SEL_TYPE>
+static bool convert_to_driver_interface(const SEL_TYPE& sel, enum switch_interface& intf) {
+    switch (sel.intf()) {
+    case SwitchInterface::SW_INTF_PHYSICAL:
+        intf = switch_interface_PHYSICAL;
         break;
 
-    case SwitchInterfaceType::SW_INTF_HOST:
-        if (intf.index >= dev.nhosts) {
-            return false;
-        }
-        intf.type = switch_interface_type_HOST;
+    case SwitchInterface::SW_INTF_TEST:
+        intf = switch_interface_TEST;
         break;
 
-    case SwitchInterfaceType::SW_INTF_UNKNOWN:
+    case SwitchInterface::SW_INTF_UNKNOWN:
     default:
         return false;
     }
@@ -69,19 +61,18 @@ static bool interface_to_switch_id(const Device& dev,
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool interface_from_switch_id(SwitchInterfaceId& id,
-                                     const struct switch_interface_id& intf) {
-    id.set_index(intf.index);
-    switch (intf.type) {
-    case switch_interface_type_PORT:
-        id.set_itype(SwitchInterfaceType::SW_INTF_PORT);
+template<typename SEL_TYPE>
+static bool convert_from_driver_interface(SEL_TYPE& sel, enum switch_interface intf) {
+    switch (intf) {
+    case switch_interface_PHYSICAL:
+        sel.set_intf(SwitchInterface::SW_INTF_PHYSICAL);
         break;
 
-    case switch_interface_type_HOST:
-        id.set_itype(SwitchInterfaceType::SW_INTF_HOST);
+    case switch_interface_TEST:
+        sel.set_intf(SwitchInterface::SW_INTF_TEST);
         break;
 
-    case switch_interface_type_UNKNOWN:
+    case switch_interface_UNKNOWN:
     default:
         return false;
     }
@@ -90,33 +81,22 @@ static bool interface_from_switch_id(SwitchInterfaceId& id,
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool processor_to_switch_id(const Device& dev,
-                                   const SwitchProcessorId& id,
-                                   struct switch_processor_id& proc) {
-    proc.index = id.index();
-    switch (id.ptype()) {
-    case SwitchProcessorType::SW_PROC_BYPASS:
-        if (proc.index != 0) {
-            return false;
-        }
-        proc.type = switch_processor_type_BYPASS;
+static bool convert_to_driver_destination(const SwitchIngressSelector& sel,
+                                          enum switch_destination& dest) {
+    switch (sel.dest()) {
+    case SwitchDestination::SW_DEST_BYPASS:
+        dest = switch_destination_BYPASS;
         break;
 
-    case SwitchProcessorType::SW_PROC_DROP:
-        if (proc.index != 0) {
-            return false;
-        }
-        proc.type = switch_processor_type_DROP;
+    case SwitchDestination::SW_DEST_DROP:
+        dest = switch_destination_DROP;
         break;
 
-    case SwitchProcessorType::SW_PROC_APP:
-        if (proc.index >= dev.napps) {
-            return false;
-        }
-        proc.type = switch_processor_type_APP;
+    case SwitchDestination::SW_DEST_APP:
+        dest = switch_destination_APP;
         break;
 
-    case SwitchProcessorType::SW_PROC_UNKNOWN:
+    case SwitchDestination::SW_DEST_UNKNOWN:
     default:
         return false;
     }
@@ -125,23 +105,22 @@ static bool processor_to_switch_id(const Device& dev,
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool processor_from_switch_id(SwitchProcessorId& id,
-                                     const struct switch_processor_id& proc) {
-    id.set_index(proc.index);
-    switch (proc.type) {
-    case switch_processor_type_BYPASS:
-        id.set_ptype(SwitchProcessorType::SW_PROC_BYPASS);
+static bool convert_from_driver_destination(SwitchIngressSelector& sel,
+                                            enum switch_destination dest) {
+    switch (dest) {
+    case switch_destination_BYPASS:
+        sel.set_dest(SwitchDestination::SW_DEST_BYPASS);
         break;
 
-    case switch_processor_type_DROP:
-        id.set_ptype(SwitchProcessorType::SW_PROC_DROP);
+    case switch_destination_DROP:
+        sel.set_dest(SwitchDestination::SW_DEST_DROP);
         break;
 
-    case switch_processor_type_APP:
-        id.set_ptype(SwitchProcessorType::SW_PROC_APP);
+    case switch_destination_APP:
+        sel.set_dest(SwitchDestination::SW_DEST_APP);
         break;
 
-    case switch_processor_type_UNKNOWN:
+    case switch_destination_UNKNOWN:
     default:
         return false;
     }
@@ -150,128 +129,43 @@ static bool processor_from_switch_id(SwitchProcessorId& id,
 }
 
 //--------------------------------------------------------------------------------------------------
-static ErrorCode get_switch_ingress_config(const Device& dev,
-                                           SwitchConfig& config,
-                                           const struct switch_interface_id& intf) {
-    volatile auto blk = &dev.bar2->smartnic_regs;
+static bool convert_to_driver_bypass_mode(const SwitchConfig& config,
+                                          enum switch_bypass_mode& mode) {
+    switch (config.bypass_mode()) {
+    case SwitchBypassMode::SW_BYPASS_STRAIGHT:
+        mode = switch_bypass_mode_STRAIGHT;
+        break;
 
-    struct switch_interface_id to_intf;
-    if (!switch_get_ingress_source(blk, &intf, &to_intf)) {
-        return ErrorCode::EC_FAILED_GET_IGR_SRC;
+    case SwitchBypassMode::SW_BYPASS_SWAP:
+        mode = switch_bypass_mode_SWAP;
+        break;
+
+    case SwitchBypassMode::SW_BYPASS_UNKNOWN:
+    default:
+        return false;
     }
 
-    auto src = config.add_ingress_sources();
-    if (!interface_from_switch_id(*src->mutable_from_intf(), intf)) {
-        return ErrorCode::EC_UNSUPPORTED_IGR_SRC_FROM_INTF;
-    }
-
-    if (!interface_from_switch_id(*src->mutable_to_intf(), to_intf)) {
-        return ErrorCode::EC_UNSUPPORTED_IGR_SRC_TO_INTF;
-    }
-
-    struct switch_processor_id to_proc;
-    if (!switch_get_ingress_connection(blk, &intf, &to_proc)) {
-        return ErrorCode::EC_FAILED_GET_IGR_CONN;
-    }
-
-    auto conn = config.add_ingress_connections();
-    if (!interface_from_switch_id(*conn->mutable_from_intf(), intf)) {
-        return ErrorCode::EC_UNSUPPORTED_IGR_CONN_FROM_INTF;
-    }
-
-    if (!processor_from_switch_id(*conn->mutable_to_proc(), to_proc)) {
-        return ErrorCode::EC_UNSUPPORTED_IGR_CONN_TO_PROC;
-    }
-
-    return ErrorCode::EC_OK;
+    return true;
 }
 
 //--------------------------------------------------------------------------------------------------
-static ErrorCode get_switch_egress_config(const Device& dev,
-                                          SwitchConfig& config,
-                                          const struct switch_interface_id& intf,
-                                          const enum switch_processor_type type) {
-    volatile auto blk = &dev.bar2->smartnic_regs;
-    struct switch_processor_id proc = {.type = type, .index = 0};
-    unsigned int max_index = 0;
-
-    switch (type) {
-    case switch_processor_type_BYPASS:
-        max_index = 1;
+static bool convert_from_driver_bypass_mode(SwitchConfig& config,
+                                            const enum switch_bypass_mode mode) {
+    switch (mode) {
+    case switch_bypass_mode_STRAIGHT:
+        config.set_bypass_mode(SwitchBypassMode::SW_BYPASS_STRAIGHT);
         break;
 
-    case switch_processor_type_APP:
-        max_index = dev.napps;
+    case switch_bypass_mode_SWAP:
+        config.set_bypass_mode(SwitchBypassMode::SW_BYPASS_SWAP);
         break;
 
-    case switch_processor_type_DROP:
-    case switch_processor_type_UNKNOWN:
+    case switch_bypass_mode_UNKNOWN:
     default:
-        break;
+        return false;
     }
 
-    for (; proc.index < max_index; ++proc.index) {
-        struct switch_interface_id to_intf;
-        if (!switch_get_egress_connection(blk, &proc, &intf, &to_intf)) {
-            return ErrorCode::EC_FAILED_GET_EGR_CONN;
-        }
-
-        auto conn = config.add_egress_connections();
-        if (!processor_from_switch_id(*conn->mutable_on_proc(), proc)) {
-            return ErrorCode::EC_UNSUPPORTED_EGR_CONN_ON_PROC;
-        }
-
-        if (!interface_from_switch_id(*conn->mutable_from_intf(), intf)) {
-            return ErrorCode::EC_UNSUPPORTED_EGR_CONN_FROM_INTF;
-        }
-
-        if (!interface_from_switch_id(*conn->mutable_to_intf(), to_intf)) {
-            return ErrorCode::EC_UNSUPPORTED_EGR_CONN_TO_INTF;
-        }
-    }
-
-    return ErrorCode::EC_OK;
-}
-
-//--------------------------------------------------------------------------------------------------
-static ErrorCode get_switch_interface_config(const Device& dev,
-                                             SwitchConfig& config,
-                                             const enum switch_interface_type type) {
-    struct switch_interface_id intf = {.type = type, .index = 0};
-    unsigned int max_index = 0;
-
-    switch (type) {
-    case switch_interface_type_PORT:
-        max_index = dev.nports;
-        break;
-
-    case switch_interface_type_HOST:
-        max_index = dev.nhosts;
-        break;
-
-    case switch_interface_type_UNKNOWN:
-    default:
-        break;
-    }
-
-    for (; intf.index < max_index; ++intf.index) {
-        auto err = get_switch_ingress_config(dev, config, intf);
-        if (err != ErrorCode::EC_OK) {
-            return err;
-        }
-
-        err = get_switch_egress_config(dev, config, intf, switch_processor_type_BYPASS);
-        if (err != ErrorCode::EC_OK) {
-            return err;
-        }
-
-        err = get_switch_egress_config(dev, config, intf, switch_processor_type_APP);
-        if (err != ErrorCode::EC_OK) {
-            return err;
-        }
-    }
-
-    return ErrorCode::EC_OK;
+    return true;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -296,14 +190,66 @@ void SmartnicConfigImpl::get_switch_config(
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
+        volatile auto blk = &dev->bar2->smartnic_regs;
+        auto err = ErrorCode::EC_OK;
         SwitchConfigResponse resp;
         auto config = resp.mutable_config();
 
-        auto err = get_switch_interface_config(*dev, *config, switch_interface_type_PORT);
-        if (err == ErrorCode::EC_OK) {
-            err = get_switch_interface_config(*dev, *config, switch_interface_type_HOST);
+        for (unsigned int port_id = 0; port_id < dev->nports; ++port_id) {
+            struct switch_ingress_selector is;
+            is.index = port_id;
+            if (!switch_get_ingress_selector(blk, &is)) {
+                err = ErrorCode::EC_FAILED_GET_IGR_SEL;
+                goto write_response;
+            }
+
+            {
+                auto sel = config->add_ingress_selectors();
+                sel->set_index(is.index);
+
+                if (!convert_from_driver_interface<typeof(*sel)>(*sel, is.intf)) {
+                    err = ErrorCode::EC_UNSUPPORTED_IGR_SEL_INTF;
+                    goto write_response;
+                }
+
+                if (!convert_from_driver_destination(*sel, is.dest)) {
+                    err = ErrorCode::EC_UNSUPPORTED_IGR_SEL_DEST;
+                    goto write_response;
+                }
+            }
+
+            struct switch_egress_selector es;
+            es.index = port_id;
+            if (!switch_get_egress_selector(blk, &es)) {
+                err = ErrorCode::EC_FAILED_GET_EGR_SEL;
+                goto write_response;
+            }
+
+            {
+                auto sel = config->add_egress_selectors();
+                sel->set_index(es.index);
+
+                if (!convert_from_driver_interface<typeof(*sel)>(*sel, es.intf)) {
+                    err = ErrorCode::EC_UNSUPPORTED_EGR_SEL_INTF;
+                    goto write_response;
+                }
+            }
         }
 
+        {
+            enum switch_bypass_mode mode;
+            if (!switch_get_bypass_mode(blk, &mode)) {
+                err = ErrorCode::EC_FAILED_GET_BYPASS_MODE;
+                goto write_response;
+            }
+
+            if (!convert_from_driver_bypass_mode(*config, mode)) {
+                err = ErrorCode::EC_UNSUPPORTED_BYPASS_MODE;
+                goto write_response;
+            }
+        }
+
+    write_response:
         resp.set_error_code(err);
         resp.set_dev_id(dev_id);
 
@@ -370,100 +316,50 @@ void SmartnicConfigImpl::set_switch_config(
         auto err = ErrorCode::EC_OK;
         SwitchConfigResponse resp;
 
-        for (auto src : config.ingress_sources()) {
-            if (!src.has_from_intf()) {
-                err = ErrorCode::EC_MISSING_IGR_SRC_FROM_INTF;
+        for (auto sel : config.ingress_selectors()) {
+            struct switch_ingress_selector is;
+            is.index = sel.index();
+
+            if (!convert_to_driver_interface<typeof(sel)>(sel, is.intf)) {
+                err = ErrorCode::EC_UNSUPPORTED_IGR_SEL_INTF;
                 goto write_response;
             }
 
-            if (!src.has_to_intf()) {
-                err = ErrorCode::EC_MISSING_IGR_SRC_TO_INTF;
+            if (!convert_to_driver_destination(sel, is.dest)) {
+                err = ErrorCode::EC_UNSUPPORTED_IGR_SEL_DEST;
                 goto write_response;
             }
 
-            struct switch_interface_id from_intf;
-            if (!interface_to_switch_id(*dev, src.from_intf(), from_intf)) {
-                err = ErrorCode::EC_UNSUPPORTED_IGR_SRC_FROM_INTF;
-                goto write_response;
-            }
-
-            struct switch_interface_id to_intf;
-            if (!interface_to_switch_id(*dev, src.to_intf(), to_intf)) {
-                err = ErrorCode::EC_UNSUPPORTED_IGR_SRC_TO_INTF;
-                goto write_response;
-            }
-
-            if (!switch_set_ingress_source(blk, &from_intf, &to_intf)) {
-                err = ErrorCode::EC_FAILED_SET_IGR_SRC;
+            if (!switch_set_ingress_selector(blk, &is)) {
+                err = ErrorCode::EC_FAILED_SET_IGR_SEL;
                 goto write_response;
             }
         }
 
-        for (auto conn : config.ingress_connections()) {
-            if (!conn.has_from_intf()) {
-                err = ErrorCode::EC_MISSING_IGR_CONN_FROM_INTF;
+        for (auto sel : config.egress_selectors()) {
+            struct switch_egress_selector es;
+            es.index = sel.index();
+
+            if (!convert_to_driver_interface<typeof(sel)>(sel, es.intf)) {
+                err = ErrorCode::EC_UNSUPPORTED_EGR_SEL_INTF;
                 goto write_response;
             }
 
-            if (!conn.has_to_proc()) {
-                err = ErrorCode::EC_MISSING_IGR_CONN_TO_PROC;
-                goto write_response;
-            }
-
-            struct switch_interface_id from_intf;
-            if (!interface_to_switch_id(*dev, conn.from_intf(), from_intf)) {
-                err = ErrorCode::EC_UNSUPPORTED_IGR_CONN_FROM_INTF;
-                goto write_response;
-            }
-
-            struct switch_processor_id to_proc;
-            if (!processor_to_switch_id(*dev, conn.to_proc(), to_proc)) {
-                err = ErrorCode::EC_UNSUPPORTED_IGR_CONN_TO_PROC;
-                goto write_response;
-            }
-
-            if (!switch_set_ingress_connection(blk, &from_intf, &to_proc)) {
-                err = ErrorCode::EC_FAILED_SET_IGR_CONN;
+            if (!switch_set_egress_selector(blk, &es)) {
+                err = ErrorCode::EC_FAILED_SET_EGR_SEL;
                 goto write_response;
             }
         }
 
-        for (auto conn : config.egress_connections()) {
-            if (!conn.has_on_proc()) {
-                err = ErrorCode::EC_MISSING_EGR_CONN_ON_PROC;
+        if (config.bypass_mode() != SwitchBypassMode::SW_BYPASS_UNKNOWN) {
+            enum switch_bypass_mode mode;
+            if (!convert_to_driver_bypass_mode(config, mode)) {
+                err = ErrorCode::EC_UNSUPPORTED_BYPASS_MODE;
                 goto write_response;
             }
 
-            if (!conn.has_from_intf()) {
-                err = ErrorCode::EC_MISSING_EGR_CONN_FROM_INTF;
-                goto write_response;
-            }
-
-            if (!conn.has_to_intf()) {
-                err = ErrorCode::EC_MISSING_EGR_CONN_TO_INTF;
-                goto write_response;
-            }
-
-            struct switch_processor_id on_proc;
-            if (!processor_to_switch_id(*dev, conn.on_proc(), on_proc)) {
-                err = ErrorCode::EC_UNSUPPORTED_EGR_CONN_ON_PROC;
-                goto write_response;
-            }
-
-            struct switch_interface_id from_intf;
-            if (!interface_to_switch_id(*dev, conn.from_intf(), from_intf)) {
-                err = ErrorCode::EC_UNSUPPORTED_EGR_CONN_FROM_INTF;
-                goto write_response;
-            }
-
-            struct switch_interface_id to_intf;
-            if (!interface_to_switch_id(*dev, conn.to_intf(), to_intf)) {
-                err = ErrorCode::EC_UNSUPPORTED_EGR_CONN_TO_INTF;
-                goto write_response;
-            }
-
-            if (!switch_set_egress_connection(blk, &on_proc, &from_intf, &to_intf)) {
-                err = ErrorCode::EC_FAILED_SET_EGR_CONN;
+            if (!switch_set_bypass_mode(blk, mode)) {
+                err = ErrorCode::EC_FAILED_SET_BYPASS_MODE;
                 goto write_response;
             }
         }
