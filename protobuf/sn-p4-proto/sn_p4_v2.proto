@@ -349,6 +349,7 @@ enum ServerDebugFlag {
     DEBUG_FLAG_TABLE_RULE_INSERT = 2;
     DEBUG_FLAG_TABLE_RULE_DELETE = 3;
     DEBUG_FLAG_PIPELINE_INFO = 10;
+    DEBUG_FLAG_PIPELINE_DRIVER = 11;
 }
 
 message ServerDebug {
