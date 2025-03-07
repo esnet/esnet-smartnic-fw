@@ -19,18 +19,31 @@ using namespace sn_cfg::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
+const char* device_stats_domain_name(DeviceStatsDomain dom) {
+    switch (dom) {
+    case DeviceStatsDomain::COUNTERS: return "COUNTERS";
+    case DeviceStatsDomain::MONITORS: return "MONITORS";
+    case DeviceStatsDomain::MODULES: return "MODULES";
+
+    case DeviceStatsDomain::NDOMAINS:
+        break;
+    }
+    return "UNKNOWN";
+}
+
+//--------------------------------------------------------------------------------------------------
 static uint16_t read_hex_pci_id(const string& bus_id, const string& file) {
     string path = "/sys/bus/pci/devices/" + bus_id + '/' + file;
     ifstream in(path, ios::in);
     if (!in.is_open()) {
-        cerr << "ERROR: Failed to open file '" << path << "'." << endl;
+        SERVER_LOG_LINE_INIT(device, ERROR, "Failed to open file '" << path << "'");
         return 0xffff;
     }
 
     ostringstream out;
     out << in.rdbuf();
     if (in.fail()) {
-        cerr << "ERROR: Failed to read file '" << path << "'." << endl;
+        SERVER_LOG_LINE_INIT(device, ERROR, "Failed to read file '" << path << "'");
         return 0xffff;
     }
 
@@ -76,6 +89,9 @@ void SmartnicConfigImpl::init_device(Device* dev) {
 
     unsigned int n = 0;
     for (auto info : sysmons) {
+        SERVER_LOG_LINE_INIT(device, INFO,
+            "Initializing sysmon " << n << " on device " << dev->bus_id);
+
         ostringstream name;
         name << "sysmon" << n;
         n += 1;
@@ -87,18 +103,21 @@ void SmartnicConfigImpl::init_device(Device* dev) {
         stats->zone = sysmon_stats_zone_alloc(
             dev->stats.domains[DeviceStatsDomain::MONITORS], info.blk, stats->name.c_str());
         if (stats->zone == NULL) {
-            cerr << "ERROR: Failed to alloc sysmon " << n << " stats zone for device "
-                 << dev->bus_id << "."  << endl;
+            SERVER_LOG_LINE_INIT(device, ERROR,
+                "Failed to alloc sysmon " << n << " stats zone for device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
         dev->stats.zones[DeviceStatsZone::SYSMON_MONITORS].push_back(stats);
+        SERVER_LOG_LINE_INIT(device, INFO,
+            "Setup monitors for sysmon " << n << " on device " << dev->bus_id);
     }
 
+    SERVER_LOG_LINE_INIT(device, INFO, "Initializing CMS on device " << dev->bus_id);
     dev->cms.blk = &dev->bar2->cms;
     cms_init(&dev->cms);
     if (!cms_reset(&dev->cms)) {
-        cerr << "ERROR: Failed to reset CMS for device " << dev->bus_id << "."  << endl;
+        SERVER_LOG_LINE_INIT(device, ERROR, "Failed to reset CMS for device " << dev->bus_id);
         exit(EXIT_FAILURE);
     }
 
@@ -107,10 +126,12 @@ void SmartnicConfigImpl::init_device(Device* dev) {
     stats->zone = cms_card_stats_zone_alloc(
         dev->stats.domains[DeviceStatsDomain::MONITORS], &dev->cms, stats->name.c_str());
     if (stats->zone == NULL) {
-        cerr << "ERROR: Failed to alloc CMS stats zone for device " << dev->bus_id << "."  << endl;
+        SERVER_LOG_LINE_INIT(device, ERROR,
+            "Failed to alloc CMS stats zone for device " << dev->bus_id);
         exit(EXIT_FAILURE);
     }
     dev->stats.zones[DeviceStatsZone::CARD_MONITORS].push_back(stats);
+    SERVER_LOG_LINE_INIT(device, INFO, "Setup monitors for CMS on device " << dev->bus_id);
 }
 
 //--------------------------------------------------------------------------------------------------

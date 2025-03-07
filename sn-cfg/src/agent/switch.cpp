@@ -21,11 +21,13 @@ void SmartnicConfigImpl::init_switch(Device* dev) {
     stats->zone = switch_stats_zone_alloc(
         dev->stats.domains[DeviceStatsDomain::COUNTERS], dev->bar2, stats->name.c_str());
     if (stats->zone == NULL) {
-        cerr << "ERROR: Failed to alloc stats zone for switch." << endl;
+        SERVER_LOG_LINE_INIT(switch, ERROR,
+            "Failed to alloc stats zone for switch on device " << dev->bus_id);
         exit(EXIT_FAILURE);
     }
 
     dev->stats.zones[DeviceStatsZone::SWITCH_COUNTERS].push_back(stats);
+    SERVER_LOG_LINE_INIT(switch, INFO, "Setup counters for switch on device " << dev->bus_id);
 }
 
 //--------------------------------------------------------------------------------------------------

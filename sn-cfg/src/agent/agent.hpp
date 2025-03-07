@@ -121,10 +121,25 @@ private:
 
     const char* debug_flag_label(const ServerDebugFlag flag);
 
-#define SERVER_LOG_IF_DEBUG(_flag, _label, _stream_statements) \
+#define _SERVER_LOG(_label_str, _log_type, _stream_statements) \
+    cerr << #_log_type "[" << _label_str << "]: " << _stream_statements << flush
+#define SERVER_LOG(_label, _log_type, _stream_statements) \
+    _SERVER_LOG(#_label, _log_type, _stream_statements)
+#define SERVER_LOG_LINE(_label, _log_type, _stream_statements) \
+    SERVER_LOG(_label, _log_type, _stream_statements << endl)
+
+#define SERVER_LOG_INIT(_label, _log_type, _stream_statements) \
+    SERVER_LOG(_label, INIT_##_log_type, _stream_statements)
+#define SERVER_LOG_LINE_INIT(_label, _log_type, _stream_statements) \
+    SERVER_LOG_INIT(_label, _log_type, _stream_statements << endl)
+
+#define SERVER_LOG_DEBUG(_label_str, _log_type, _stream_statements) \
+    _SERVER_LOG(_label_str, DEBUG_##_log_type, _stream_statements)
+#define SERVER_LOG_LINE_DEBUG(_flag, _log_type, _stream_statements) \
+    _SERVER_LOG(this->debug_flag_label(_flag), DEBUG_##_log_type, _stream_statements << endl)
+#define SERVER_LOG_IF_DEBUG(_flag, _log_type, _stream_statements) \
     if (this->debug.flags.test(_flag)) { \
-        cerr << "DEBUG_" #_label "[" << this->debug_flag_label(_flag) << "]: " \
-             << _stream_statements << endl; \
+        SERVER_LOG_LINE_DEBUG(_flag, _log_type, _stream_statements); \
     }
 
     struct {

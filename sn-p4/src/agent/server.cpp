@@ -123,6 +123,7 @@ void SmartnicP4Impl::init_server_stats(void) {
     }
 
     server_stats.status = stats;
+    SERVER_LOG_LINE_INIT(server, INFO, "Setup server status");
 }
 
 //--------------------------------------------------------------------------------------------------

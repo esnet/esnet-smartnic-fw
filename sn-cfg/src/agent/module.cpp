@@ -124,11 +124,15 @@ void SmartnicConfigImpl::init_module(Device* dev) {
         stats->zone = cms_module_stats_zone_alloc(
             dev->stats.domains[DeviceStatsDomain::MODULES], &dev->cms, mod_id, stats->name.c_str());
         if (stats->zone == NULL) {
-            cerr << "ERROR: Failed to alloc stats zone for module ID " << mod_id << "."  << endl;
+            SERVER_LOG_LINE_INIT(module, ERROR,
+                "Failed to alloc stats zone for module ID " << mod_id <<
+                " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
         dev->stats.zones[DeviceStatsZone::MODULE_MONITORS].push_back(stats);
+        SERVER_LOG_LINE_INIT(module, INFO,
+            "Setup monitors for module ID " << mod_id << " on device " << dev->bus_id);
     }
 }
 
