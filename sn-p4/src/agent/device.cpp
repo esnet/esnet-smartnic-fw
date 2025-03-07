@@ -17,18 +17,29 @@ using namespace sn_p4::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
+const char* device_stats_domain_name(DeviceStatsDomain dom) {
+    switch (dom) {
+    case DeviceStatsDomain::COUNTERS: return "COUNTERS";
+
+    case DeviceStatsDomain::NDOMAINS:
+        break;
+    }
+    return "UNKNOWN";
+}
+
+//--------------------------------------------------------------------------------------------------
 static uint16_t read_hex_pci_id(const string& bus_id, const string& file) {
     string path = "/sys/bus/pci/devices/" + bus_id + '/' + file;
     ifstream in(path, ios::in);
     if (!in.is_open()) {
-        cerr << "ERROR: Failed to open file '" << path << "'." << endl;
+        SERVER_LOG_LINE_INIT(device, ERROR, "Failed to open file '" << path << "'");
         return 0xffff;
     }
 
     ostringstream out;
     out << in.rdbuf();
     if (in.fail()) {
-        cerr << "ERROR: Failed to read file '" << path << "'." << endl;
+        SERVER_LOG_LINE_INIT(device, ERROR, "Failed to read file '" << path << "'");
         return 0xffff;
     }
 

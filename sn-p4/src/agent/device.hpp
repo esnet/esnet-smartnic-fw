@@ -15,6 +15,7 @@ enum DeviceStatsDomain {
     COUNTERS,
     NDOMAINS
 };
+const char* device_stats_domain_name(DeviceStatsDomain dom);
 
 struct DeviceStats {
     string zone_name;
