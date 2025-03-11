@@ -19,6 +19,7 @@ const char* SmartnicP4Impl::debug_flag_label(const ServerDebugFlag flag) {
     case ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_INSERT: return "TABLE_RULE_INSERT";
     case ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_DELETE: return "TABLE_RULE_DELETE";
     case ServerDebugFlag::DEBUG_FLAG_PIPELINE_INFO: return "PIPELINE_INFO";
+    case ServerDebugFlag::DEBUG_FLAG_PIPELINE_DRIVER: return "PIPELINE_DRIVER";
 
     case ServerDebugFlag::DEBUG_FLAG_UNKNOWN:
     default:
@@ -118,36 +119,37 @@ void SmartnicP4Impl::init_server_stats(void) {
     auto stats = new ServerStats;
     stats->zone = stats_zone_alloc(server_stats.domain, &zspec);
     if (stats->zone == NULL) {
-        cerr << "ERROR: Failed to alloc server status stats zone."  << endl;
+        SERVER_LOG_LINE_INIT(server, ERROR, "Failed to alloc server status stats zone");
         exit(EXIT_FAILURE);
     }
 
     server_stats.status = stats;
+    SERVER_LOG_LINE_INIT(server, INFO, "Setup server status");
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::init_server(void) {
     auto rv = timespec_get(&timestamp.start_wall, TIME_UTC);
     if (rv != TIME_UTC) {
-        cerr << "ERROR: timespec_get failed with " << rv << "." << endl;
+        SERVER_LOG_LINE_INIT(server, ERROR, "timespec_get failed with " << rv);
         exit(EXIT_FAILURE);
     }
 
     rv = clock_gettime(CLOCK_MONOTONIC, &timestamp.start_mono);
     if (rv != 0) {
-        cerr << "ERROR: monotonic clock_gettime failed with " << rv << "." << endl;
+        SERVER_LOG_LINE_INIT(server, ERROR, "monotonic clock_gettime failed with " << rv);
         exit(EXIT_FAILURE);
     }
 
     init_server_stats();
 
-    cout << "--- UTC start time: "
-         << put_time(gmtime(&timestamp.start_wall.tv_sec), "%Y-%m-%d %H:%M:%S %z")
-         << " ["
-         << timestamp.start_wall.tv_sec << "s."
-         << timestamp.start_wall.tv_nsec << "ns"
-         << "]"
-         << endl;
+    SERVER_LOG_LINE_INIT(server, INFO,
+        "UTC start time " <<
+        put_time(gmtime(&timestamp.start_wall.tv_sec), "%Y-%m-%d %H:%M:%S %z") <<
+        " [" <<
+        timestamp.start_wall.tv_sec << "s." <<
+        timestamp.start_wall.tv_nsec << "ns" <<
+        "]");
 }
 
 //--------------------------------------------------------------------------------------------------

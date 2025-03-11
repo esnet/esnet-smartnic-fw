@@ -18,6 +18,7 @@ void SmartnicP4Impl::clear_table(
     const TableRequest& req,
     function<void(const TableResponse&)> write_resp) {
     const auto debug_flag = ServerDebugFlag::DEBUG_FLAG_TABLE_CLEAR;
+    bool drv_log_enable = debug.flags.test(ServerDebugFlag::DEBUG_FLAG_PIPELINE_DRIVER);
 
     int begin_dev_id = 0;
     int end_dev_id = devices.size() - 1;
@@ -62,6 +63,8 @@ void SmartnicP4Impl::clear_table(
         const auto table_name = req.table_name();
         for (pipeline_id = begin_pipeline_id; pipeline_id <= end_pipeline_id; ++pipeline_id) {
             const auto pipeline = dev->pipelines[pipeline_id];
+            snp4_log_enable(pipeline->handle, drv_log_enable, "DEBUG_INFO[PIPELINE_DRIVER]: ");
+
             TableResponse resp;
             auto err = ErrorCode::EC_OK;
 
@@ -69,6 +72,9 @@ void SmartnicP4Impl::clear_table(
             if (table_name.empty()) {
                 if (!snp4_reset_all_tables(pipeline->handle)) {
                     err = ErrorCode::EC_FAILED_CLEAR_ALL_TABLES;
+                    SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                        "Failed to clear all tables in pipeline ID " << pipeline_id <<
+                        " on device ID " << dev_id);
                 } else {
                     SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                         "Cleared all tables in pipeline ID " << pipeline_id <<
@@ -98,6 +104,8 @@ void SmartnicP4Impl::clear_table(
             resp.set_pipeline_id(pipeline_id);
 
             write_resp(resp);
+
+            snp4_log_enable(pipeline->handle, false, NULL);
         }
     }
 }
@@ -274,6 +282,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
     auto debug_flag = do_insert ?
         ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_INSERT :
         ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_DELETE;
+    bool drv_log_enable = debug.flags.test(ServerDebugFlag::DEBUG_FLAG_PIPELINE_DRIVER);
 
     int begin_dev_id = 0;
     int end_dev_id = devices.size() - 1;
@@ -317,9 +326,10 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
 
         for (pipeline_id = begin_pipeline_id; pipeline_id <= end_pipeline_id; ++pipeline_id) {
             const auto pipeline = dev->pipelines[pipeline_id];
+            snp4_log_enable(pipeline->handle, drv_log_enable, "DEBUG_INFO[PIPELINE_DRIVER]: ");
+
             TableRuleResponse resp;
             auto err = ErrorCode::EC_OK;
-
             unsigned int rule_count = req.rules_size();
             SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                 "Processing " << rule_count <<
@@ -484,7 +494,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                                 " on device ID " << dev_id <<
                                 " (rule " << rule_idx << "/" << rule_count << ")");
                         } else {
-                            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                            SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                                 "Inserted rule into table '" << table_name <<
                                 "' in pipeline ID " << pipeline_id <<
                                 " on device ID " << dev_id <<
@@ -502,7 +512,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                                 " on device ID " << dev_id <<
                                 " (rule " << rule_idx << "/" << rule_count << ")");
                         } else {
-                            SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
+                            SERVER_LOG_IF_DEBUG(debug_flag, INFO,
                                 "Deleted rule from table '" << table_name <<
                                 "' in pipeline ID " << pipeline_id <<
                                 " on device ID " << dev_id <<
@@ -527,6 +537,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
             resp.set_pipeline_id(pipeline_id);
 
             write_resp(resp);
+
+            snp4_log_enable(pipeline->handle, false, NULL);
         }
     }
 }

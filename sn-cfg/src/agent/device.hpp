@@ -17,6 +17,7 @@ enum DeviceStatsDomain {
     MODULES,
     NDOMAINS
 };
+const char* device_stats_domain_name(DeviceStatsDomain dom);
 
 enum DeviceStatsZone {
     CARD_MONITORS,

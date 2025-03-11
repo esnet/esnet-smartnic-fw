@@ -115,6 +115,10 @@ static void init_counters_block_metric(InitCountersBlock* blk,
 //--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::init_counters(Device* dev, DevicePipeline* pipeline) {
     const auto pi = &pipeline->info;
+    SERVER_LOG_LINE_INIT(counters, INFO,
+        "Initializing " << pi->num_counter_blocks << " counter blocks of pipeline ID " <<
+        pipeline->id << " on device " << dev->bus_id);
+
     if (pi->num_counter_blocks == 0) {
         pipeline->stats.counters = NULL;
         return;
@@ -175,22 +179,27 @@ void SmartnicP4Impl::init_counters(Device* dev, DevicePipeline* pipeline) {
         blk->labels = labels_base;
         labels_base += blk->nmetrics * COUNTER_NLABELS;
 
+        const char* tname = "UNKNOWN";
         switch (blk->info->type) {
         case SNP4_INFO_COUNTER_TYPE_PACKETS_AND_BYTES:
             init_counters_block_metric(blk, 0, "packets");
             init_counters_block_metric(blk, 1, "bytes");
+            tname = "PACKETS_AND_BYTES";
             break;
 
         case SNP4_INFO_COUNTER_TYPE_PACKETS:
             init_counters_block_metric(blk, 0, NULL);
+            tname = "PACKETS";
             break;
 
         case SNP4_INFO_COUNTER_TYPE_BYTES:
             init_counters_block_metric(blk, 0, NULL);
+            tname = "BYTES";
             break;
 
         case SNP4_INFO_COUNTER_TYPE_FLAG:
             init_counters_block_metric(blk, 0, NULL);
+            tname = "FLAG";
             break;
         }
 
@@ -209,6 +218,11 @@ void SmartnicP4Impl::init_counters(Device* dev, DevicePipeline* pipeline) {
         blk->bspec->latch.data_size =
             sizeof(CountersLatchData) +
             blk->nmetrics * blk->info->num_counters * sizeof(uint64_t);
+
+        SERVER_LOG_LINE_INIT(counters, INFO,
+            "Setup for block '" << blk->info->name << "' containing " << blk->info->num_counters <<
+            " counters of type '" << tname << "'" << " of pipeline ID " << pipeline->id <<
+            " on device " << dev->bus_id);
     }
 
     struct stats_zone_spec zspec = {
@@ -219,12 +233,16 @@ void SmartnicP4Impl::init_counters(Device* dev, DevicePipeline* pipeline) {
 
     stats->zone = stats_zone_alloc(dev->stats.domains[DeviceStatsDomain::COUNTERS], &zspec);
     if (stats->zone == NULL) {
-        cerr << "ERROR: Failed to alloc counter stats zone for pipeline ID " << pipeline->id
-             << " on device " << dev->bus_id << "."  << endl;
+        SERVER_LOG_LINE_INIT(counters, ERROR,
+            "Failed to alloc counter stats zone for pipeline ID " << pipeline->id <<
+            " on device " << dev->bus_id);
         exit(EXIT_FAILURE);
     }
 
     pipeline->stats.counters = stats;
+    SERVER_LOG_LINE_INIT(counters, INFO,
+        "Completed init for counters of pipeline ID " << pipeline->id <<
+        " on device " << dev->bus_id);
 }
 
 //--------------------------------------------------------------------------------------------------

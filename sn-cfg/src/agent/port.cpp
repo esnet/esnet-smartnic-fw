@@ -24,7 +24,8 @@ void SmartnicConfigImpl::init_port(Device* dev) {
         case 0: cmac = &dev->bar2->cmac0; break;
         case 1: cmac = &dev->bar2->cmac1; break;
         default:
-            cerr << "ERROR: Unsupported port ID " << port_id << "." << endl;
+            SERVER_LOG_LINE_INIT(port, ERROR,
+                "Unsupported port ID " << port_id << " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
@@ -36,11 +37,15 @@ void SmartnicConfigImpl::init_port(Device* dev) {
         stats->zone = cmac_stats_zone_alloc(
             dev->stats.domains[DeviceStatsDomain::COUNTERS], cmac, stats->name.c_str());
         if (stats->zone == NULL) {
-            cerr << "ERROR: Failed to alloc stats zone for port ID " << port_id << "."  << endl;
+            SERVER_LOG_LINE_INIT(port, ERROR,
+                "Failed to alloc stats zone for port ID " << port_id <<
+                " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
         dev->stats.zones[DeviceStatsZone::PORT_COUNTERS].push_back(stats);
+        SERVER_LOG_LINE_INIT(port, INFO,
+            "Setup counters for port ID " << port_id << " on device " << dev->bus_id);
     }
 }
 

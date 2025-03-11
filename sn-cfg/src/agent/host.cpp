@@ -27,7 +27,8 @@ void SmartnicConfigImpl::init_host(Device* dev) {
         case 0: adapter = &dev->bar2->cmac_adapter0; break;
         case 1: adapter = &dev->bar2->cmac_adapter1; break;
         default:
-            cerr << "ERROR: Unsupported host ID " << host_id << "." << endl;
+            SERVER_LOG_LINE_INIT(host, ERROR,
+                "Unsupported host ID " << host_id << " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
@@ -39,11 +40,15 @@ void SmartnicConfigImpl::init_host(Device* dev) {
         stats->zone = qdma_stats_zone_alloc(
             dev->stats.domains[DeviceStatsDomain::COUNTERS], adapter, stats->name.c_str());
         if (stats->zone == NULL) {
-            cerr << "ERROR: Failed to alloc stats zone for host ID " << host_id << "."  << endl;
+            SERVER_LOG_LINE_INIT(host, ERROR,
+                "Failed to alloc stats zone for host ID " << host_id <<
+                " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
         dev->stats.zones[DeviceStatsZone::HOST_COUNTERS].push_back(stats);
+        SERVER_LOG_LINE_INIT(host, INFO,
+            "Setup counters for host ID " << host_id << " on device " << dev->bus_id);
     }
 }
 

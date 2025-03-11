@@ -96,18 +96,16 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
                                        unsigned int prometheus_port) {
     int rv = prom_collector_registry_default_init();
     if (rv != 0) {
-        cerr << "ERROR: Failed to init default prometheus registry." << endl;
+        SERVER_LOG_LINE_INIT(ctor, ERROR, "Failed to init default prometheus registry.");
         exit(EXIT_FAILURE);
     }
     prometheus.registry = PROM_COLLECTOR_REGISTRY_DEFAULT;
 
-    cout << endl << "--- PCI bus IDs:" << endl;
     for (auto bus_id : bus_ids) {
-        cout << "------> " << bus_id << endl;
-
+        SERVER_LOG_LINE_INIT(ctor, INFO, "Mapping PCIe BAR2 of device " << bus_id);
         volatile struct esnet_smartnic_bar2* bar2 = smartnic_map_bar2_by_pciaddr(bus_id.c_str());
         if (bar2 == NULL) {
-            cerr << "ERROR: Failed to map PCIe BAR2 register space for device " << bus_id << endl;
+            SERVER_LOG_LINE_INIT(ctor, ERROR, "Failed to map PCIe BAR2 of device " << bus_id);
             exit(EXIT_FAILURE);
         }
 
@@ -131,6 +129,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         };
 
         for (auto dom = 0; dom < DeviceStatsDomain::NDOMAINS; ++dom) {
+            const char* dname = device_stats_domain_name((DeviceStatsDomain)dom);
             unsigned int seconds;
             switch (dom) {
             case DeviceStatsDomain::COUNTERS:
@@ -148,10 +147,12 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
             }
             spec.thread.interval_ms = seconds * 1000;
 
+            SERVER_LOG_LINE_INIT(ctor, INFO,
+                "Allocating statistics domain '" << dname << "' on device " << bus_id);
             dev->stats.domains[dom] = stats_domain_alloc(&spec);
             if (dev->stats.domains[dom] == NULL) {
-                cerr << "ERROR: Failed to allocate statistics domain " << dom
-                     << " on device " << bus_id << "." << endl;
+                SERVER_LOG_LINE_INIT(ctor, ERROR,
+                    "Failed to allocate statistics domain '" << dname << "' on device " << bus_id);
                 exit(EXIT_FAILURE);
             }
         }
@@ -162,14 +163,17 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         init_port(dev);
         init_switch(dev);
 
+        SERVER_LOG_LINE_INIT(ctor, INFO, "Starting statistics collection on device " << bus_id);
         for (auto domain : dev->stats.domains) {
             stats_domain_clear_metrics(domain);
             stats_domain_start(domain);
         }
 
         devices.push_back(dev);
+        SERVER_LOG_LINE_INIT(ctor, INFO, "Completed init of device " << bus_id);
     }
 
+    SERVER_LOG_LINE_INIT(ctor, INFO, "Allocating statistics domain for server");
     struct stats_domain_spec server_spec = {
         .name = "sn-cfg",
         .thread = {
@@ -181,20 +185,22 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
     };
     server_stats.domain = stats_domain_alloc(&server_spec);
     if (server_stats.domain == NULL) {
-        cerr << "ERROR: Failed to allocate server statistics domain." << endl;
+        SERVER_LOG_LINE_INIT(ctor, ERROR, "Failed to allocate statistics domain for server");
         exit(EXIT_FAILURE);
     }
 
     init_server();
 
+    SERVER_LOG_LINE_INIT(ctor, INFO, "Starting statistics collection for server");
     stats_domain_clear_metrics(server_stats.domain);
     stats_domain_start(server_stats.domain);
 
+    SERVER_LOG_LINE_INIT(ctor, INFO, "Starting Prometheus daemon on port " << prometheus_port);
     promhttp_set_active_collector_registry(prometheus.registry);
     prometheus.daemon = promhttp_start_daemon(
         MHD_USE_SELECT_INTERNALLY, prometheus_port, NULL, NULL);
     if (prometheus.daemon == NULL) {
-        cerr << "ERROR: Failed to start prometheus HTTP daemon." << endl;
+        SERVER_LOG_LINE_INIT(ctor, ERROR, "Failed to start prometheus daemon");
         exit(EXIT_FAILURE);
     }
 }
@@ -232,14 +238,14 @@ SmartnicConfigImpl::~SmartnicConfigImpl() {
 static string read_bin_file(const string& path) {
     ifstream in(path, ios::binary);
     if (!in.is_open()) {
-        cerr << "ERROR: Failed to open file '" << path << "'." << endl;
+        SERVER_LOG_LINE_INIT(agent, ERROR, "Failed to open file '" << path << "'");
         exit(EXIT_FAILURE);
     }
 
     ostringstream out;
     out << in.rdbuf();
     if (in.fail()) {
-        cerr << "ERROR: Failed to read file '" << path << "'." << endl;
+        SERVER_LOG_LINE_INIT(agent, ERROR, "Failed to read file '" << path << "'");
         exit(EXIT_FAILURE);
     }
 
@@ -294,19 +300,19 @@ static bool load_config_file(const string& path, Json::Value& config) {
 
     ifstream in(path, ios::binary);
     if (!in.is_open()) {
-        cerr << "ERROR: Failed to open config file '" << path << "'." << endl;
+        SERVER_LOG_LINE_INIT(agent, ERROR, "Failed to open config file '" << path << "'");
         exit(EXIT_FAILURE);
     }
 
     Json::CharReaderBuilder builder;
     string err;
     if (!Json::parseFromStream(builder, in, &config, &err)) {
-        cerr << "ERROR: Failed to parse config file '" << path << "': " << err << endl;
+        SERVER_LOG_LINE_INIT(agent, ERROR, "Failed to parse config file '" << path << "': " << err);
         exit(EXIT_FAILURE);
     }
 
     if (in.fail()) {
-        cerr << "ERROR: Failed to read config file '" << path << "'." << endl;
+        SERVER_LOG_LINE_INIT(agent, ERROR, "Failed to read config file '" << path << "'");
         exit(EXIT_FAILURE);
     }
 
@@ -321,7 +327,7 @@ static int agent_server_run(const Arguments& args) {
         load_config_file(args.server.config_file, config)) {
         config = config["server"];
         if (!config.isObject()) {
-            cerr << "ERROR: Invalid config file format." << endl;
+            SERVER_LOG_LINE_INIT(agent, ERROR, "Invalid config file format");
             exit(EXIT_FAILURE);
         }
     }
@@ -336,10 +342,10 @@ static int agent_server_run(const Arguments& args) {
         if (config_auth_tokens == Json::Value::null ||
             !config_auth_tokens.isArray() ||
             config_auth_tokens.size() < 1) {
-            cerr <<
-                "ERROR: Missing tokens needed for authenticating clients. Specify the tokens to "
+            SERVER_LOG_LINE_INIT(agent, ERROR,
+                "Missing tokens needed for authenticating clients. Specify the tokens to "
                 "use with one or more --auth-token options or add to the config file as "
-                HELP_CONFIG_AUTH_TOKENS "." << endl;
+                HELP_CONFIG_AUTH_TOKENS);
             exit(EXIT_FAILURE);
         }
 
@@ -353,10 +359,10 @@ static int agent_server_run(const Arguments& args) {
     if (tls_cert_chain.empty()) { // Get default from config file.
         auto config_tls_cert_chain = config_tls["cert-chain"];
         if (config_tls_cert_chain == Json::Value::null) {
-            cerr <<
-                "ERROR: Missing server certificate chain needed for sending to clients during TLS "
-                "handshake. Specify the PEM file to use with the --tls-cert-chain option or add to "
-                "the config file as " HELP_CONFIG_TLS_CERT_CHAIN "." << endl;
+            SERVER_LOG_LINE_INIT(agent, ERROR,
+                "Missing server certificate chain needed for sending to clients during TLS "
+                "handshake. Specify the PEM file to use with the --tls-cert-chain option or "
+                "add to the config file as " HELP_CONFIG_TLS_CERT_CHAIN);
             exit(EXIT_FAILURE);
         }
         tls_cert_chain = config_tls_cert_chain.asString();
@@ -367,16 +373,18 @@ static int agent_server_run(const Arguments& args) {
     if (tls_key.empty()) { // Get default from config file.
         auto config_tls_key = config_tls["key"];
         if (config_tls_key == Json::Value::null) {
-            cerr <<
-                "ERROR: Missing server private key needed for TLS encryption. Specify the PEM "
+            SERVER_LOG_LINE_INIT(agent, ERROR,
+                "Missing server private key needed for TLS encryption. Specify the PEM "
                 "file to use with the --tls-key option or add to the config file as "
-                HELP_CONFIG_TLS_KEY "." << endl;
+                HELP_CONFIG_TLS_KEY);
             exit(EXIT_FAILURE);
         }
         tls_key = config_tls_key.asString();
     }
 
     // Setup the credentials for the TLS handshake.
+    SERVER_LOG_LINE_INIT(agent, INFO,
+        "TLS: key_path='" << tls_key << "', cert_chain_path='" << tls_cert_chain << "'");
     SslServerCredentialsOptions opts(GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE);
     opts.pem_key_cert_pairs.push_back({
         .private_key = read_bin_file(tls_key),
@@ -407,7 +415,7 @@ static int agent_server_run(const Arguments& args) {
     health_check->SetServingStatus(true);
 
     // Process RPCs.
-    cout << __func__ << ": Serving on " << address << endl;
+    SERVER_LOG_LINE_INIT(agent, INFO, "Serving on '" << address << "'");
     server->Wait();
 
     // Delete all global objects allocated by libprotobuf to keep memory checkers happy.

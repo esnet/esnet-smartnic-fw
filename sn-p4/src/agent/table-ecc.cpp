@@ -134,19 +134,26 @@ static bool is_table_ecc_supported(enum snp4_info_table_mode mode) {
 //--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::init_table_ecc(Device* dev, DevicePipeline* pipeline) {
     const auto pi = &pipeline->info;
-
-    ostringstream zone_name;
-    zone_name << "pipeline" << pipeline->id;
-
-    auto stats = new DeviceStats;
-    stats->zone_name = zone_name.str();
-
     unsigned int total_ntables = 0;
     for (auto ti = pi->tables; ti < &pi->tables[pi->num_tables]; ++ti) {
         if (is_table_ecc_supported(ti->mode)) {
             total_ntables += 1;
         }
     }
+
+    SERVER_LOG_LINE_INIT(table_ecc, INFO,
+        "Initializing " << total_ntables << " table ECC counters of pipeline ID " <<
+        pipeline->id << " on device " << dev->bus_id);
+    if (total_ntables == 0) {
+        pipeline->stats.table_ecc = NULL;
+        return;
+    }
+
+    ostringstream zone_name;
+    zone_name << "pipeline" << pipeline->id;
+
+    auto stats = new DeviceStats;
+    stats->zone_name = zone_name.str();
 
     InitTableEcc table_ecc[total_ntables];
     memset(table_ecc, 0, sizeof(table_ecc));
@@ -198,6 +205,10 @@ void SmartnicP4Impl::init_table_ecc(Device* dev, DevicePipeline* pipeline) {
         tecc->bspec->latch.data_size = sizeof(TableEccLatchData);
 
         tidx += 1;
+
+        SERVER_LOG_LINE_INIT(table_ecc, INFO,
+            "Setup for ECC counters on table '" << ti->name << "' of pipeline ID " <<
+            pipeline->id << " on device " << dev->bus_id);
     }
 
     struct stats_zone_spec zspec = {
@@ -208,12 +219,16 @@ void SmartnicP4Impl::init_table_ecc(Device* dev, DevicePipeline* pipeline) {
 
     stats->zone = stats_zone_alloc(dev->stats.domains[DeviceStatsDomain::COUNTERS], &zspec);
     if (stats->zone == NULL) {
-        cerr << "ERROR: Failed to alloc table ECC stats zone for pipeline ID " << pipeline->id
-             << " on device " << dev->bus_id << "."  << endl;
+        SERVER_LOG_LINE_INIT(table_ecc, ERROR,
+            "Failed to alloc table ECC stats zone for pipeline ID " << pipeline->id <<
+            " on device " << dev->bus_id);
         exit(EXIT_FAILURE);
     }
 
     pipeline->stats.table_ecc = stats;
+    SERVER_LOG_LINE_INIT(table_ecc, INFO,
+        "Completed init for table ECC counters of pipeline ID " << pipeline->id <<
+        " on device " << dev->bus_id);
 }
 
 //--------------------------------------------------------------------------------------------------

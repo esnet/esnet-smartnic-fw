@@ -80,6 +80,8 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
         if (!snp4_sdnet_present(id)) {
             continue;
         }
+        SERVER_LOG_LINE_INIT(pipeline, INFO,
+            "Initializing pipeline ID " << id << " on device " << dev->bus_id);
 
         auto pipeline = new DevicePipeline{
             .id = id,
@@ -90,21 +92,27 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
 
         pipeline->handle = snp4_init(id, (uintptr_t)dev->bar2);
         if (pipeline->handle == NULL) {
-            cerr << "ERROR: Failed to initialize snp4/vitisnetp4 library for pipeline ID "
-                 << id << " on device " << dev->bus_id << "." << endl;
+            SERVER_LOG_LINE_INIT(pipeline, ERROR,
+                "Failed to initialize snp4/vitisnetp4 library for pipeline ID " << id <<
+                " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
+        SERVER_LOG_LINE_INIT(pipeline, INFO, "Resetting all tables of pipeline ID " << id);
         if (!snp4_reset_all_tables(pipeline->handle)) {
-            cerr << "ERROR: Failed to reset snp4/vitisnetp4 tables for pipeline ID "
-                 << id << " on device " << dev->bus_id << "." << endl;
+            SERVER_LOG_LINE_INIT(pipeline, ERROR,
+                "Failed to reset snp4/vitisnetp4 tables of pipeline ID " << id <<
+                " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
+        SERVER_LOG_LINE_INIT(pipeline, INFO,
+            "Loading info of pipeline ID " << id << " on device " << dev->bus_id);
         auto rc = snp4_info_get_pipeline(id, &pipeline->info);
         if (rc != SNP4_STATUS_OK) {
-            cerr << "ERROR: Failed to load snp4 info (" << rc << ") for pipeline ID "
-                 << id << " on device " << dev->bus_id << "." << endl;
+            SERVER_LOG_LINE_INIT(pipeline, ERROR,
+                "Failed to load snp4 info (" << rc << ") for pipeline ID " << id <<
+                " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
@@ -112,6 +120,8 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
         init_table_ecc(dev, pipeline);
 
         dev->pipelines.push_back(pipeline);
+        SERVER_LOG_LINE_INIT(pipeline, INFO,
+            "Completed init of pipeline ID " << id << " on device " << dev->bus_id);
     }
 }
 
@@ -124,8 +134,9 @@ void SmartnicP4Impl::deinit_pipeline(Device* dev) {
         deinit_table_ecc(pipeline);
 
         if (!snp4_deinit(pipeline->handle)) {
-            cerr << "ERROR: Failed to deinit snp4/vitisnetp4 library for pipeline ID "
-                 << pipeline->id << " on device " << dev->bus_id << "." << endl;
+            SERVER_LOG_LINE_INIT(pipeline, ERROR,
+                "Failed to deinit snp4/vitisnetp4 library for pipeline ID " << pipeline->id <<
+                " on device " << dev->bus_id);
         }
 
         dev->pipelines.pop_back();
