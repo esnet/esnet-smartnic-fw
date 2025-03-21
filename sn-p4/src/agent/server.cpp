@@ -20,6 +20,7 @@ const char* SmartnicP4Impl::debug_flag_label(const ServerDebugFlag flag) {
     case ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_DELETE: return "TABLE_RULE_DELETE";
     case ServerDebugFlag::DEBUG_FLAG_PIPELINE_INFO: return "PIPELINE_INFO";
     case ServerDebugFlag::DEBUG_FLAG_PIPELINE_DRIVER: return "PIPELINE_DRIVER";
+    case ServerDebugFlag::DEBUG_FLAG_STATS: return "STATS";
 
     case ServerDebugFlag::DEBUG_FLAG_UNKNOWN:
     default:

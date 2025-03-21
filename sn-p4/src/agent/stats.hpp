@@ -1,8 +1,6 @@
 #ifndef STATS_HPP
 #define STATS_HPP
 
-#include <bitset>
-
 #include "sn_p4_v2.grpc.pb.h"
 
 using namespace sn_p4::v2;
@@ -10,9 +8,8 @@ using namespace std;
 
 //--------------------------------------------------------------------------------------------------
 struct GetStatsContext {
+    const StatsFilters& filters;
     Stats* stats;
-    bitset<StatsMetricType_MAX + 1> metric_types;
-    bool non_zero;
 };
 
 extern "C" {

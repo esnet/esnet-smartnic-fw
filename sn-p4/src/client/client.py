@@ -251,6 +251,7 @@ def show(ctx):
 def main():
     class Commands: ...
     cmds = Commands()
+    cmds.settings = {'prog_name': 'sn-p4'}
     cmds.main = click_main
     cmds.apply = apply
     cmds.batch = batch
@@ -262,4 +263,8 @@ def main():
 
     for mod in SUB_COMMAND_MODULES:
         mod.add_sub_commands(cmds)
-    cmds.main(auto_envvar_prefix='SN_P4_CLI')
+
+    cmds.main(
+        prog_name=cmds.settings['prog_name'],
+        auto_envvar_prefix='SN_P4_CLI',
+    )

@@ -71,6 +71,23 @@ enum ErrorCode {
 }
 
 //--------------------------------------------------------------------------------------------------
+enum StringRegexpGrammar {
+    STR_REGEXP_GRAMMAR_UNKNOWN = 0; // Field is unset.
+    STR_REGEXP_GRAMMAR_ECMA_SCRIPT = 1; // https://en.cppreference.com/w/cpp/regex/ecmascript
+                                        // https://eel.is/c++draft/re.grammar
+    STR_REGEXP_GRAMMAR_BASIC_POSIX = 2;
+    STR_REGEXP_GRAMMAR_EXTENDED_POSIX = 3;
+    STR_REGEXP_GRAMMAR_AWK = 4;
+    STR_REGEXP_GRAMMAR_GREP = 5;
+    STR_REGEXP_GRAMMAR_EGREP = 6;
+}
+
+message StringRegexp {
+    StringRegexpGrammar grammar = 1; // When unset, defaults to ECMAScript.
+    string pattern = 2;
+}
+
+//--------------------------------------------------------------------------------------------------
 enum StatsMetricType {
     STATS_METRIC_TYPE_UNKNOWN = 0; // Field is unset.
     STATS_METRIC_TYPE_COUNTER = 1;
@@ -105,10 +122,116 @@ message Stats {
     repeated StatsMetric metrics = 1;
 }
 
+message StatsMetricMatchString {
+    message Split {
+        message Part {
+            message Match {
+                oneof attribute { // Acts as a wildcard when unset.
+                    StatsMetricMatchString value = 1; // Singular string match to apply.
+                    uint32 index = 2; // Used to match against a single part of the split (used for
+                                      // cases where the order of the parts is significant). Use as
+                                      // one term in an "all_set" of matches to restrict the other
+                                      // matches to only the chosen part.
+                }
+            }
+
+            // Covenience structure used solely to work around the inability to include "repeated"
+            // fields within a "oneof". Defined this way to leverage self-referential nesting.
+            message Set {
+                repeated StatsMetricMatchString.Split.Part members = 1;
+            }
+
+            bool negated = 1; // Logical negation of the final result after computing the term.
+            oneof term { // Acts as a wildcard when unset.
+                StatsMetricMatchString.Split.Part.Match match = 10; // Singular match to apply.
+                StatsMetricMatchString.Split.Part.Set any_set = 11; // Logical OR of matches.
+                StatsMetricMatchString.Split.Part.Set all_set = 12; // Logical AND of matches.
+            }
+        }
+
+        string pattern = 1; // Regular expression pattern to use for splitting the string into parts
+                            // prior to computing the term. The pattern grammar is ECMAScript (as
+                            // per https://eel.is/c++draft/re.grammar).
+
+        bool any = 2; // true: Split is true when ANY of the parts match (logical OR over parts).
+                      // false: Split is true when ALL of the parts match (logical AND over parts).
+
+        StatsMetricMatchString.Split.Part part = 3; // Specifies how to match each part after
+                                                    // splitting on the pattern.
+    }
+
+    oneof method { // Acts as a wildcard when unset.
+        string exact = 1; // Match only the entire string.
+        string prefix = 2; // Match from the start of the string.
+        string suffix = 3; // Match from the end of the string.
+        string substring = 4; // Match anywhere within the string.
+        StringRegexp regexp = 5; // Match by regular expression.
+        StatsMetricMatchString.Split split = 6; // Split the string and match each part.
+    }
+}
+
+message StatsMetricMatchIndexSlice {
+    sint32 start = 1; // Index of the first value included in the slice. Use a negative value to
+                      // indicate the index is relative to the end of the range. Must be <= to the
+                      // end index.
+    sint32 end = 2; // Index of the last value included in the slice. Use a negative value to
+                    // indicate the index is relative to the end of the range. Must be >= to the
+                    // start index.
+    uint32 step = 3; // Increment applied from the start index until, and not exceeding, the end.
+                     // The step size must be a positive integer. A value of 0 is interpreted as 1.
+                     // Since the intent is for filtering rather than sorting, using a negative step
+                     // to reverse the sequence is not supported.
+}
+
+message StatsMetricMatchIndices {
+    // Restricts which indices of an array metric are to be included. If the union of all slices is
+    // empty, the metric is not matched. All singleton (non-array) metrics will not be matched.
+    // Leave the list empty to match only singleton (non-array) metrics.
+    repeated StatsMetricMatchIndexSlice slices = 1;
+}
+
+message StatsMetricMatchLabel {
+    // The result of the key and value matches are logically ANDed.
+    StatsMetricMatchString key = 1; // Leave unset to wildard.
+    StatsMetricMatchString value = 2; // Leave unset to wildcard.
+}
+
+message StatsMetricMatch {
+    oneof attribute { // Acts as a wildcard when unset.
+        StatsMetricType type = 1; // Restrict to metrics of this type.
+        StatsMetricMatchString domain = 2; // Restrict the domain containing a metric.
+        StatsMetricMatchString zone = 3; // Restrict the zone containing a metric.
+        StatsMetricMatchString block = 4; // Restrict of the block containing a metric.
+        StatsMetricMatchString name = 5; // Restrict the name of the metric.
+        StatsMetricMatchIndices indices = 6; // Restrict the range of indices deemed valid.
+        StatsMetricMatchLabel label = 7; // Restrict which labels are possessed by a metric.
+    }
+}
+
+message StatsMetricFilter {
+    // Covenience structure used solely to work around the inability to include "repeated" fields
+    // within a "oneof". Defined this way to leverage self-referential nesting.
+    message Set {
+        repeated StatsMetricFilter members = 1;
+    }
+
+    bool negated = 1; // Logical negation of the final result after computing the term.
+    oneof term { // Acts as a wildcard when unset.
+        StatsMetricMatch match = 10; // Match a singular metric attribute.
+        StatsMetricFilter.Set any_set = 11; // Logical OR of filters.
+        StatsMetricFilter.Set all_set = 12; // Logical AND of filters.
+    }
+}
+
 message StatsFilters {
-    repeated StatsMetricType metric_types = 1; // Restrict metrics to the given type(s).
-                                               // Leave unset for all types.
-    bool non_zero = 2; // Restrict metrics to those whose value is not zero.
+    // This field is no longer supported and will be ignored. Use the metric_filter field instead.
+    repeated StatsMetricType metric_types = 1 [deprecated = true];
+
+    bool non_zero = 2; // Restrict metrics to those whose value is not zero. This check is applied
+                       // before any other filters.
+
+    StatsMetricFilter metric_filter = 3; // Logical expression used to restrict metrics by matching
+                                         // on various attributes. Leave unset to match all.
 }
 
 message StatsRequest {
@@ -350,6 +473,7 @@ enum ServerDebugFlag {
     DEBUG_FLAG_TABLE_RULE_DELETE = 3;
     DEBUG_FLAG_PIPELINE_INFO = 10;
     DEBUG_FLAG_PIPELINE_DRIVER = 11;
+    DEBUG_FLAG_STATS = 20;
 }
 
 message ServerDebug {
