@@ -16,8 +16,16 @@ using namespace std;
 extern "C" {
     int get_stats_for_each_metric(const struct stats_for_each_spec* spec) {
         GetStatsContext* ctx = static_cast<typeof(ctx)>(spec->arg);
-        if (ctx->non_zero && spec->values->u64 == 0) {
-            return 0;
+
+        if (ctx->non_zero) {
+            bool non_zero = false;
+            for (auto v = spec->values; !non_zero && v < &spec->values[spec->nvalues]; ++v) {
+                non_zero = v->u64 != 0;
+            }
+
+            if (!non_zero) {
+                return 0;
+            }
         }
 
         StatsMetricType type;
@@ -45,6 +53,7 @@ extern "C" {
         auto metric = ctx->stats->add_metrics();
         metric->set_type(type);
         metric->set_name(spec->metric->name);
+        metric->set_num_elements(spec->metric->nelements);
 
         auto scope = metric->mutable_scope();
         scope->set_domain(spec->domain->name);
@@ -55,9 +64,17 @@ extern "C" {
         last_update->set_seconds(spec->last_update.tv_sec);
         last_update->set_nanos(spec->last_update.tv_nsec);
 
-        auto value = metric->mutable_value();
-        value->set_u64(spec->values->u64);
-        value->set_f64(spec->values->f64);
+        for (unsigned int idx = 0; idx < spec->nvalues; ++idx) {
+            auto v = &spec->values[idx];
+            if (ctx->non_zero && v->u64 == 0) {
+                continue;
+            }
+
+            auto value = metric->add_values();
+            value->set_index(idx);
+            value->set_u64(v->u64);
+            value->set_f64(v->f64);
+        }
 
         return 0;
     }

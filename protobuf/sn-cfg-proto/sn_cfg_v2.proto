@@ -100,15 +100,23 @@ message StatsMetricScope {
 message StatsMetricValue {
     uint64 u64 = 1;
     double f64 = 2;
+    uint32 index = 3; // Used to distinguish values for array metrics.
 }
 
 message StatsMetric {
     StatsMetricType type = 1;
     StatsMetricScope scope = 2;
     string name = 3;
-    StatsMetricValue value = 4;
+
+    // This field is no longer populated. Use the values field instead.
+    StatsMetricValue value = 4 [deprecated = true];
+
     google.protobuf.Timestamp last_update = 5; // Monotonic timestamp indicating when the metric was
                                                // last updated.
+
+    uint32 num_elements = 6; // Indicates the metric is a singleton when 0, an array otherwise.
+    repeated StatsMetricValue values = 7; // Will contain one value for singleton metrics and be a
+                                          // list of values for array metrics.
 }
 
 message Stats {

@@ -194,16 +194,21 @@ def _show_port_stats(dev_id, port_id, stats, kargs):
     value_len = 0
     metrics = {}
     for metric in stats.metrics:
-        name = metric.name
-        name_len = max(name_len, len(name))
+        is_array = metric.num_elements > 0
+        last_update = format_timestamp(metric.last_update)
+        for value in metric.values:
+            name = metric.name
+            if is_array:
+                name += f'[{value.index}]'
+            name_len = max(name_len, len(name))
 
-        svalue = f'{metric.value.u64}'
-        value_len = max(value_len, len(svalue))
+            svalue = f'{value.u64}'
+            value_len = max(value_len, len(svalue))
 
-        metrics[name] = {
-            'value': svalue,
-            'last_update': format_timestamp(metric.last_update),
-        }
+            metrics[name] = {
+                'value': svalue,
+                'last_update': last_update,
+            }
 
     if metrics:
         last_update = kargs.get('last_update', False)

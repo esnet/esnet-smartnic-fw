@@ -40,6 +40,10 @@ sn_cfg_proto_dep = declare_dependency(
     ],
 )
 
+libsn_cfg_proto_cpp_args = [
+    '-Wno-deprecated-declarations', # Needed due to how protobuf generates C++ code when a
+                                    # nested message has been deprecated.
+]
 libsn_cfg_proto = shared_library(
     'sn_cfg_proto',
     [
@@ -51,6 +55,7 @@ libsn_cfg_proto = shared_library(
         libprotobuf,
         sn_cfg_proto_dep,
     ],
+    cpp_args: libsn_cfg_proto_cpp_args,
     install: true,
     soversion: 1,
 )
@@ -58,6 +63,7 @@ libsn_cfg_proto = shared_library(
 pkg = import('pkgconfig')
 pkg.generate(
     libsn_cfg_proto,
+    extra_cflags: libsn_cfg_proto_cpp_args,
     subdirs: 'esnet-smartnic',
 )
 
@@ -65,6 +71,7 @@ libsn_cfg_proto_dep = declare_dependency(
     link_with: [
         libsn_cfg_proto,
     ],
+    compile_args: libsn_cfg_proto_cpp_args,
     dependencies: [
         libgrpcpp,
         libprotobuf,

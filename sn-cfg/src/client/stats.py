@@ -86,24 +86,31 @@ def _show_stats(dev_id, stats, kargs):
     value_len = 0
     metrics = {}
     for metric in stats.metrics:
-        name = metric.scope.zone
+        base_name = metric.scope.zone
         if not metric.name.startswith(metric.scope.block):
-            name += f'_{metric.scope.block}'
-        name += f'_{metric.name}'
-        name_len = max(name_len, len(name))
+            base_name += f'_{metric.scope.block}'
+        base_name += f'_{metric.name}'
 
-        if metric.type == StatsMetricType.STATS_METRIC_TYPE_FLAG:
-            svalue = 'yes' if metric.value.u64 != 0 else 'no'
-        elif metric.type == StatsMetricType.STATS_METRIC_TYPE_GAUGE:
-            svalue = f'{metric.value.f64:.4g}'
-        else:
-            svalue = f'{metric.value.u64}'
-        value_len = max(value_len, len(svalue))
+        is_array = metric.num_elements > 0
+        last_update = format_timestamp(metric.last_update)
+        for value in metric.values:
+            if metric.type == StatsMetricType.STATS_METRIC_TYPE_FLAG:
+                svalue = 'yes' if value.u64 != 0 else 'no'
+            elif metric.type == StatsMetricType.STATS_METRIC_TYPE_GAUGE:
+                svalue = f'{value.f64:.4g}'
+            else:
+                svalue = f'{value.u64}'
+            value_len = max(value_len, len(svalue))
 
-        metrics[name] = {
-            'value': svalue,
-            'last_update': format_timestamp(metric.last_update),
-        }
+            name = base_name
+            if is_array:
+                name += f'[{value.index}]'
+            name_len = max(name_len, len(name))
+
+            metrics[name] = {
+                'value': svalue,
+                'last_update': last_update,
+            }
 
     if metrics:
         last_update = kargs.get('last_update', False)
