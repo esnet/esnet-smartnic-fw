@@ -76,14 +76,6 @@ enum ErrorCode {
 }
 
 //--------------------------------------------------------------------------------------------------
-message StatsCounter {
-    string domain = 1;
-    string zone = 2;
-    string block = 3;
-    string name = 4;
-    uint64 value = 5;
-}
-
 enum StatsMetricType {
     STATS_METRIC_TYPE_UNKNOWN = 0; // Field is unset.
     STATS_METRIC_TYPE_COUNTER = 1;
@@ -120,8 +112,9 @@ message StatsMetric {
 }
 
 message Stats {
-    // This field is no longer populated. Use the metrics field instead.
-    repeated StatsCounter counters = 1 [deprecated = true];
+    // Reserve deprecated field numbers and names.
+    reserved 1;
+    reserved "counters";
 
     repeated StatsMetric metrics = 2;
 }
@@ -223,10 +216,9 @@ message DeviceStatusMonitor {
 }
 
 message DeviceStatus {
-    // This field is no longer populated. Use the monitors field with:
-    // - source == "sysmon<index>" ("sysmon0", "sysmon1", ...)
-    // - name == "temp"
-    repeated DeviceSystemMonitor sysmons = 1 [deprecated = true];
+    // Reserve deprecated field numbers and names.
+    reserved 1;
+    reserved "sysmons";
 
     repeated DeviceStatusMonitor monitors = 2;
     repeated DeviceStatusAlarm alarms = 3;
