@@ -35,9 +35,18 @@ struct stats_label_format_spec {
     unsigned int idx;
 };
 
+enum stats_label_flag {
+    stats_label_flag_NO_EXPORT, // Don't export the label via Prometheus, but make it available for
+                                // internal uses such as for metadata or filtering.
+};
+
+#define STATS_LABEL_FLAG_MASK(_name) (1 << stats_label_flag_##_name)
+#define STATS_LABEL_FLAG_TEST(_flags, _name) (((_flags) & STATS_LABEL_FLAG_MASK(_name)) != 0)
+
 struct stats_label_spec {
     const char* key;
     const char* value; // Ignored when value_alloc is provided.
+    unsigned int flags;
 
     const char* (*value_alloc)(const struct stats_label_format_spec* spec);
     void (*value_free)(const char* value);

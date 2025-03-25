@@ -294,18 +294,29 @@ static struct stats_metric* __stats_metric_alloc(const struct stats_metric_spec*
     metric->spec.labels = lspec;
     metric->spec.nlabels = nlabels;
 
+    const char* public_label_keys[nlabels];
+    unsigned int npublic_labels = 0;
     for (unsigned int n = 0; n < DEFAULT_STATS_LABELS_COUNT; ++n, ++lspec) {
         *lspec = default_stats_labels[n];
+        if (!STATS_LABEL_FLAG_TEST(lspec->flags, NO_EXPORT)) {
+            public_label_keys[npublic_labels++] = lspec->key;
+        }
     }
 
     if (is_array) {
         for (unsigned int n = 0; n < ARRAY_STATS_LABELS_COUNT; ++n, ++lspec) {
             *lspec = array_stats_labels[n];
+            if (!STATS_LABEL_FLAG_TEST(lspec->flags, NO_EXPORT)) {
+                public_label_keys[npublic_labels++] = lspec->key;
+            }
         }
     }
 
     for (unsigned int n = 0; n < spec->nlabels; ++n, ++lspec) {
         *lspec = spec->labels[n];
+        if (!STATS_LABEL_FLAG_TEST(lspec->flags, NO_EXPORT)) {
+            public_label_keys[npublic_labels++] = lspec->key;
+        }
     }
 
     struct stats_label* labels = (typeof(labels))&metric->spec.labels[nlabels];
@@ -318,12 +329,8 @@ static struct stats_metric* __stats_metric_alloc(const struct stats_metric_spec*
         labels += nlabels;
     }
 
-    const char* label_keys[nlabels];
-    for (unsigned int n = 0; n < nlabels; ++n) {
-        label_keys[n] = metric->spec.labels[n].key;
-    }
-
-    metric->prometheus.metric = prom_gauge_new(spec->name, spec->desc, nlabels, label_keys);
+    metric->prometheus.metric = prom_gauge_new(
+        spec->name, spec->desc, npublic_labels, public_label_keys);
     if (metric->prometheus.metric == NULL) {
         log_err(ENOMEM, "prom_gauge_new failed for metric %s", spec->name);
         goto free_metric;
@@ -561,11 +568,15 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
                 e->value.f64 = (double)e->value.u64;
             }
 
-            const char* label_values[mspec->nlabels];
+            const char* public_label_values[mspec->nlabels];
+            const char** plv = public_label_values;
             for (unsigned int n = 0; n < mspec->nlabels; ++n) {
-                label_values[n] = e->value.labels[n].value;
+                if (!STATS_LABEL_FLAG_TEST(mspec->labels[n].flags, NO_EXPORT)) {
+                    *plv = e->value.labels[n].value;
+                    plv += 1;
+                }
             }
-            prom_gauge_set(metric->prometheus.metric, e->value.f64, label_values);
+            prom_gauge_set(metric->prometheus.metric, e->value.f64, public_label_values);
         }
     }
 
