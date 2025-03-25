@@ -55,7 +55,7 @@ variables:
 
 pull_sn_hw:
   stage: pull_sn_hw
-  image: ubuntu:jammy
+  image: wharf.es.net/dockerhub-proxy/library/ubuntu:jammy
   variables:
     ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/$SN_HW_GROUP%2F$SN_HW_REPO/jobs/artifacts/$SN_HW_BRANCH/download?job_token=$CI_JOB_TOKEN&job=$SN_HW_API_JOB"
     GIT_SUBMODULE_STRATEGY: none
@@ -97,9 +97,9 @@ pull_sn_hw:
 
 package:
   stage: build
-  image: docker:26.1
+  image: wharf.es.net/dockerhub-proxy/library/docker:26.1
   services:
-    - docker:26.1-dind
+    - wharf.es.net/dockerhub-proxy/library/docker:26.1-dind
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     PUBLISH_URI: $HSITE/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
