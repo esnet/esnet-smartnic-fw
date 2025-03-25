@@ -41,16 +41,25 @@ struct stats_label_spec {
 
     const char* (*value_alloc)(const struct stats_label_format_spec* spec);
     void (*value_free)(const char* value);
+    void* data;
 };
 
 static inline void stats_label_value_free(const char* value) {
     free((void*)value);
 }
 
+struct stats_label {
+    const char* key;
+    const char* value;
+};
+
 //--------------------------------------------------------------------------------------------------
 struct stats_metric_value {
     uint64_t u64;
     double f64;
+
+    const struct stats_label* labels;
+    size_t nlabels;
 };
 
 enum stats_metric_type {

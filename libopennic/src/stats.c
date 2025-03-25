@@ -24,8 +24,6 @@
 struct stats_metric_element {
     struct stats_metric_value value;
     uint64_t last;
-
-    const char** label_values;
 };
 
 struct stats_metric {
@@ -201,18 +199,19 @@ static void __stats_metric_attach(struct stats_metric* metric, struct stats_bloc
         struct stats_metric_element* e = &metric->elements[n];
 
         fspec.idx = n;
-        const char** lv = e->label_values;
+        struct stats_label* label = (typeof(label))e->value.labels;
         for (const struct stats_label_spec* lspec = spec->labels;
              lspec < &spec->labels[spec->nlabels];
-             ++lspec, ++lv) {
+             ++lspec, ++label) {
             fspec.label = lspec;
             if (lspec->value_alloc != NULL) {
-                *lv = lspec->value_alloc(&fspec);
+                label->value = lspec->value_alloc(&fspec);
             } else if (lspec->value != NULL) {
-                *lv = lspec->value;
+                label->value = lspec->value;
             } else {
-                *lv = "";
+                label->value = "";
             }
+            label->key = lspec->key;
         }
     }
 
@@ -228,13 +227,13 @@ static void __stats_metric_detach(struct stats_metric* metric) {
     for (struct stats_metric_element* e = metric->elements;
          e < &metric->elements[metric->nelements];
          ++e) {
-        const char** lv = e->label_values;
+        struct stats_label* label = (typeof(label))e->value.labels;
         for (const struct stats_label_spec* lspec = spec->labels;
              lspec < &spec->labels[spec->nlabels];
-             ++lspec, ++lv) {
+             ++lspec, ++label) {
             if (lspec->value_free != NULL) {
-                lspec->value_free(*lv);
-                *lv = NULL;
+                lspec->value_free(label->value);
+                label->value = NULL;
             }
         }
     }
@@ -278,7 +277,7 @@ static struct stats_metric* __stats_metric_alloc(const struct stats_metric_spec*
     struct stats_metric* metric = calloc(1, sizeof(*metric) +
         nelements * sizeof(metric->elements[0]) +
         nlabels * sizeof(spec->labels[0]) +
-        nelements * nlabels * sizeof(metric->elements->label_values[0]));
+        nelements * nlabels * sizeof(metric->elements[0].value.labels[0]));
     if (metric == NULL) {
         return NULL;
     }
@@ -291,31 +290,32 @@ static struct stats_metric* __stats_metric_alloc(const struct stats_metric_spec*
     metric->elements = (typeof(metric->elements))&metric[1];
     metric->nelements = nelements;
 
-    struct stats_label_spec* labels = (typeof(labels))&metric->elements[nelements];
-    metric->spec.labels = labels;
+    struct stats_label_spec* lspec = (typeof(lspec))&metric->elements[nelements];
+    metric->spec.labels = lspec;
     metric->spec.nlabels = nlabels;
 
-    for (unsigned int n = 0; n < DEFAULT_STATS_LABELS_COUNT; ++n, ++labels) {
-        *labels = default_stats_labels[n];
+    for (unsigned int n = 0; n < DEFAULT_STATS_LABELS_COUNT; ++n, ++lspec) {
+        *lspec = default_stats_labels[n];
     }
 
     if (is_array) {
-        for (unsigned int n = 0; n < ARRAY_STATS_LABELS_COUNT; ++n, ++labels) {
-            *labels = array_stats_labels[n];
+        for (unsigned int n = 0; n < ARRAY_STATS_LABELS_COUNT; ++n, ++lspec) {
+            *lspec = array_stats_labels[n];
         }
     }
 
-    for (unsigned int n = 0; n < spec->nlabels; ++n, ++labels) {
-        *labels = spec->labels[n];
+    for (unsigned int n = 0; n < spec->nlabels; ++n, ++lspec) {
+        *lspec = spec->labels[n];
     }
 
-    const char** label_values = (typeof(label_values))&metric->spec.labels[nlabels];
+    struct stats_label* labels = (typeof(labels))&metric->spec.labels[nlabels];
     for (struct stats_metric_element* e = metric->elements; e < &metric->elements[nelements]; ++e) {
         e->value.u64 = spec->init_value;
         e->last = spec->init_value;
 
-        e->label_values = label_values;
-        label_values += nlabels;
+        e->value.labels = labels;
+        e->value.nlabels = nlabels;
+        labels += nlabels;
     }
 
     const char* label_keys[nlabels];
@@ -560,7 +560,12 @@ static void __stats_block_update_metrics(struct stats_block* blk, bool clear) {
             } else {
                 e->value.f64 = (double)e->value.u64;
             }
-            prom_gauge_set(metric->prometheus.metric, e->value.f64, e->label_values);
+
+            const char* label_values[mspec->nlabels];
+            for (unsigned int n = 0; n < mspec->nlabels; ++n) {
+                label_values[n] = e->value.labels[n].value;
+            }
+            prom_gauge_set(metric->prometheus.metric, e->value.f64, label_values);
         }
     }
 
