@@ -55,7 +55,7 @@ variables:
 
 pull_sn_hw:
   stage: pull_sn_hw
-  image: ubuntu:focal
+  image: ubuntu:jammy
   variables:
     ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/$SN_HW_GROUP%2F$SN_HW_REPO/jobs/artifacts/$SN_HW_BRANCH/download?job_token=$CI_JOB_TOKEN&job=$SN_HW_API_JOB"
     GIT_SUBMODULE_STRATEGY: none
