@@ -55,6 +55,14 @@ def stats_req(dev_id, **stats_kargs):
                 tf = type_filters.any_set.members.add()
                 tf.match.type = METRIC_TYPE_RMAP[mt]
 
+        units = stats_kargs.get('units')
+        if units:
+            units_filters = root.all_set.members.add()
+            for u in units:
+                uf = units_filters.any_set.members.add()
+                uf.match.label.key.exact = 'units'
+                uf.match.label.value.exact = u
+
         req_kargs['filters'] = StatsFilters(
             non_zero=not stats_kargs.get('zeroes'),
             with_labels=stats_kargs.get('labels'),
@@ -529,6 +537,14 @@ def show_stats_options(fn):
             '--labels', '-l',
             is_flag=True,
             help='Include all labels associated with each metric in the display.',
+        ),
+        click.option(
+            '--units', '-u',
+            multiple=True,
+            help='''
+            Filter to restrict statistic metrics to the given units (only applicable to metrics that
+            have been defined with the "units" label).
+            ''',
         ),
     )
     return apply_options(options, fn)
