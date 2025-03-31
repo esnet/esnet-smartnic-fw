@@ -637,6 +637,7 @@ extern "C" {
         last_update->set_seconds(spec->last_update.tv_sec);
         last_update->set_nanos(spec->last_update.tv_nsec);
 
+        bool with_labels = ctx->filters.with_labels();
         for (unsigned int n = 0; n < spec->nvalues; ++n) {
             if (!valid.is_bit_set(n)) {
                 continue;
@@ -647,6 +648,14 @@ extern "C" {
             value->set_index(n);
             value->set_u64(v->u64);
             value->set_f64(v->f64);
+
+            if (with_labels) {
+                for (auto l = v->labels; l < &v->labels[v->nlabels]; ++l) {
+                    auto label = value->add_labels();
+                    label->set_key(l->key);
+                    label->set_value(l->value);
+                }
+            }
         }
 
         return 0;

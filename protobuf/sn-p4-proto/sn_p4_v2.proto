@@ -101,10 +101,17 @@ message StatsMetricScope {
     string block = 3;
 }
 
+message StatsMetricLabel {
+    string key = 1;
+    string value = 2;
+}
+
 message StatsMetricValue {
     uint64 u64 = 1;
     double f64 = 2;
     uint32 index = 3; // Used to distinguish values for array metrics.
+    repeated StatsMetricLabel labels = 4; // Populated when the "with_labels" flag in StatsFilters
+                                          // is true. Empty otherwise.
 }
 
 message StatsMetric {
@@ -232,6 +239,8 @@ message StatsFilters {
 
     StatsMetricFilter metric_filter = 3; // Logical expression used to restrict metrics by matching
                                          // on various attributes. Leave unset to match all.
+
+    bool with_labels = 4; // Include the labels associated with each metric value.
 }
 
 message StatsRequest {

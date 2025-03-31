@@ -57,6 +57,7 @@ def stats_req(dev_id, **stats_kargs):
 
         req_kargs['filters'] = StatsFilters(
             non_zero=not stats_kargs.get('zeroes'),
+            with_labels=stats_kargs.get('labels'),
             metric_filter=root,
         )
 
@@ -121,16 +122,22 @@ def _show_stats(dev_id, stats, kargs):
             metrics[name] = {
                 'value': svalue,
                 'last_update': last_update,
+                'labels': dict((l.key, l.value) for l in value.labels),
             }
 
     if metrics:
         last_update = kargs.get('last_update', False)
+        with_labels = kargs.get('labels', False)
         for name in sorted(metrics, key=natural_sort_key):
             m = metrics[name]
             row = f'{name:>{name_len}}: {m["value"]:<{value_len}}'
             if last_update:
                 row += f'    [{m["last_update"]}]'
             rows.append(row)
+
+            if with_labels:
+                for k, v in sorted(m["labels"].items(), key=lambda i: i[0]):
+                    rows.append(f'{"":>{name_len}}  <{k}="{v}">')
 
     click.echo('\n'.join(rows))
 
@@ -517,6 +524,11 @@ def show_stats_options(fn):
             type=Filter(),
             multiple=True,
             help='Custom expression for filtering metrics.',
+        ),
+        click.option(
+            '--labels', '-l',
+            is_flag=True,
+            help='Include all labels associated with each metric in the display.',
         ),
     )
     return apply_options(options, fn)
