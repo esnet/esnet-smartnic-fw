@@ -99,7 +99,8 @@ package:
   stage: build
   image: wharf.es.net/dockerhub-proxy/library/docker:26.1
   services:
-    - wharf.es.net/dockerhub-proxy/library/docker:26.1-dind
+    - name: wharf.es.net/dockerhub-proxy/library/docker:26.1-dind
+      alias: docker
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     PUBLISH_URI: $HSITE/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
