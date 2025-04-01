@@ -253,18 +253,23 @@ void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk) {
 }
 
 //--------------------------------------------------------------------------------------------------
-#define SWITCH_STATS_COUNTER(_name) \
+#define SWITCH_STATS_COUNTER_NLABELS 1
+#define SWITCH_STATS_COUNTER(_name, _units) \
 { \
     __STATS_METRIC_SPEC(#_name, NULL, COUNTER, STATS_METRIC_FLAG_MASK(CLEAR_ON_READ), 0), \
     .io = { \
         .offset = offsetof(struct axi4s_probe_block, _name##_upper), \
         .size = 2 * sizeof(uint32_t), \
     }, \
+    .nlabels = SWITCH_STATS_COUNTER_NLABELS, \
+    .labels = (const struct stats_label_spec[SWITCH_STATS_COUNTER_NLABELS]){ \
+        {.key = "units", .value = #_units, .flags = STATS_LABEL_FLAG_MASK(NO_EXPORT)}, \
+    }, \
 }
 
 static const struct stats_metric_spec switch_stats_metrics[] = {
-    SWITCH_STATS_COUNTER(pkt_count),
-    SWITCH_STATS_COUNTER(byte_count),
+    SWITCH_STATS_COUNTER(pkt_count, packets),
+    SWITCH_STATS_COUNTER(byte_count, bytes),
 };
 
 struct switch_stats_block_info {

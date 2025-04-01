@@ -128,9 +128,8 @@ struct stats_metric_spec {
     __STATS_METRIC_SPEC(_name, _desc, _type, _flags, _init_value) \
 }
 
-#define STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value, \
-                             _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
-{ \
+#define __STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value, \
+                               _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
     __STATS_METRIC_SPEC(_name, _desc, _type, _flags, _init_value), \
     .io = { \
         .offset = offsetof(_io_type, _io_field), \
@@ -139,7 +138,13 @@ struct stats_metric_spec {
         .shift = _io_shift, \
         .invert = _io_invert, \
         .data = _io_data, \
-    }, \
+    }
+
+#define STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value,  \
+                             _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
+{ \
+    __STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value, \
+                           _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
 }
 
 //--------------------------------------------------------------------------------------------------
