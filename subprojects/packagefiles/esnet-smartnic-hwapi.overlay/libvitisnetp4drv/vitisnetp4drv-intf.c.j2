@@ -8,11 +8,67 @@
 
 #include <stddef.h>
 
+{%- if metadata: %}
+
+#define ARRAY_SIZE(_name) (sizeof(_name) / sizeof(_name[0]))
+
+    {%- if metadata.counter_blocks: %}
+        {%- for name, blk in metadata.counter_blocks | dictsort: %}
+            {%- if blk.counters: %}
+                {%- set aliases = {} %}
+                {%- for index, counter in blk.counters | dictsort: %}
+                    {%- if counter.alias: %}
+                        {%- set _ = aliases.update({index: counter.alias}) %}
+                    {%- endif %}
+                {%- endfor %}
+
+                {%- if aliases: %}
+
+/*----------------------------------------------------------------------------*/
+static const char* counter_block_{{ name }}_aliases[] = {
+                    {%- for index, alias in aliases | dictsort: %}
+    [{{ index }}] = "{{ alias }}",
+                    {%- endfor %}
+};
+                {%- endif %}
+            {%- endif %}
+
+/*----------------------------------------------------------------------------*/
+static const struct vitis_net_p4_drv_metadata_counter_block counter_block_{{ name }} = {
+    .name = "{{ name }}",
+
+            {%- if aliases: %}
+    .aliases = counter_block_{{ name }}_aliases,
+    .num_aliases = ARRAY_SIZE(counter_block_{{ name }}_aliases),
+            {%- endif %}
+};
+        {%- endfor %}
+
+/*----------------------------------------------------------------------------*/
+static const struct vitis_net_p4_drv_metadata_counter_block* counter_blocks[] = {
+        {%- for name in metadata.counter_blocks | sort: %}
+    &counter_block_{{ name }},
+        {%- endfor %}
+};
+    {%- endif %}
+
+/*----------------------------------------------------------------------------*/
+static const struct vitis_net_p4_drv_metadata metadata = {
+    {%- if metadata.counter_blocks: %}
+    .counter_blocks = counter_blocks,
+    .num_counter_blocks = ARRAY_SIZE(counter_blocks),
+    {%- endif %}
+};
+{%- endif %}
+
 /*----------------------------------------------------------------------------*/
 const struct vitis_net_p4_drv_intf vitis_net_p4_drv_intf_{{ ip_name }} = {
     .info = {
         .name = "{{ ip_name }}",
         .offset = offsetof(struct esnet_smartnic_bar2, {{ regmap_name }}),
+{%- if metadata: %}
+        .metadata = &metadata,
+{%- endif %}
     },
 
     .common = {
