@@ -374,7 +374,12 @@ static enum snp4_status snp4_info_get_tables(struct snp4_info_table * tables, ui
   return SNP4_STATUS_OK;
 }
 
-static enum snp4_status snp4_info_get_counter_blocks(struct snp4_info_counter_block * counter_blocks, uint16_t max_counter_blocks, uint16_t * num_counter_blocks, XilVitisNetP4TargetCounterConfig * cfg_counters[], unsigned int size) {
+static enum snp4_status snp4_info_get_counter_blocks(struct snp4_info_counter_block * counter_blocks,
+                                                     uint16_t max_counter_blocks,
+                                                     uint16_t * num_counter_blocks,
+                                                     XilVitisNetP4TargetCounterConfig * cfg_counters[],
+                                                     unsigned int size,
+                                                     const struct vitis_net_p4_drv_metadata * metadata) {
   // Make sure our info struct will hold all of this pipeline's counter blocks
   if (size > max_counter_blocks) {
     return SNP4_STATUS_INFO_TOO_MANY_COUNTER_BLOCKS;
@@ -406,6 +411,17 @@ static enum snp4_status snp4_info_get_counter_blocks(struct snp4_info_counter_bl
       return SNP4_STATUS_INFO_INVALID_COUNTER_TYPE;
       break;
     }
+
+    if (metadata != NULL) {
+      for (unsigned int b = 0; b < metadata->num_counter_blocks; ++b) {
+        const struct vitis_net_p4_drv_metadata_counter_block * mcb = metadata->counter_blocks[b];
+        if (strcmp(block->name, mcb->name) == 0) {
+          block->aliases = mcb->aliases;
+          block->num_aliases = mcb->num_aliases;
+          break;
+        }
+      }
+    }
   }
 
   return SNP4_STATUS_OK;
@@ -436,5 +452,6 @@ enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info
                                       ARRAY_SIZE(pipeline->counter_blocks),
                                       &pipeline->num_counter_blocks,
                                       cfg->CounterListPtr,
-                                      cfg->CounterListSize);
+                                      cfg->CounterListSize,
+                                      intf->info.metadata);
 }
