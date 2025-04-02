@@ -7,6 +7,7 @@ import click
 import collections
 import gettext
 import grpc
+import types
 
 from sn_p4_proto.v2 import (
     BatchOperation,
@@ -65,7 +66,7 @@ def stats_req(dev_id, **stats_kargs):
 
         req_kargs['filters'] = StatsFilters(
             non_zero=not stats_kargs.get('zeroes'),
-            with_labels=stats_kargs.get('labels'),
+            with_labels=stats_kargs.get('labels') or stats_kargs.get('aliases'),
             metric_filter=root,
         )
 
@@ -102,15 +103,13 @@ def _show_stats(dev_id, stats, kargs):
     rows.append(f'Device ID: {dev_id}')
     rows.append(HEADER_SEP)
 
-    name_len = 0
-    value_len = 0
-    metrics = {}
-    for metric in stats.metrics:
-        base_name = metric.scope.zone
-        if not metric.name.startswith(metric.scope.block):
-            base_name += f'_{metric.scope.block}'
-        base_name += f'_{metric.name}'
+    with_last_update = kargs.get('last_update', False)
+    with_labels = kargs.get('labels', False)
+    with_aliases = kargs.get('aliases', False)
+    with_long_name = kargs.get('long_name', False)
 
+    metrics = types.SimpleNamespace(by_short_name={}, by_partial_name={}, by_long_name={})
+    for metric in stats.metrics:
         is_array = metric.num_elements > 0
         last_update = format_timestamp(metric.last_update)
         for value in metric.values:
@@ -120,32 +119,73 @@ def _show_stats(dev_id, stats, kargs):
                 svalue = f'{value.f64:.4g}'
             else:
                 svalue = f'{value.u64}'
-            value_len = max(value_len, len(svalue))
 
-            name = base_name
-            if is_array:
-                name += f'[{value.index}]'
+            labels = dict((l.key, l.value) for l in value.labels)
+
+            short_name = None
+            if with_aliases:
+                alias = labels.get('alias')
+                if alias:
+                    short_name = alias
+            if short_name is None:
+                short_name = metric.name
+                if is_array:
+                    short_name += f'[{value.index}]'
+
+            partial_name = f'{metric.scope.block}.{short_name}'
+            long_name = f'{metric.scope.zone}.{partial_name}'
+            m = types.SimpleNamespace(
+                short_name=short_name,
+                partial_name=partial_name,
+                long_name=long_name,
+                value=svalue,
+                last_update=last_update,
+                labels=labels,
+            )
+
+            mlist = metrics.by_short_name.setdefault(short_name, [])
+            mlist.append(m)
+
+            mlist = metrics.by_partial_name.setdefault(partial_name, [])
+            mlist.append(m)
+
+            mlist = metrics.by_long_name.setdefault(long_name, [])
+            mlist.append(m)
+
+    if with_long_name:
+        metrics.final = metrics.by_long_name
+    else:
+        metrics.final = {}
+        for short_name, slist in metrics.by_short_name.items():
+            if len(slist) == 1:
+                metrics.final[short_name] = slist
+                continue
+
+            for m in slist:
+                plist = metrics.by_partial_name[m.partial_name]
+                if len(plist) == 1:
+                    metrics.final[m.partial_name] = plist
+                else:
+                    metrics.final[m.long_name] = metrics.by_long_name[m.long_name]
+
+    if metrics.final:
+        name_len = 0
+        value_len = 0
+        for name, mlist in metrics.final.items():
             name_len = max(name_len, len(name))
+            for metric in mlist:
+                value_len = max(value_len, len(metric.value))
 
-            metrics[name] = {
-                'value': svalue,
-                'last_update': last_update,
-                'labels': dict((l.key, l.value) for l in value.labels),
-            }
+        for name in sorted(metrics.final, key=natural_sort_key):
+            for metric in metrics.final[name]:
+                row = f'{name:>{name_len}}: {metric.value:<{value_len}}'
+                if with_last_update:
+                    row += f'    [{metric.last_update}]'
+                rows.append(row)
 
-    if metrics:
-        last_update = kargs.get('last_update', False)
-        with_labels = kargs.get('labels', False)
-        for name in sorted(metrics, key=natural_sort_key):
-            m = metrics[name]
-            row = f'{name:>{name_len}}: {m["value"]:<{value_len}}'
-            if last_update:
-                row += f'    [{m["last_update"]}]'
-            rows.append(row)
-
-            if with_labels:
-                for k, v in sorted(m["labels"].items(), key=lambda i: i[0]):
-                    rows.append(f'{"":>{name_len}}  <{k}="{v}">')
+                if with_labels:
+                    for k, v in sorted(metric.labels.items(), key=lambda pair: pair[0]):
+                        rows.append(f'{"":>{name_len}}  <{k}="{v}">')
 
     click.echo('\n'.join(rows))
 
@@ -517,7 +557,7 @@ def show_stats_options(fn):
             help='Filter to restrict statistic metrics to the given type(s).',
         ),
         click.option(
-            '--zeroes',
+            '--zeroes', '-z',
             is_flag=True,
             help='Include zero valued statistic metrics in the display.',
         ),
@@ -544,6 +584,20 @@ def show_stats_options(fn):
             help='''
             Filter to restrict statistic metrics to the given units (only applicable to metrics that
             have been defined with the "units" label).
+            ''',
+        ),
+        click.option(
+            '--aliases', '-a',
+            is_flag=True,
+            help='Use alias label instead of metric name when present.',
+        ),
+        click.option(
+            '--long-name', '-n',
+            is_flag=True,
+            help='''
+            Use the fully-qualified long format for the metric name. The format is:
+            <zone>.<block>.<name>, where <name> is either the metric name or an alias if the
+            --aliases flag is specified.
             ''',
         ),
     )

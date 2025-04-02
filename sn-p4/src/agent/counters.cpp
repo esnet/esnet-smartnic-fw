@@ -67,7 +67,7 @@ extern "C" {
 }
 
 //--------------------------------------------------------------------------------------------------
-#define COUNTER_NLABELS 2
+#define COUNTER_NLABELS 3
 #define COUNTER_NSTRINGS 1
 
 struct InitCountersBlock {
@@ -79,6 +79,23 @@ struct InitCountersBlock {
     unsigned int nmetrics;
     string* strings;
 };
+
+extern "C" {
+    static const char* counter_block_label_value_alias(const struct stats_label_format_spec* spec) {
+        const struct snp4_info_counter_block* info = (typeof(info))spec->label->data;
+
+        const char* value = NULL;
+        if (spec->idx < info->num_aliases) {
+            value = info->aliases[spec->idx];
+        }
+
+        if (value == NULL) {
+            value = "";
+        }
+
+        return value;
+    }
+}
 
 static void init_counters_block_metric(InitCountersBlock* blk,
                                        unsigned int idx,
@@ -117,6 +134,15 @@ static void init_counters_block_metric(InitCountersBlock* blk,
         labels->key = "units";
         labels->value = units;
         labels->flags = STATS_LABEL_FLAG_MASK(NO_EXPORT);
+        labels += 1;
+        mspec->nlabels += 1;
+    }
+
+    if (blk->info->aliases != NULL) {
+        labels->key = "alias";
+        labels->flags = STATS_LABEL_FLAG_MASK(NO_EXPORT);
+        labels->value_alloc = counter_block_label_value_alias;
+        labels->data = (typeof(labels->data))blk->info;
         labels += 1;
         mspec->nlabels += 1;
     }
