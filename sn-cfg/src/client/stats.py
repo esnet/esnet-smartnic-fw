@@ -10,6 +10,7 @@ import click
 import collections
 import gettext
 import grpc
+import re
 import types
 
 from sn_cfg_proto import (
@@ -237,6 +238,209 @@ def batch_stats(op, **kargs):
     return batch_generate_stats_req(op, **kargs), batch_process_stats_resp(kargs)
 
 #---------------------------------------------------------------------------------------------------
+def stats_view_req(dev_id, **stats_kargs):
+    views = StatsMetricMatchLabel()
+    views.key.exact = 'views'
+    views.value.split.pattern = ','
+    views.value.split.any = True
+
+    for vf in stats_kargs.get('view_filters', ()):
+        p = views.value.split.part.any_set.members.add()
+        p.match.value.regexp.pattern = vf
+
+    stats_kargs.update({
+        'filters': (StatsMetricFilter(match=StatsMetricMatch(label=views)),),
+        'labels': True,
+        'metric_types': ('counter',),
+        'units': ('packets',) + (('bytes',) if stats_kargs.get('bytes', False) else ()),
+    })
+    return stats_req(dev_id, **stats_kargs)
+
+#---------------------------------------------------------------------------------------------------
+def rpc_stats_view(op, **kargs):
+    req = stats_view_req(**kargs)
+    try:
+        for resp in op(req):
+            if resp.error_code != ErrorCode.EC_OK:
+                raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+            yield resp
+    except grpc.RpcError as e:
+        raise click.ClickException(str(e))
+
+def rpc_get_stats_view(stub, **kargs):
+    for resp in rpc_stats_view(stub.GetStats, **kargs):
+        yield resp.dev_id, resp.stats
+
+#---------------------------------------------------------------------------------------------------
+def _show_stats_view(dev_id, stats, kargs):
+    class Metric:
+        def __init__(self):
+            self.packets = 0
+            self.bytes = 0
+
+        def __str__(self):
+            return self.format_packets()
+
+        def format_packets(self):
+            return f'{self.packets:,}'
+
+        def format_bytes(self):
+            return f'[{self.bytes:,}B]'
+
+    class Column:
+        def __init__(self, port, direction):
+            self.port = port
+            self.direction = direction
+
+            self.width = 0
+            self.rows = []
+
+            self.append(None, fill='=')
+            if port is None:
+                self.append(f'Device ID {dev_id}', align='<')
+            else:
+                self.append(f'Port {port} ' + direction.capitalize())
+
+        def append(self, entry, fill='', align='>'):
+            if entry is not None:
+                entry = ' ' + str(entry) + ' '
+                self.width = max(self.width, len(entry))
+            self.rows.append((entry, fill, align))
+
+        def format(self, idx):
+            entry, fill, align = self.rows[idx]
+            if entry is None:
+                entry = ''
+            return f'{entry:{fill}{align}{self.width}}'
+
+    view_filters = tuple(re.compile(v) for v in kargs.get('view_filters'))
+    views = {}
+    ports = {}
+    for metric in stats.metrics:
+        name = metric.scope.block
+        value = metric.values[0]
+
+        labels = dict((l.key, l.value) for l in value.labels)
+        units = labels.get('units', 'packets')
+
+        for view_spec in labels.get('views').split(','):
+            for view_filter in view_filters:
+                match = view_filter.match(view_spec)
+                if match is not None:
+                    view_name, view_port, view_dir = view_spec.split(ViewFilter.FIELD_SEP)
+                    col_key = view_port + view_dir
+                    ports.setdefault(view_port, {}).setdefault(view_dir, col_key)
+
+                    name = name.replace('app' + view_port, 'app*')
+                    suffix = '_' + view_port
+                    if name.endswith(suffix):
+                        name = name.removesuffix(suffix) + '_*'
+
+                    view = views.setdefault(view_name, types.SimpleNamespace(rows={}, totals={}))
+                    row_cols = view.rows.setdefault(name, {})
+
+                    m = row_cols.setdefault(col_key, Metric())
+                    t = view.totals.setdefault(col_key, Metric())
+                    if units == 'bytes':
+                        m.bytes = value.u64
+                        t.bytes += m.bytes
+                    else:
+                        m.packets = value.u64
+                        t.packets += m.packets
+                    break
+
+    name_col = Column(None, None)
+    columns = [name_col]
+    metric_cols = {}
+    for port in sorted(ports, key=natural_sort_key):
+        directions = ports[port]
+        for direction in sorted(directions, key=natural_sort_key):
+            col_key = directions[direction]
+            col = Column(port, direction)
+            columns.append(col)
+            metric_cols[col_key] = col
+
+    with_bytes = kargs.get('bytes', False)
+    for view_name in sorted(views, key=natural_sort_key):
+        for col in columns:
+            col.append(None, fill='=')
+            col.append(view_name if col is name_col else None, align='<')
+            col.append(None, fill='-')
+
+        view = views[view_name]
+        for name in sorted(view.rows, key=natural_sort_key):
+            name_col.append(name)
+            if with_bytes:
+                name_col.append(None)
+
+            row_cols = view.rows[name]
+            for col_key, col in metric_cols.items():
+                entry = row_cols.get(col_key)
+                col.append(entry)
+                if with_bytes:
+                    col.append(entry.format_bytes() if entry is not None else None)
+
+        name_col.append('totals')
+        if with_bytes:
+            name_col.append(None)
+
+        for col_key, col in metric_cols.items():
+            entry = view.totals.get(col_key)
+            col.append(entry)
+            if with_bytes:
+                col.append(entry.format_bytes() if entry is not None else None)
+
+    if views:
+        for col in columns:
+            col.append(None, fill='=')
+
+        rows = []
+        for idx in range(len(name_col.rows)):
+            row = ''
+            prev = None
+            for col in columns:
+                col_sep = '|' if prev is None or prev.port == col.port else '||'
+                row += col_sep + col.format(idx)
+                prev = col
+            rows.append(row + '|')
+
+        click.echo('\n'.join(rows))
+
+def show_stats_view(client, **kargs):
+    for dev_id, stats in rpc_get_stats_view(client.stub, **kargs):
+        _show_stats_view(dev_id, stats, kargs)
+
+#---------------------------------------------------------------------------------------------------
+def batch_generate_stats_view_req(op, **kargs):
+    yield BatchRequest(op=op, stats=stats_view_req(**kargs))
+
+def batch_process_stats_view_resp(kargs):
+    def process(resp):
+        if not resp.HasField('stats'):
+            return False
+
+        supported_ops = {
+            BatchOperation.BOP_GET: 'Got',
+        }
+        op = resp.op
+        if op not in supported_ops:
+            raise click.ClickException('Response for unsupported batch operation: {op}')
+        op_label = supported_ops[op]
+
+        resp = resp.stats
+        if resp.error_code != ErrorCode.EC_OK:
+            raise click.ClickException('Remote failure: ' + error_code_str(resp.error_code))
+
+        if op == BatchOperation.BOP_GET:
+            _show_stats_view(resp.dev_id, resp.stats, kargs)
+        return True
+
+    return process
+
+def batch_stats_view(op, **kargs):
+    return batch_generate_stats_view_req(op, **kargs), batch_process_stats_view_resp(kargs)
+
+#---------------------------------------------------------------------------------------------------
 def clear_stats_options(fn):
     options = (
         device_id_option,
@@ -403,6 +607,53 @@ Example 3: Various custom filters to select metrics by array indices.
 - Select only array metrics outside the range of even indices 10 <= i <= 20:
   {{prog_name}} show stats --zeroes \\
       --filter 'all(neg(singleton), neg(indices[10:20:2]))'
+\b
+\b
+Example 4: Filter to select only metrics counting packets on the output side of
+           port 1 of the sn.egr component (and all of it's sub-components) of
+           the SmartNIC datapath.
+- Using the provided sub-command:
+  {{prog_name}} show stats view --zeroes --view-filter 'sn.egr.*:1:out'
+\b
+- Using a custom filter:
+  {{prog_name}} show stats --zeroes \\
+      --filter 'label(exact("units"), exact("packets"))' \\
+      --filter '
+          label( \\
+              exact("views"), \\
+              split_any(",", \\
+                  part_value(re(r"^sn\\.egr\\.[^:]*:1:out$")), \\
+              ) \\
+          )'
+\b
+- Using a more complex custom filter that matches each field of the view
+  specification separately.
+  {{prog_name}} show stats --zeroes \\
+      --filter 'label(exact("units"), exact("packets"))' \\
+      --filter '
+          label( \\
+              exact("views"), \\
+              split_any(",", \\
+                  part_value(
+                      split_all(":", \\
+                          any( \\
+                              all( \\
+                                  part_index(0), \\
+                                  part_value(re(r"^sn\\.egr\\.[^:]*$")), \\
+                              ), \\
+                              all( \\
+                                  part_index(1), \\
+                                  part_value(exact("1")), \\
+                              ), \\
+                              all( \\
+                                  part_index(2), \\
+                                  part_value(exact("out")), \\
+                              ) \\
+                          ) \\
+                      ) \\
+                  ) \\
+              ) \\
+          )'
 '''
 
     def convert(self, value, param, ctx):
@@ -626,6 +877,67 @@ def show_stats_options(fn):
     ) + stats_show_base_options()
     return apply_options(options, fn)
 
+class ViewFilter(click.ParamType):
+    # Needed for auto-generated help (or implement get_metavar method instead).
+    name = 'view_filter'
+
+    NFIELDS = 3
+    FIELD_SEP = ':'
+    FIELD_GLOB_RE = r'[^' + FIELD_SEP + ']*'
+
+    def _fixup_field(self, field):
+        # View fields are matched by regular expression, so special characters need to be escaped.
+        return field.replace('.', r'\.').replace('*', self.FIELD_GLOB_RE)
+
+    def convert(self, value, param, ctx):
+        fields = [self._fixup_field(f) for f in value.split(self.FIELD_SEP)]
+        nfields = len(fields)
+        if nfields == 1 and fields[0] == '':
+            msg = gettext.gettext('Empty view specification filter.')
+            self.fail(msg, param, ctx)
+
+        if nfields > self.NFIELDS:
+            msg = gettext.gettext(
+                f'Too many fields in view specification filter "{value}". Expected no more than '
+                f'{self.NFIELDS} fields.')
+            self.fail(msg, param, ctx)
+
+        if nfields < self.NFIELDS:
+            fields.extend((self.NFIELDS - nfields)*[self.FIELD_GLOB_RE])
+
+        return '^' + self.FIELD_SEP.join(fields) + '$'
+
+def show_stats_view_options(fn):
+    options = (
+        device_id_option,
+        click.option(
+            '--zeroes', '-z',
+            is_flag=True,
+            help='Include zero valued statistic metrics in the display.',
+        ),
+        click.option(
+            '--bytes', '-b',
+            is_flag=True,
+            help='Include byte counts in the display.',
+        ),
+        click.option(
+            '--view-filter', '-v',
+            'view_filters',
+            type=ViewFilter(),
+            multiple=True,
+            default=('*',),
+            show_default=True,
+            help = '''
+            A filter to select which metrics to display based on their view specifications. A view
+            specification filter is a triplet of the form <name>:<port>:<direction>, where <name> is
+            a "." separated sequence of SmartNIC datapath components naming the view (any of which
+            may be globbed using "*"), <port> is 0, 1 or "*" for any, and <direction> is "in", "out"
+            or "*" for any.
+            ''',
+        ),
+    )
+    return apply_options(options, fn)
+
 #---------------------------------------------------------------------------------------------------
 def add_batch_commands(cmd):
     # Click doesn't support nested groups when using command chaining, so the command hierarchy
@@ -646,6 +958,14 @@ def add_batch_commands(cmd):
         '''
         return batch_stats(BatchOperation.BOP_GET, **kargs)
 
+    @cmd.command(name='show-stats-view')
+    @show_stats_view_options
+    def show_stats_view(**kargs):
+        '''
+        Display SmartNIC statistics by view.
+        '''
+        return batch_stats_view(BatchOperation.BOP_GET, **kargs)
+
 #---------------------------------------------------------------------------------------------------
 def add_clear_commands(cmd):
     @cmd.command
@@ -660,7 +980,8 @@ def add_clear_commands(cmd):
 #---------------------------------------------------------------------------------------------------
 def add_show_commands(cmd, settings):
     filter_help = Filter.HELP.format(**settings)
-    @cmd.command(
+    @cmd.group(
+        invoke_without_command=True,
         help=f'''
 Display SmartNIC statistics.
 {filter_help}
@@ -669,7 +990,17 @@ Display SmartNIC statistics.
     @show_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
-        show_stats(ctx.obj, **kargs)
+        if ctx.invoked_subcommand is None:
+            show_stats(ctx.obj, **kargs)
+
+    @stats.command
+    @show_stats_view_options
+    @click.pass_context
+    def view(ctx, **kargs):
+        '''
+        Display SmartNIC statistics by view.
+        '''
+        show_stats_view(ctx.obj, **kargs)
 
 #---------------------------------------------------------------------------------------------------
 def add_sub_commands(cmds):
