@@ -1,6 +1,9 @@
 #---------------------------------------------------------------------------------------------------
 __all__ = (
     'add_sub_command',
+    'stats_req_kargs',
+    'stats_show_base_options',
+    'stats_show_format',
 )
 
 import click
@@ -40,7 +43,7 @@ METRIC_TYPE_MAP = {
 METRIC_TYPE_RMAP = dict((name, enum) for enum, name in METRIC_TYPE_MAP.items())
 
 #---------------------------------------------------------------------------------------------------
-def stats_req(dev_id, **stats_kargs):
+def stats_req_kargs(dev_id, stats_kargs):
     req_kargs = {'dev_id': dev_id}
     if stats_kargs:
         root = StatsMetricFilter()
@@ -70,7 +73,10 @@ def stats_req(dev_id, **stats_kargs):
             metric_filter=root,
         )
 
-    return StatsRequest(**req_kargs)
+    return req_kargs
+
+def stats_req(dev_id, **stats_kargs):
+    return StatsRequest(**stats_req_kargs(dev_id, stats_kargs))
 
 #---------------------------------------------------------------------------------------------------
 def rpc_stats(op, **kargs):
@@ -97,12 +103,7 @@ def clear_stats(client, **kargs):
         click.echo(f'Cleared statistics for device ID {dev_id}.')
 
 #---------------------------------------------------------------------------------------------------
-def _show_stats(dev_id, stats, kargs):
-    rows = []
-    rows.append(HEADER_SEP)
-    rows.append(f'Device ID: {dev_id}')
-    rows.append(HEADER_SEP)
-
+def stats_show_format(stats, kargs):
     with_last_update = kargs.get('last_update', False)
     with_labels = kargs.get('labels', False)
     with_aliases = kargs.get('aliases', False)
@@ -168,6 +169,7 @@ def _show_stats(dev_id, stats, kargs):
                 else:
                     metrics.final[m.long_name] = metrics.by_long_name[m.long_name]
 
+    rows = []
     if metrics.final:
         name_len = 0
         value_len = 0
@@ -187,6 +189,14 @@ def _show_stats(dev_id, stats, kargs):
                     for k, v in sorted(metric.labels.items(), key=lambda pair: pair[0]):
                         rows.append(f'{"":>{name_len}}  <{k}="{v}">')
 
+    return rows
+
+def _show_stats(dev_id, stats, kargs):
+    rows = []
+    rows.append(HEADER_SEP)
+    rows.append(f'Device ID: {dev_id}')
+    rows.append(HEADER_SEP)
+    rows.extend(stats_show_format(stats, kargs))
     click.echo('\n'.join(rows))
 
 def show_stats(client, **kargs):
@@ -546,15 +556,18 @@ Example 3: Various custom filters to select metrics by array indices.
 
         return ns
 
-def show_stats_options(fn):
-    options = (
-        device_id_option,
+def stats_show_base_options():
+    return (
         click.option(
             '--metric-type', '-m',
             'metric_types',
             type=click.Choice(sorted(name for name in METRIC_TYPE_RMAP)),
             multiple=True,
-            help='Filter to restrict statistic metrics to the given type(s).',
+            help='''
+            Filter to restrict statistic metrics to the given type(s). Multiple options will result
+            in the logical OR of the given types. The set of all the given types will be logically
+            ANDed with other filtering options.
+            ''',
         ),
         click.option(
             '--zeroes', '-z',
@@ -571,7 +584,10 @@ def show_stats_options(fn):
             'filters',
             type=Filter(),
             multiple=True,
-            help='Custom expression for filtering metrics.',
+            help='''
+            Custom expression for filtering metrics. Multiple options will result in the logical AND
+            of the given filters, along with any other filtering options.
+            ''',
         ),
         click.option(
             '--labels', '-l',
@@ -583,7 +599,9 @@ def show_stats_options(fn):
             multiple=True,
             help='''
             Filter to restrict statistic metrics to the given units (only applicable to metrics that
-            have been defined with the "units" label).
+            have been defined with the "units" label). Common units are "packets" and "bytes".
+            Multiple options will result in the logical OR of the given units. The set of all the
+            given units will be logically ANDed with other filtering options.
             ''',
         ),
         click.option(
@@ -601,6 +619,11 @@ def show_stats_options(fn):
             ''',
         ),
     )
+
+def show_stats_options(fn):
+    options = (
+        device_id_option,
+    ) + stats_show_base_options()
     return apply_options(options, fn)
 
 #---------------------------------------------------------------------------------------------------
