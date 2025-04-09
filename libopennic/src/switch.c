@@ -309,11 +309,9 @@ static const struct switch_stats_block_info switch_stats_top_info[] = {
 
     SWITCH_STATS_TOP_INFO(probe_to_bypass_0),
     SWITCH_STATS_TOP_INFO(drops_to_bypass_0),
-    SWITCH_STATS_TOP_INFO(drops_from_bypass_0),
 
     SWITCH_STATS_TOP_INFO(probe_to_bypass_1),
     SWITCH_STATS_TOP_INFO(drops_to_bypass_1),
-    SWITCH_STATS_TOP_INFO(drops_from_bypass_1),
 
     SWITCH_STATS_TOP_INFO(probe_from_pf0),
     SWITCH_STATS_TOP_INFO(probe_from_pf0_vf0),
@@ -337,25 +335,33 @@ static const struct switch_stats_block_info switch_stats_top_info[] = {
 
     SWITCH_STATS_TOP_INFO(drops_q_range_fail_0),
     SWITCH_STATS_TOP_INFO(drops_q_range_fail_1),
+
+    SWITCH_STATS_TOP_INFO(probe_to_app_igr_in0),
+    SWITCH_STATS_TOP_INFO(probe_to_app_igr_in1),
+    SWITCH_STATS_TOP_INFO(probe_to_app_igr_p4_out0),
+    SWITCH_STATS_TOP_INFO(probe_to_app_igr_p4_out1),
+
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_in0),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_in1),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_out0),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_out1),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_p4_in0),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_p4_in1),
 };
 
 #define SWITCH_STATS_P4_PROC_INFO(_prefix, _name) \
     SWITCH_STATS_BLOCK_INFO(p4_proc_decoder, "p4_proc_" #_prefix "_", _name)
 
 static const struct switch_stats_block_info switch_stats_p4_proc_igr_info[] = {
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_0),
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_1),
-
-    SWITCH_STATS_P4_PROC_INFO(igr, probe_to_pyld_fifo),
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_to_pyld_fifo),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_p4),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_unset_err_port_0),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_unset_err_port_1),
 };
 
 static const struct switch_stats_block_info switch_stats_p4_proc_egr_info[] = {
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_0),
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_1),
-
-    SWITCH_STATS_P4_PROC_INFO(egr, probe_to_pyld_fifo),
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_to_pyld_fifo),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_p4),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_unset_err_port_0),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_unset_err_port_1),
 };
 
 //--------------------------------------------------------------------------------------------------
