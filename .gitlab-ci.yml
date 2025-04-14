@@ -333,6 +333,13 @@ ejfat:
         EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R014A"
         EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
 
+      - GL_ENV_NAME: node3/3/stable
+        SYSTEM_HW_BOARD: au280
+        AAP_LIMIT: node3.fpga.es.net
+        EXTRA_VAR_STACK_UNIQUE: 3
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S00JA"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:e1:00"
+
       - GL_ENV_NAME: node3/4/dev
         SYSTEM_HW_BOARD: au280
         AAP_LIMIT: node3.fpga.es.net
