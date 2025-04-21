@@ -3,6 +3,7 @@
 #include "array_size.h"
 #include "axi4s_probe_block.h"
 #include "memory-barriers.h"
+#include "regmap-config.h"
 #include "smartnic.h"
 #include "stats.h"
 #include <stdbool.h>
@@ -309,9 +310,15 @@ static const struct switch_stats_block_info switch_stats_top_info[] = {
 
     SWITCH_STATS_TOP_INFO(probe_to_bypass_0),
     SWITCH_STATS_TOP_INFO(drops_to_bypass_0),
+#if !REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
+    SWITCH_STATS_TOP_INFO(drops_from_bypass_0),
+#endif
 
     SWITCH_STATS_TOP_INFO(probe_to_bypass_1),
     SWITCH_STATS_TOP_INFO(drops_to_bypass_1),
+#if !REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
+    SWITCH_STATS_TOP_INFO(drops_from_bypass_1),
+#endif
 
     SWITCH_STATS_TOP_INFO(probe_from_pf0),
     SWITCH_STATS_TOP_INFO(probe_from_pf0_vf0),
@@ -336,6 +343,7 @@ static const struct switch_stats_block_info switch_stats_top_info[] = {
     SWITCH_STATS_TOP_INFO(drops_q_range_fail_0),
     SWITCH_STATS_TOP_INFO(drops_q_range_fail_1),
 
+#if REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
     SWITCH_STATS_TOP_INFO(probe_to_app_igr_in0),
     SWITCH_STATS_TOP_INFO(probe_to_app_igr_in1),
     SWITCH_STATS_TOP_INFO(probe_to_app_igr_p4_out0),
@@ -347,21 +355,38 @@ static const struct switch_stats_block_info switch_stats_top_info[] = {
     SWITCH_STATS_TOP_INFO(probe_to_app_egr_out1),
     SWITCH_STATS_TOP_INFO(probe_to_app_egr_p4_in0),
     SWITCH_STATS_TOP_INFO(probe_to_app_egr_p4_in1),
+#endif
 };
 
 #define SWITCH_STATS_P4_PROC_INFO(_prefix, _name) \
     SWITCH_STATS_BLOCK_INFO(p4_proc_decoder, "p4_proc_" #_prefix "_", _name)
 
 static const struct switch_stats_block_info switch_stats_p4_proc_igr_info[] = {
+#if REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
     SWITCH_STATS_P4_PROC_INFO(igr, drops_from_p4),
     SWITCH_STATS_P4_PROC_INFO(igr, drops_unset_err_port_0),
     SWITCH_STATS_P4_PROC_INFO(igr, drops_unset_err_port_1),
+#else
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_0),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_1),
+
+    SWITCH_STATS_P4_PROC_INFO(igr, probe_to_pyld_fifo),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_to_pyld_fifo),
+#endif
 };
 
 static const struct switch_stats_block_info switch_stats_p4_proc_egr_info[] = {
+#if REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
     SWITCH_STATS_P4_PROC_INFO(egr, drops_from_p4),
     SWITCH_STATS_P4_PROC_INFO(egr, drops_unset_err_port_0),
     SWITCH_STATS_P4_PROC_INFO(egr, drops_unset_err_port_1),
+#else
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_0),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_1),
+
+    SWITCH_STATS_P4_PROC_INFO(egr, probe_to_pyld_fifo),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_to_pyld_fifo),
+#endif
 };
 
 //--------------------------------------------------------------------------------------------------
