@@ -13,6 +13,8 @@ dev = 'esnet-smartnic'
 dev_ = dev.underscorify()
 top_ir = dev + '-top-ir.yaml'
 template_dir = '@SOURCE_ROOT@/regio/src/regio/tools/templates'
+this_dir = meson.current_source_dir()
+cc = meson.get_compiler('c')
 
 regmap_info_blocks = run_command(
   regio_info_prog,
@@ -61,8 +63,20 @@ regmap_c_headers = custom_target(
   install_dir : 'include/esnet-smartnic',
 )
 
+regmap_c_config = custom_target(
+  'regmap-c-config',
+  output : ['regmap-config.h'],
+  depends : [regmap_c_headers],
+  command : [
+    this_dir / 'regmap-c-config.sh',
+    '@PRIVATE_DIR@',
+    '@OUTPUT@',
+    ' '.join(cc.cmd_array()) +' -I@OUTDIR@',
+  ],
+)
+
 regmap_c_headers_dep = declare_dependency(
-  sources : [regmap_c_headers],
+  sources : [regmap_c_headers, regmap_c_config],
   include_directories : include_directories('.')
 )
 
