@@ -269,7 +269,7 @@ ftap:
   needs:
     - package
 
-ejfat:
+.ejfat:
   extends: .aap_run
   stage: review
   environment:
@@ -282,6 +282,61 @@ ejfat:
       #   e.g. node3/1/alpha
       # Keep it short since it shows up in the UI
 
+  variables:
+    AAP_JOB_TEMPLATE: 635
+    #
+    # AAP Job Template Overrides
+    #   See here for more overrides: https://gitlab.es.net/ht/cicd-common/-/blob/main/README.md?ref_type=heads#aap-run
+    #
+    #AAP_SCM_BRANCH: testing
+    #AAP_VERBOSITY: 3
+
+    #
+    # Extra variables provided to the playbook
+    #   EXTRA_VARS is an optional JSON dictionary evaluated *first*
+    #     NOTE: keys are *not* converted to lower case in this dictionary.  Use this if you need upper case keys.
+    #
+    #   EXTRA_VAR_name/EXTRA_VAR_NAME is a string which will be merged into the extra_vars dictionary as
+    #       "name": "value"
+    #     and will *override* matching keys found in the EXTRA_VARS dictionary
+    #     NOTE: keys like "NAME" or "NaMe" will be converted to lower case before merging
+    #
+    # EXTRA_VARS: '{ "foo": "bar", "xyzzy": "${SOME_GITLAB_VARIABLE}" }'
+    # EXTRA_VAR_FOO: "baz"
+
+    EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
+    EXTRA_VAR_STACK_ROOT_PATH: /usr/local/ejfat/${EXTRA_VAR_STACK_UNIQUE}
+    EXTRA_VAR_STACK_COMPOSE_PROFILES: "smartnic-mgr-dpdk-portlink,smartnic-ingress,smartnic-metrics"
+  rules:
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
+      when: never
+    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
+      when: manual
+      allow_failure: true
+  needs:
+    - package
+
+ejfat-staging:
+  extends: .ejfat
+  parallel:
+    matrix:
+      # node4.fpga.es.net
+      - GL_ENV_NAME: node4/0/staging
+        SYSTEM_HW_BOARD: au280
+        AAP_LIMIT: node4.fpga.es.net
+        EXTRA_VAR_STACK_UNIQUE: 0
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S00KA"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
+  rules:
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
+      when: never
+    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
+      allow_failure: true
+
+ejfat-dev-multi:
+  extends: .ejfat
+  parallel:
+    matrix:
       # node2.fpga.es.net
       - GL_ENV_NAME: node2/0/dev
         SYSTEM_HW_BOARD: au280
@@ -311,6 +366,10 @@ ejfat:
         EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R009A"
         EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:41:00"
 
+ejfat-dev-single:
+  extends: .ejfat
+  parallel:
+    matrix:
       - GL_ENV_NAME: node2/4/dev
         SYSTEM_HW_BOARD: au55c
         AAP_LIMIT: node2.fpga.es.net
@@ -318,6 +377,31 @@ ejfat:
         EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL14O0W1MTCA"
         EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
 
+      - GL_ENV_NAME: node3/4/dev
+        SYSTEM_HW_BOARD: au280
+        AAP_LIMIT: node3.fpga.es.net
+        EXTRA_VAR_STACK_UNIQUE: 4
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S02DA"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:c1:00"
+
+      - GL_ENV_NAME: node3/5/dev
+        SYSTEM_HW_BOARD: au280
+        AAP_LIMIT: node3.fpga.es.net
+        EXTRA_VAR_STACK_UNIQUE: 5
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R00HA"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
+
+      - GL_ENV_NAME: node3/6/dev
+        SYSTEM_HW_BOARD: au280
+        AAP_LIMIT: node3.fpga.es.net
+        EXTRA_VAR_STACK_UNIQUE: 6
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204R026A"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:41:00"
+
+ejfat-prod:
+  extends: .ejfat
+  parallel:
+    matrix:
       # node3.fpga.es.net
       - GL_ENV_NAME: node3/1/alpha
         SYSTEM_HW_BOARD: au280
@@ -333,38 +417,12 @@ ejfat:
         EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R014A"
         EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
 
-  variables:
-    AAP_JOB_TEMPLATE: 635
-    #
-    # AAP Job Template Overrides
-    #   See here for more overrides: https://gitlab.es.net/ht/cicd-common/-/blob/main/README.md?ref_type=heads#aap-run
-    #
-    #AAP_SCM_BRANCH: testing
-    #AAP_VERBOSITY: 3
-
-    #
-    # Extra variables provided to the playbook
-    #   EXTRA_VARS is an optional JSON dictionary evaluated *first*
-    #     NOTE: keys are *not* converted to lower case in this dictionary.  Use this if you need upper case keys.
-    #
-    #   EXTRA_VAR_name/EXTRA_VAR_NAME is a string which will be merged into the extra_vars dictionary as
-    #       "name": "value"
-    #     and will *override* matching keys found in the EXTRA_VARS dictionary
-    #     NOTE: keys like "NAME" or "NaMe" will be converted to lower case before merging
-    #
-    # EXTRA_VARS: '{ "foo": "bar", "xyzzy": "${SOME_GITLAB_VARIABLE}" }'
-    # EXTRA_VAR_FOO: "baz"
-
-    EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
-    EXTRA_VAR_STACK_ROOT_PATH: /usr/local/ejfat/${EXTRA_VAR_STACK_UNIQUE}
-  rules:
-    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
-      when: never
-    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
-      when: manual
-      allow_failure: true
-  needs:
-    - package
+      - GL_ENV_NAME: node3/3/stable
+        SYSTEM_HW_BOARD: au280
+        AAP_LIMIT: node3.fpga.es.net
+        EXTRA_VAR_STACK_UNIQUE: 3
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S00JA"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:e1:00"
 
 .trigger_sw:
   stage: trigger_downstream
