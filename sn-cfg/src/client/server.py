@@ -30,6 +30,7 @@ HEADER_SEP = '-' * 40
 #---------------------------------------------------------------------------------------------------
 DEBUG_FLAG_MAP = {
     ServerDebugFlag.DEBUG_FLAG_BATCH: 'batch',
+    ServerDebugFlag.DEBUG_FLAG_STATS: 'stats',
 }
 DEBUG_FLAG_RMAP = dict((name, enum) for enum, name in DEBUG_FLAG_MAP.items())
 

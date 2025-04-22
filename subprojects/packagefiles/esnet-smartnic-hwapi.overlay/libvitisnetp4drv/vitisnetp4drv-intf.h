@@ -13,10 +13,24 @@ extern "C" {
 #endif
 
 /*----------------------------------------------------------------------------*/
+struct vitis_net_p4_drv_metadata_counter_block {
+    const char* name;
+    const char* const* aliases;
+    size_t num_aliases;
+};
+
+/*----------------------------------------------------------------------------*/
+struct vitis_net_p4_drv_metadata {
+    const struct vitis_net_p4_drv_metadata_counter_block* const* counter_blocks;
+    size_t num_counter_blocks;
+};
+
+/*----------------------------------------------------------------------------*/
 struct vitis_net_p4_drv_intf {
     struct {
         const char* name;
         uintptr_t offset;
+        const struct vitis_net_p4_drv_metadata* metadata;
     } info;
 
     struct {

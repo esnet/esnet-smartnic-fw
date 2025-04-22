@@ -142,26 +142,33 @@ bool qdma_function_set_queues(volatile struct esnet_smartnic_bar2* bar2,
 }
 
 //--------------------------------------------------------------------------------------------------
-#define CMAC_ADAPTER_STATS_COUNTER(_name) \
+#define CMAC_ADAPTER_STATS_COUNTER_NLABELS 1
+#define _CMAC_ADAPTER_STATS_COUNTER(_name, _units) \
 { \
     __STATS_METRIC_SPEC(#_name, NULL, COUNTER, 0, 0), \
     .io = { \
         .offset = offsetof(struct cmac_adapter_block, _name##_lo), \
         .size = 2 * sizeof(uint32_t), \
     }, \
+    .nlabels = CMAC_ADAPTER_STATS_COUNTER_NLABELS, \
+    .labels = (const struct stats_label_spec[CMAC_ADAPTER_STATS_COUNTER_NLABELS]){ \
+        {.key = "units", .value = #_units, .flags = STATS_LABEL_FLAG_MASK(NO_EXPORT)}, \
+    }, \
 }
+#define CMAC_ADAPTER_STATS_COUNTER(_prefix, _units) \
+    _CMAC_ADAPTER_STATS_COUNTER(_prefix##_##_units, _units)
 
 static const struct stats_metric_spec cmac_adapter_stats_metrics[] = {
-    CMAC_ADAPTER_STATS_COUNTER(tx_packets),
-    CMAC_ADAPTER_STATS_COUNTER(tx_bytes),
-    CMAC_ADAPTER_STATS_COUNTER(tx_drop_packets),
-    CMAC_ADAPTER_STATS_COUNTER(tx_drop_bytes),
-    CMAC_ADAPTER_STATS_COUNTER(rx_packets),
-    CMAC_ADAPTER_STATS_COUNTER(rx_bytes),
-    CMAC_ADAPTER_STATS_COUNTER(rx_drop_packets),
-    CMAC_ADAPTER_STATS_COUNTER(rx_drop_bytes),
-    CMAC_ADAPTER_STATS_COUNTER(rx_err_packets),
-    CMAC_ADAPTER_STATS_COUNTER(rx_err_bytes),
+    CMAC_ADAPTER_STATS_COUNTER(tx, packets),
+    CMAC_ADAPTER_STATS_COUNTER(tx, bytes),
+    CMAC_ADAPTER_STATS_COUNTER(tx_drop, packets),
+    CMAC_ADAPTER_STATS_COUNTER(tx_drop, bytes),
+    CMAC_ADAPTER_STATS_COUNTER(rx, packets),
+    CMAC_ADAPTER_STATS_COUNTER(rx, bytes),
+    CMAC_ADAPTER_STATS_COUNTER(rx_drop, packets),
+    CMAC_ADAPTER_STATS_COUNTER(rx_drop, bytes),
+    CMAC_ADAPTER_STATS_COUNTER(rx_err, packets),
+    CMAC_ADAPTER_STATS_COUNTER(rx_err, bytes),
 };
 
 //--------------------------------------------------------------------------------------------------

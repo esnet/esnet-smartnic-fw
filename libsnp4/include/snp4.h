@@ -160,6 +160,9 @@ struct snp4_info_counter_block {
   enum snp4_info_counter_type type;
   uint32_t width;
   uint32_t num_counters;
+
+  const char* const* aliases;
+  size_t num_aliases;
 };
 
 struct snp4_info_pipeline {

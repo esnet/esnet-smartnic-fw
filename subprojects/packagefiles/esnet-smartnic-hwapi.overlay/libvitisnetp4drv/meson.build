@@ -105,12 +105,13 @@ foreach ip_name: ip_names
     endif
 
     ip_dir_prefix = ip_dir_prefixes[ip_name]
+    ip_dir = this_dir / ip_dir_prefix
     inc_dir = include_directories('.', ip_dir_prefix + 'include')
 
     # Create a dependency for the Vitis driver library.
     drv_dep = cc.find_library(
         lib_base,
-        dirs: this_dir / ip_dir_prefix + 'lib',
+        dirs: ip_dir + 'lib',
         static: true,
     )
 
@@ -127,6 +128,7 @@ foreach ip_name: ip_names
             this_dir / intf_base + '.py',
             ip_name,
             regmap_names[ip_name],
+            ip_dir + 'metadata.yaml',
             '@OUTPUT@',
         ],
         depend_files: [

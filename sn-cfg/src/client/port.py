@@ -23,6 +23,7 @@ from sn_cfg_proto import (
 
 from .device import device_id_option
 from .error import error_code_str
+from .stats import stats_req_kargs, stats_show_base_options, stats_show_format
 from .utils import apply_options, FLOW_CONTROL_THRESHOLD, format_timestamp, natural_sort_key
 
 HEADER_SEP = '-' * 40
@@ -148,15 +149,8 @@ def batch_port_config(op, **kargs):
 
 #---------------------------------------------------------------------------------------------------
 def port_stats_req(dev_id, port_id, **stats_kargs):
-    req_kargs = {'dev_id': dev_id, 'port_id': port_id}
-    if stats_kargs:
-        filters_kargs = {}
-        if not stats_kargs.get('zeroes'):
-            filters_kargs['non_zero'] = True
-
-        if filters_kargs:
-            req_kargs['filters'] = StatsFilters(**filters_kargs)
-
+    req_kargs = stats_req_kargs(dev_id, stats_kargs)
+    req_kargs['port_id'] = port_id
     return PortStatsRequest(**req_kargs)
 
 #---------------------------------------------------------------------------------------------------
@@ -189,31 +183,7 @@ def _show_port_stats(dev_id, port_id, stats, kargs):
     rows.append(HEADER_SEP)
     rows.append(f'Port ID: {port_id} on device ID {dev_id}')
     rows.append(HEADER_SEP)
-
-    name_len = 0
-    value_len = 0
-    metrics = {}
-    for metric in stats.metrics:
-        name = metric.name
-        name_len = max(name_len, len(name))
-
-        svalue = f'{metric.value.u64}'
-        value_len = max(value_len, len(svalue))
-
-        metrics[name] = {
-            'value': svalue,
-            'last_update': format_timestamp(metric.last_update),
-        }
-
-    if metrics:
-        last_update = kargs.get('last_update', False)
-        for name in sorted(metrics, key=natural_sort_key):
-            m = metrics[name]
-            row = f'{name:>{name_len}}: {m["value"]:<{value_len}}'
-            if last_update:
-                row += f'    [{m["last_update"]}]'
-            rows.append(row)
-
+    rows.extend(stats_show_format(stats, kargs))
     click.echo('\n'.join(rows))
 
 def show_port_stats(client, **kargs):
@@ -374,17 +344,7 @@ def show_port_stats_options(fn):
     options = (
         device_id_option,
         port_id_option,
-        click.option(
-            '--zeroes',
-            is_flag=True,
-            help='Include zero valued counters in the display.',
-        ),
-        click.option(
-            '--last-update',
-            is_flag=True,
-            help='Include the counter last update timestamp in the display.',
-        ),
-    )
+    ) + stats_show_base_options()
     return apply_options(options, fn)
 
 #---------------------------------------------------------------------------------------------------

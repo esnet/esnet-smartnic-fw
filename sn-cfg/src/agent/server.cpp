@@ -16,6 +16,7 @@ using namespace std;
 const char* SmartnicConfigImpl::debug_flag_label(const ServerDebugFlag flag) {
     switch (flag) {
     case ServerDebugFlag::DEBUG_FLAG_BATCH: return "BATCH";
+    case ServerDebugFlag::DEBUG_FLAG_STATS: return "STATS";
 
     case ServerDebugFlag::DEBUG_FLAG_UNKNOWN:
     default:

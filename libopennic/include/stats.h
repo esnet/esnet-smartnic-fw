@@ -35,22 +35,40 @@ struct stats_label_format_spec {
     unsigned int idx;
 };
 
+enum stats_label_flag {
+    stats_label_flag_NO_EXPORT, // Don't export the label via Prometheus, but make it available for
+                                // internal uses such as for metadata or filtering.
+};
+
+#define STATS_LABEL_FLAG_MASK(_name) (1 << stats_label_flag_##_name)
+#define STATS_LABEL_FLAG_TEST(_flags, _name) (((_flags) & STATS_LABEL_FLAG_MASK(_name)) != 0)
+
 struct stats_label_spec {
     const char* key;
     const char* value; // Ignored when value_alloc is provided.
+    unsigned int flags;
 
     const char* (*value_alloc)(const struct stats_label_format_spec* spec);
     void (*value_free)(const char* value);
+    void* data;
 };
 
 static inline void stats_label_value_free(const char* value) {
     free((void*)value);
 }
 
+struct stats_label {
+    const char* key;
+    const char* value;
+};
+
 //--------------------------------------------------------------------------------------------------
 struct stats_metric_value {
     uint64_t u64;
     double f64;
+
+    const struct stats_label* labels;
+    size_t nlabels;
 };
 
 enum stats_metric_type {
@@ -110,9 +128,8 @@ struct stats_metric_spec {
     __STATS_METRIC_SPEC(_name, _desc, _type, _flags, _init_value) \
 }
 
-#define STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value, \
-                             _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
-{ \
+#define __STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value, \
+                               _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
     __STATS_METRIC_SPEC(_name, _desc, _type, _flags, _init_value), \
     .io = { \
         .offset = offsetof(_io_type, _io_field), \
@@ -121,7 +138,13 @@ struct stats_metric_spec {
         .shift = _io_shift, \
         .invert = _io_invert, \
         .data = _io_data, \
-    }, \
+    }
+
+#define STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value,  \
+                             _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
+{ \
+    __STATS_METRIC_SPEC_IO(_name, _desc, _type, _flags, _init_value, \
+                           _io_type, _io_field, _io_width, _io_shift, _io_invert, _io_data) \
 }
 
 //--------------------------------------------------------------------------------------------------

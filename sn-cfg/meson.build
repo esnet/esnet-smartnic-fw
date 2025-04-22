@@ -58,6 +58,9 @@ libsn_cfg_client = shared_library(
 pkg = import('pkgconfig')
 pkg.generate(
     libsn_cfg_client,
+    libraries: [
+        libsn_cfg_proto_dep,
+    ],
     subdirs: 'esnet-smartnic',
 )
 

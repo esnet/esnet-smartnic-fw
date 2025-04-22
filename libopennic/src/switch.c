@@ -253,139 +253,273 @@ void switch_set_defaults_one_to_one(volatile struct smartnic_block* blk) {
 }
 
 //--------------------------------------------------------------------------------------------------
-#define SWITCH_STATS_COUNTER(_name) \
+#define SWITCH_STATS_COUNTER_NLABELS 2
+#define SWITCH_STATS_COUNTER(_name, _units) \
 { \
     __STATS_METRIC_SPEC(#_name, NULL, COUNTER, STATS_METRIC_FLAG_MASK(CLEAR_ON_READ), 0), \
     .io = { \
         .offset = offsetof(struct axi4s_probe_block, _name##_upper), \
         .size = 2 * sizeof(uint32_t), \
     }, \
+    .nlabels = SWITCH_STATS_COUNTER_NLABELS, \
+    .labels = (const struct stats_label_spec[SWITCH_STATS_COUNTER_NLABELS]){ \
+        {.key = "units", .value = #_units, .flags = STATS_LABEL_FLAG_MASK(NO_EXPORT)}, \
+        {.key = "views", .value = "<placeholder>", .flags = STATS_LABEL_FLAG_MASK(NO_EXPORT)}, \
+    }, \
 }
 
 static const struct stats_metric_spec switch_stats_metrics[] = {
-    SWITCH_STATS_COUNTER(pkt_count),
-    SWITCH_STATS_COUNTER(byte_count),
+    SWITCH_STATS_COUNTER(pkt_count, packets),
+    SWITCH_STATS_COUNTER(byte_count, bytes),
 };
+
+#define VIEW(_name, _port, _direction) #_name ":" #_port ":" #_direction
+#define VCAT(_a, _b) _a "," _b
 
 struct switch_stats_block_info {
     const char* name;
     uintptr_t offset;
+    const char* views;
 };
 
-#define SWITCH_STATS_BLOCK_INFO(_block, _prefix, _name)  \
+#define SWITCH_STATS_BLOCK_INFO(_block, _prefix, _name, _views...) \
 { \
     .name = _prefix #_name, \
     .offset = offsetof(struct _block, _name), \
+    .views = _views, \
 }
 
-#define SWITCH_STATS_TOP_INFO(_name) SWITCH_STATS_BLOCK_INFO(esnet_smartnic_bar2, "", _name)
+#define SWITCH_STATS_TOP_INFO(_name, _views...) \
+    SWITCH_STATS_BLOCK_INFO(esnet_smartnic_bar2, "", _name,## _views)
 static const struct switch_stats_block_info switch_stats_top_info[] = {
-    SWITCH_STATS_TOP_INFO(probe_core_to_app0),
-    SWITCH_STATS_TOP_INFO(probe_core_to_app1),
-    SWITCH_STATS_TOP_INFO(probe_app0_to_core),
-    SWITCH_STATS_TOP_INFO(probe_app1_to_core),
+    SWITCH_STATS_TOP_INFO(probe_core_to_app0, VCAT(VCAT(
+                          VIEW(sn.igr.mux, 0, out),
+                          VIEW(sn.igr.app, 0, in)),
+                          VIEW(sn.igr.app.p4, 0, in))),
+    SWITCH_STATS_TOP_INFO(probe_core_to_app1, VCAT(VCAT(
+                          VIEW(sn.igr.mux, 1, out),
+                          VIEW(sn.igr.app, 1, in)),
+                          VIEW(sn.igr.app.p4, 1, in))),
+    SWITCH_STATS_TOP_INFO(probe_app0_to_core, VCAT(VCAT(
+                          VIEW(sn.egr.demux, 0, in),
+                          VIEW(sn.egr.app, 0, out)),
+                          VIEW(sn.egr.app.p4, 0, out))),
+    SWITCH_STATS_TOP_INFO(probe_app1_to_core, VCAT(VCAT(
+                          VIEW(sn.egr.demux, 1, in),
+                          VIEW(sn.egr.app, 1, out)),
+                          VIEW(sn.egr.app.p4, 1, out))),
 
-    SWITCH_STATS_TOP_INFO(probe_from_cmac_0),
-    SWITCH_STATS_TOP_INFO(drops_ovfl_from_cmac_0),
-    SWITCH_STATS_TOP_INFO(drops_err_from_cmac_0),
+    SWITCH_STATS_TOP_INFO(probe_from_cmac_0, VCAT(VCAT(
+                          VIEW(sn, 0, in),
+                          VIEW(sn.igr, 0, in)),
+                          VIEW(sn.igr.mux, 0, in))),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_from_cmac_0, VCAT(VCAT(
+                          VIEW(sn, 0, in),
+                          VIEW(sn.igr, 0, in)),
+                          VIEW(sn.igr.mux, 0, in))),
+    SWITCH_STATS_TOP_INFO(drops_err_from_cmac_0, VCAT(VCAT(
+                          VIEW(sn, 0, in),
+                          VIEW(sn.igr, 0, in)),
+                          VIEW(sn.igr.mux, 0, in))),
 
-    SWITCH_STATS_TOP_INFO(probe_from_cmac_1),
-    SWITCH_STATS_TOP_INFO(drops_ovfl_from_cmac_1),
-    SWITCH_STATS_TOP_INFO(drops_err_from_cmac_1),
+    SWITCH_STATS_TOP_INFO(probe_from_cmac_1, VCAT(VCAT(
+                          VIEW(sn, 1, in),
+                          VIEW(sn.igr, 1, in)),
+                          VIEW(sn.igr.mux, 1, in))),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_from_cmac_1, VCAT(VCAT(
+                          VIEW(sn, 1, in),
+                          VIEW(sn.igr, 1, in)),
+                          VIEW(sn.igr.mux, 1, in))),
+    SWITCH_STATS_TOP_INFO(drops_err_from_cmac_1, VCAT(VCAT(
+                          VIEW(sn, 1, in),
+                          VIEW(sn.igr, 1, in)),
+                          VIEW(sn.igr.mux, 1, in))),
 
-    SWITCH_STATS_TOP_INFO(probe_to_cmac_0),
-    SWITCH_STATS_TOP_INFO(drops_ovfl_to_cmac_0),
+    SWITCH_STATS_TOP_INFO(probe_to_cmac_0, VCAT(VCAT(
+                          VIEW(sn, 0, out),
+                          VIEW(sn.egr, 0, out)),
+                          VIEW(sn.egr.demux, 0, out))),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_to_cmac_0, VCAT(VCAT(
+                          VIEW(sn, 0, out),
+                          VIEW(sn.egr, 0, out)),
+                          VIEW(sn.egr.demux, 0, out))),
 
-    SWITCH_STATS_TOP_INFO(probe_to_cmac_1),
-    SWITCH_STATS_TOP_INFO(drops_ovfl_to_cmac_1),
+    SWITCH_STATS_TOP_INFO(probe_to_cmac_1, VCAT(VCAT(
+                          VIEW(sn, 1, out),
+                          VIEW(sn.egr, 1, out)),
+                          VIEW(sn.egr.demux, 1, out))),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_to_cmac_1, VCAT(VCAT(
+                          VIEW(sn, 1, out),
+                          VIEW(sn.egr, 1, out)),
+                          VIEW(sn.egr.demux, 1, out))),
 
-    SWITCH_STATS_TOP_INFO(probe_from_host_0),
-    SWITCH_STATS_TOP_INFO(probe_from_host_1),
+    SWITCH_STATS_TOP_INFO(probe_from_host_0,
+                          VIEW(sn, 0, in)),
+    SWITCH_STATS_TOP_INFO(probe_from_host_1,
+                          VIEW(sn, 1, in)),
 
-    SWITCH_STATS_TOP_INFO(probe_to_host_0),
-    SWITCH_STATS_TOP_INFO(drops_ovfl_to_host_0),
+    SWITCH_STATS_TOP_INFO(probe_to_host_0,
+                          VIEW(sn, 0, out)),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_to_host_0,
+                          VIEW(sn, 0, out)),
 
-    SWITCH_STATS_TOP_INFO(probe_to_host_1),
-    SWITCH_STATS_TOP_INFO(drops_ovfl_to_host_1),
+    SWITCH_STATS_TOP_INFO(probe_to_host_1,
+                          VIEW(sn, 1, out)),
+    SWITCH_STATS_TOP_INFO(drops_ovfl_to_host_1,
+                          VIEW(sn, 1, out)),
 
-    SWITCH_STATS_TOP_INFO(probe_to_bypass_0),
-    SWITCH_STATS_TOP_INFO(drops_to_bypass_0),
+    SWITCH_STATS_TOP_INFO(probe_to_bypass_0,
+                          VIEW(sn.igr.mux, 0, out)),
+    SWITCH_STATS_TOP_INFO(drops_to_bypass_0,
+                          VIEW(sn.igr.mux, 0, out)),
 #if !REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
-    SWITCH_STATS_TOP_INFO(drops_from_bypass_0),
+    SWITCH_STATS_TOP_INFO(drops_from_bypass_0,
+                          VIEW(sn.egr.demux, 0, in)),
 #endif
 
-    SWITCH_STATS_TOP_INFO(probe_to_bypass_1),
-    SWITCH_STATS_TOP_INFO(drops_to_bypass_1),
+    SWITCH_STATS_TOP_INFO(probe_to_bypass_1,
+                          VIEW(sn.igr.mux, 1, out)),
+    SWITCH_STATS_TOP_INFO(drops_to_bypass_1,
+                          VIEW(sn.igr.mux, 1, out)),
 #if !REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
-    SWITCH_STATS_TOP_INFO(drops_from_bypass_1),
+    SWITCH_STATS_TOP_INFO(drops_from_bypass_1,
+                          VIEW(sn.egr.demux, 1, in)),
 #endif
 
-    SWITCH_STATS_TOP_INFO(probe_from_pf0),
-    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf0),
-    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf1),
-    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf2),
+    SWITCH_STATS_TOP_INFO(probe_from_pf0, VCAT(
+                          VIEW(sn.egr.app, 0, in),
+                          VIEW(sn.egr.app.mux, 0, in))),
+    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf0, VCAT(
+                          VIEW(sn.egr.app, 0, in),
+                          VIEW(sn.egr.app.user, 0, in))),
+    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf1, VCAT(
+                          VIEW(sn.egr.app, 0, in),
+                          VIEW(sn.egr.app.p4, 0, in))),
+    SWITCH_STATS_TOP_INFO(probe_from_pf0_vf2,
+                          VIEW(sn.igr.mux, 0, in)),
 
-    SWITCH_STATS_TOP_INFO(probe_to_pf0),
-    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf0),
-    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf1),
-    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf2),
+    SWITCH_STATS_TOP_INFO(probe_to_pf0, VCAT(
+                          VIEW(sn.igr.app, 0, out),
+                          VIEW(sn.igr.app.demux, 0, out))),
+    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf0, VCAT(
+                          VIEW(sn.igr.app, 0, out),
+                          VIEW(sn.igr.app.user, 0, out))),
+    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf1, VCAT(
+                          VIEW(sn.egr.app, 0, out),
+                          VIEW(sn.egr.app.p4, 0, out))),
+    SWITCH_STATS_TOP_INFO(probe_to_pf0_vf2,
+                          VIEW(sn.egr.demux, 0, out)),
 
-    SWITCH_STATS_TOP_INFO(probe_from_pf1),
-    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf0),
-    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf1),
-    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf2),
+    SWITCH_STATS_TOP_INFO(probe_from_pf1, VCAT(
+                          VIEW(sn.egr.app, 1, in),
+                          VIEW(sn.egr.app.mux, 1, in))),
+    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf0, VCAT(
+                          VIEW(sn.egr.app, 1, in),
+                          VIEW(sn.egr.app.user, 1, in))),
+    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf1, VCAT(
+                          VIEW(sn.egr.app, 1, in),
+                          VIEW(sn.egr.app.p4, 1, in))),
+    SWITCH_STATS_TOP_INFO(probe_from_pf1_vf2,
+                          VIEW(sn.igr.mux, 1, in)),
 
-    SWITCH_STATS_TOP_INFO(probe_to_pf1),
-    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf0),
-    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf1),
-    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf2),
+    SWITCH_STATS_TOP_INFO(probe_to_pf1, VCAT(
+                          VIEW(sn.igr.app, 1, out),
+                          VIEW(sn.igr.app.demux, 1, out))),
+    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf0, VCAT(
+                          VIEW(sn.igr.app, 1, out),
+                          VIEW(sn.igr.app.user, 1, out))),
+    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf1, VCAT(
+                          VIEW(sn.egr.app, 1, out),
+                          VIEW(sn.egr.app.p4, 1, out))),
+    SWITCH_STATS_TOP_INFO(probe_to_pf1_vf2,
+                          VIEW(sn.egr.demux, 1, out)),
 
-    SWITCH_STATS_TOP_INFO(drops_q_range_fail_0),
-    SWITCH_STATS_TOP_INFO(drops_q_range_fail_1),
+    SWITCH_STATS_TOP_INFO(drops_q_range_fail_0,
+                          VIEW(sn, 0, out)),
+    SWITCH_STATS_TOP_INFO(drops_q_range_fail_1,
+                          VIEW(sn, 1, out)),
 
 #if REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
-    SWITCH_STATS_TOP_INFO(probe_to_app_igr_in0),
-    SWITCH_STATS_TOP_INFO(probe_to_app_igr_in1),
-    SWITCH_STATS_TOP_INFO(probe_to_app_igr_p4_out0),
-    SWITCH_STATS_TOP_INFO(probe_to_app_igr_p4_out1),
+    SWITCH_STATS_TOP_INFO(probe_to_app_igr_in0, VCAT(
+                          VIEW(sn.igr.app.demux, 0, out),
+                          VIEW(sn.igr.app.user, 0, in))),
+    SWITCH_STATS_TOP_INFO(probe_to_app_igr_in1, VCAT(
+                          VIEW(sn.igr.app.demux, 1, out),
+                          VIEW(sn.igr.app.user, 1, in))),
 
-    SWITCH_STATS_TOP_INFO(probe_to_app_egr_in0),
-    SWITCH_STATS_TOP_INFO(probe_to_app_egr_in1),
-    SWITCH_STATS_TOP_INFO(probe_to_app_egr_out0),
-    SWITCH_STATS_TOP_INFO(probe_to_app_egr_out1),
-    SWITCH_STATS_TOP_INFO(probe_to_app_egr_p4_in0),
-    SWITCH_STATS_TOP_INFO(probe_to_app_egr_p4_in1),
+    SWITCH_STATS_TOP_INFO(probe_to_app_igr_p4_out0, VCAT(
+                          VIEW(sn.igr.app.p4, 0, out),
+                          VIEW(sn.igr.app.demux, 0, in))),
+    SWITCH_STATS_TOP_INFO(probe_to_app_igr_p4_out1, VCAT(
+                          VIEW(sn.igr.app.p4, 1, out),
+                          VIEW(sn.igr.app.demux, 1, in))),
+
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_in0, VCAT(
+                          VIEW(sn.igr.app.user, 0, out),
+                          VIEW(sn.egr.app.user, 0, in))),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_in1, VCAT(
+                          VIEW(sn.igr.app.user, 1, out),
+                          VIEW(sn.egr.app.user, 1, in))),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_out0, VCAT(
+                          VIEW(sn.egr.app.user, 0, out),
+                          VIEW(sn.egr.app.mux, 0, in))),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_out1, VCAT(
+                          VIEW(sn.egr.app.user, 1, out),
+                          VIEW(sn.egr.app.mux, 1, in))),
+
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_p4_in0, VCAT(
+                          VIEW(sn.egr.app.p4, 0, in),
+                          VIEW(sn.egr.app.mux, 0, out))),
+    SWITCH_STATS_TOP_INFO(probe_to_app_egr_p4_in1, VCAT(
+                          VIEW(sn.egr.app.p4, 1, in),
+                          VIEW(sn.egr.app.mux, 1, out))),
 #endif
 };
 
-#define SWITCH_STATS_P4_PROC_INFO(_prefix, _name) \
-    SWITCH_STATS_BLOCK_INFO(p4_proc_decoder, "p4_proc_" #_prefix "_", _name)
+#define SWITCH_STATS_P4_PROC_INFO(_prefix, _name, _views...) \
+    SWITCH_STATS_BLOCK_INFO(p4_proc_decoder, "p4_proc_" #_prefix "_", _name,## _views)
 
 static const struct switch_stats_block_info switch_stats_p4_proc_igr_info[] = {
 #if REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_p4),
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_unset_err_port_0),
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_unset_err_port_1),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_p4, VCAT(
+                              VIEW(sn.igr.app.p4, 0, out),
+                              VIEW(sn.igr.app.p4, 1, out))),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_unset_err_port_0,
+                              VIEW(sn.igr.app.p4, 0, out)),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_unset_err_port_1,
+                              VIEW(sn.igr.app.p4, 1, out)),
 #else
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_0),
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_1),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_0,
+                              VIEW(sn.egr.app.p4, 0, out)),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_from_proc_port_1,
+                              VIEW(sn.egr.app.p4, 0, out)),
 
-    SWITCH_STATS_P4_PROC_INFO(igr, probe_to_pyld_fifo),
-    SWITCH_STATS_P4_PROC_INFO(igr, drops_to_pyld_fifo),
+    SWITCH_STATS_P4_PROC_INFO(igr, probe_to_pyld_fifo,
+                              VIEW(sn.igr.app.p4, 0, in)),
+    SWITCH_STATS_P4_PROC_INFO(igr, drops_to_pyld_fifo,
+                              VIEW(sn.igr.app.p4, 0, in)),
 #endif
 };
 
 static const struct switch_stats_block_info switch_stats_p4_proc_egr_info[] = {
 #if REGMAP_CONFIG_WITH_V2_SWITCH_COUNTERS
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_p4),
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_unset_err_port_0),
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_unset_err_port_1),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_p4, VCAT(
+                              VIEW(sn.egr.app.p4, 0, out),
+                              VIEW(sn.egr.app.p4, 1, out))),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_unset_err_port_0,
+                              VIEW(sn.egr.app.p4, 0, out)),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_unset_err_port_1,
+                              VIEW(sn.egr.app.p4, 1, out)),
 #else
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_0),
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_1),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_0,
+                              VIEW(sn.egr.app.p4, 1, out)),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_from_proc_port_1,
+                              VIEW(sn.egr.app.p4, 1, out)),
 
-    SWITCH_STATS_P4_PROC_INFO(egr, probe_to_pyld_fifo),
-    SWITCH_STATS_P4_PROC_INFO(egr, drops_to_pyld_fifo),
+    SWITCH_STATS_P4_PROC_INFO(egr, probe_to_pyld_fifo,
+                              VIEW(sn.igr.app.p4, 1, in)),
+    SWITCH_STATS_P4_PROC_INFO(egr, drops_to_pyld_fifo,
+                              VIEW(sn.igr.app.p4, 1, in)),
 #endif
 };
 
@@ -475,10 +609,15 @@ struct stats_zone* switch_stats_zone_alloc(struct stats_domain* domain,
         grp->is_valid = true;
     }
 
+#define NMETRICS (nblocks * ARRAY_SIZE(switch_stats_metrics))
     struct stats_block_spec bspecs[nblocks];
-    memset(bspecs, 0, sizeof(bspecs[0]) * nblocks);
+    struct stats_metric_spec mspecs[NMETRICS];
+    struct stats_label_spec lspecs[NMETRICS * SWITCH_STATS_COUNTER_NLABELS];
+#undef NMETRICS
 
     struct stats_block_spec* bspec = bspecs;
+    struct stats_metric_spec* mspec = mspecs;
+    struct stats_label_spec* lspec = lspecs;
     for (const struct switch_stats_block_group* grp = groups;
          grp < &groups[ARRAY_SIZE(groups)];
          ++grp) {
@@ -489,14 +628,32 @@ struct stats_zone* switch_stats_zone_alloc(struct stats_domain* domain,
         for (const struct switch_stats_block_info* info = grp->info;
              info < &grp->info[grp->ninfo];
              ++info, ++bspec) {
+            memset(bspec, 0, sizeof(*bspec));
             bspec->name = info->name;
-            bspec->metrics = switch_stats_metrics;
+            bspec->metrics = mspec;
             bspec->nmetrics = ARRAY_SIZE(switch_stats_metrics);
             bspec->io.base = grp->base + info->offset;
             bspec->attach_metrics = switch_stats_attach_metrics;
             bspec->latch_metrics = switch_stats_latch_metrics;
             bspec->release_metrics = switch_stats_release_metrics;
             bspec->read_metric = switch_stats_read_metric;
+
+            for (const struct stats_metric_spec* ms = switch_stats_metrics;
+                 ms < &switch_stats_metrics[ARRAY_SIZE(switch_stats_metrics)];
+                 ++ms, ++mspec) {
+                *mspec = *ms;
+                mspec->labels = lspec;
+                mspec->nlabels = 0;
+
+                for (const struct stats_label_spec* ls = ms->labels;
+                     ls < &ms->labels[ms->nlabels];
+                     ++ls, ++lspec, ++mspec->nlabels) {
+                    *lspec = *ls;
+                    if (strcmp(lspec->key, "views") == 0) {
+                        lspec->value = info->views;
+                    }
+                }
+            }
         }
     }
 

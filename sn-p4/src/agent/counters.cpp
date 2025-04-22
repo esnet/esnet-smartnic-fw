@@ -67,7 +67,7 @@ extern "C" {
 }
 
 //--------------------------------------------------------------------------------------------------
-#define COUNTER_NLABELS 1
+#define COUNTER_NLABELS 3
 #define COUNTER_NSTRINGS 1
 
 struct InitCountersBlock {
@@ -80,24 +80,42 @@ struct InitCountersBlock {
     string* strings;
 };
 
+extern "C" {
+    static const char* counter_block_label_value_alias(const struct stats_label_format_spec* spec) {
+        const struct snp4_info_counter_block* info = (typeof(info))spec->label->data;
+
+        const char* value = NULL;
+        if (spec->idx < info->num_aliases) {
+            value = info->aliases[spec->idx];
+        }
+
+        if (value == NULL) {
+            value = "";
+        }
+
+        return value;
+    }
+}
+
 static void init_counters_block_metric(InitCountersBlock* blk,
                                        unsigned int idx,
-                                       const char* suffix) {
+                                       const char* units,
+                                       bool add_suffix) {
     auto mspec = &blk->mspecs[idx];
     auto labels = &blk->labels[idx * COUNTER_NLABELS];
     auto strs = &blk->strings[idx * COUNTER_NSTRINGS];
 
     ostringstream name;
     name << blk->info->name;
-    if (suffix != NULL) {
-        name << '_' << suffix;
+    if (units != NULL && add_suffix) {
+        name << '_' << units;
     }
     *strs = name.str();
     mspec->name = strs->c_str();
     strs += 1;
 
     mspec->labels = labels;
-    mspec->nlabels = COUNTER_NLABELS;
+    mspec->nlabels = 0;
     mspec->type =
         blk->info->type == SNP4_INFO_COUNTER_TYPE_FLAG ?
         stats_metric_type_FLAG : stats_metric_type_COUNTER;
@@ -110,6 +128,24 @@ static void init_counters_block_metric(InitCountersBlock* blk,
     labels->key = "pipeline";
     labels->value = blk->pipeline->name;
     labels += 1;
+    mspec->nlabels += 1;
+
+    if (units != NULL) {
+        labels->key = "units";
+        labels->value = units;
+        labels->flags = STATS_LABEL_FLAG_MASK(NO_EXPORT);
+        labels += 1;
+        mspec->nlabels += 1;
+    }
+
+    if (blk->info->aliases != NULL) {
+        labels->key = "alias";
+        labels->flags = STATS_LABEL_FLAG_MASK(NO_EXPORT);
+        labels->value_alloc = counter_block_label_value_alias;
+        labels->data = (typeof(labels->data))blk->info;
+        labels += 1;
+        mspec->nlabels += 1;
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -182,23 +218,23 @@ void SmartnicP4Impl::init_counters(Device* dev, DevicePipeline* pipeline) {
         const char* tname = "UNKNOWN";
         switch (blk->info->type) {
         case SNP4_INFO_COUNTER_TYPE_PACKETS_AND_BYTES:
-            init_counters_block_metric(blk, 0, "packets");
-            init_counters_block_metric(blk, 1, "bytes");
+            init_counters_block_metric(blk, 0, "packets", true);
+            init_counters_block_metric(blk, 1, "bytes", true);
             tname = "PACKETS_AND_BYTES";
             break;
 
         case SNP4_INFO_COUNTER_TYPE_PACKETS:
-            init_counters_block_metric(blk, 0, NULL);
+            init_counters_block_metric(blk, 0, "packets", false);
             tname = "PACKETS";
             break;
 
         case SNP4_INFO_COUNTER_TYPE_BYTES:
-            init_counters_block_metric(blk, 0, NULL);
+            init_counters_block_metric(blk, 0, "bytes", false);
             tname = "BYTES";
             break;
 
         case SNP4_INFO_COUNTER_TYPE_FLAG:
-            init_counters_block_metric(blk, 0, NULL);
+            init_counters_block_metric(blk, 0, NULL, false);
             tname = "FLAG";
             break;
         }

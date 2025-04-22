@@ -243,6 +243,7 @@ def show(ctx):
 def main():
     class Commands: ...
     cmds = Commands()
+    cmds.settings = {'prog_name': 'sn-cfg'}
     cmds.main = click_main
     cmds.batch = batch
     cmds.clear = clear
@@ -251,4 +252,8 @@ def main():
 
     for mod in SUB_COMMAND_MODULES:
         mod.add_sub_commands(cmds)
-    cmds.main(auto_envvar_prefix='SN_CFG_CLI')
+
+    cmds.main(
+        prog_name=cmds.settings['prog_name'],
+        auto_envvar_prefix='SN_CFG_CLI',
+    )

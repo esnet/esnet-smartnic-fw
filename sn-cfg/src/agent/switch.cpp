@@ -420,20 +420,10 @@ void SmartnicConfigImpl::get_or_clear_switch_stats(
         end_dev_id = dev_id;
     }
 
-    GetStatsContext ctx;
-    if (!do_clear) {
-        auto filters = req.filters();
-        ctx.non_zero = filters.non_zero();
-
-        auto ntypes = filters.metric_types_size();
-        if (ntypes > 0) {
-            for (auto n = 0; n < ntypes; ++n) {
-                ctx.metric_types.set(filters.metric_types(n));
-            }
-        } else {
-            ctx.metric_types.set(StatsMetricType::STATS_METRIC_TYPE_COUNTER);
-        }
-    }
+    GetStatsContext ctx{
+        .filters = req.filters(),
+        .stats = NULL,
+    };
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
