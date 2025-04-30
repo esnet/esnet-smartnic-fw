@@ -8,6 +8,8 @@
 #include <grpc/grpc.h>
 #include "sn_cfg_v2.grpc.pb.h"
 
+#include "cms.h"
+
 using namespace grpc;
 using namespace sn_cfg::v2;
 using namespace std;
@@ -97,18 +99,20 @@ void SmartnicConfigImpl::init_server_stats(void) {
     memset(bspecs, 0, sizeof(bspecs));
     auto bspec = bspecs;
 
-#define NMETRICS 3
+#define NMETRICS (3 + devices.size())
     struct stats_metric_spec mspecs[NMETRICS];
     memset(mspecs, 0, sizeof(mspecs));
     auto mspec = mspecs;
 
-#define NLABELS 3
+#define NLABELS_CARD_INFO 5
+#define NLABELS (3 + NLABELS_CARD_INFO * devices.size())
     struct stats_label_spec lspecs[NLABELS];
     memset(lspecs, 0, sizeof(lspecs));
     auto lspec = lspecs;
 
     size_t nmetrics = 0;
     size_t nlabels = 0;
+    auto stats = new ServerStats;
 
     mspec->name = "start_time_sec";
     mspec->type = stats_metric_type_GAUGE;
@@ -165,6 +169,64 @@ void SmartnicConfigImpl::init_server_stats(void) {
     nmetrics += 1;
     nlabels = 0;
 
+    for (auto dev : devices) {
+        auto ci = cms_card_info_read(&dev->cms);
+        if (ci == NULL) {
+            SERVER_LOG_LINE_INIT(server, ERROR,
+                "Failed to query card info for device " << dev->bus_id);
+            exit(EXIT_FAILURE);
+        }
+
+        string* strings = new string[NLABELS_CARD_INFO];
+        stats->strings.push_back(strings);
+
+        *strings = dev->bus_id.c_str();
+        lspec->key = "pcie_bus_id";
+        lspec->value = strings->c_str();
+        lspec += 1;
+        nlabels += 1;
+        strings += 1;
+
+        *strings = cms_profile_to_str(ci->profile);
+        lspec->key = "profile";
+        lspec->value = strings->c_str();
+        lspec += 1;
+        nlabels += 1;
+        strings += 1;
+
+        *strings = ci->serial_number;
+        lspec->key = "serial";
+        lspec->value = strings->c_str();
+        lspec += 1;
+        nlabels += 1;
+        strings += 1;
+
+        *strings = ci->revision;
+        lspec->key = "revision";
+        lspec->value = strings->c_str();
+        lspec += 1;
+        nlabels += 1;
+        strings += 1;
+
+        *strings = ci->sc_version;
+        lspec->key = "sc_ver";
+        lspec->value = strings->c_str();
+        lspec += 1;
+        nlabels += 1;
+        strings += 1;
+
+        cms_card_info_free(ci);
+
+        mspec->name = "card_info";
+        mspec->type = stats_metric_type_FLAG;
+        mspec->flags = STATS_METRIC_FLAG_MASK(NEVER_CLEAR);
+        mspec->labels = lspec - nlabels;
+        mspec->nlabels = nlabels;
+        mspec += 1;
+        nmetrics += 1;
+        nlabels = 0;
+    }
+
     bspec->name = "info";
     bspec->metrics = mspec - nmetrics;
     bspec->nmetrics = nmetrics;
@@ -178,7 +240,6 @@ void SmartnicConfigImpl::init_server_stats(void) {
     zspec.blocks = bspecs;
     zspec.nblocks = sizeof(bspecs) / sizeof(bspecs[0]);
 
-    auto stats = new ServerStats;
     stats->zone = stats_zone_alloc(server_stats.domain, &zspec);
     if (stats->zone == NULL) {
         SERVER_LOG_LINE_INIT(server, ERROR, "Failed to alloc server status stats zone");
@@ -191,6 +252,7 @@ void SmartnicConfigImpl::init_server_stats(void) {
 #undef NBLOCKS
 #undef NMETRICS
 #undef NLABELS
+#undef NLABELS_CARD_INFO
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -231,6 +293,13 @@ void SmartnicConfigImpl::deinit_server(void) {
     server_stats.status = NULL;
 
     stats_zone_free(stats->zone);
+
+    while (!stats->strings.empty()) {
+        auto strings = stats->strings.back();
+        stats->strings.pop_back();
+        delete[] strings;
+    }
+
     delete stats;
 }
 
