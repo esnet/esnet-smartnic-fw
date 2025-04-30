@@ -552,6 +552,7 @@ services:
       - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
       - SN_P4_SERVER_AUTH_TOKENS=${SN_P4_AUTH_TOKEN}
       - SN_P4_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
+      - SN_SW_VER=${SN_SW_VER:-unset}
 
       # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
       # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
