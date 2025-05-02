@@ -89,7 +89,7 @@ public:
             }
         }
 
-        return _words[_nwords - 1] != _upper_mask;
+        return _words[_nwords - 1] == _upper_mask;
     }
 
     bool is_all_cleared() const {
