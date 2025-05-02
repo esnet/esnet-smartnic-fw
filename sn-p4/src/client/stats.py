@@ -109,7 +109,7 @@ def stats_show_format(stats, kargs):
     with_aliases = kargs.get('aliases', False)
     with_long_name = kargs.get('long_name', False)
 
-    metrics = types.SimpleNamespace(by_short_name={}, by_partial_name={}, by_long_name={})
+    metrics = types.SimpleNamespace(by_short_name={}, by_long_name={})
     for metric in stats.metrics:
         is_array = metric.num_elements > 0
         last_update = format_timestamp(metric.last_update)
@@ -133,11 +133,12 @@ def stats_show_format(stats, kargs):
                 if is_array:
                     short_name += f'[{value.index}]'
 
-            partial_name = f'{metric.scope.block}.{short_name}'
-            long_name = f'{metric.scope.zone}.{partial_name}'
+            long_name = f'{metric.scope.zone}.{metric.scope.block}.{short_name}'
+            if not short_name.startswith(metric.scope.block):
+                short_name = f'{metric.scope.block}.{short_name}'
+
             m = types.SimpleNamespace(
                 short_name=short_name,
-                partial_name=partial_name,
                 long_name=long_name,
                 value=svalue,
                 last_update=last_update,
@@ -145,9 +146,6 @@ def stats_show_format(stats, kargs):
             )
 
             mlist = metrics.by_short_name.setdefault(short_name, [])
-            mlist.append(m)
-
-            mlist = metrics.by_partial_name.setdefault(partial_name, [])
             mlist.append(m)
 
             mlist = metrics.by_long_name.setdefault(long_name, [])
@@ -163,11 +161,7 @@ def stats_show_format(stats, kargs):
                 continue
 
             for m in slist:
-                plist = metrics.by_partial_name[m.partial_name]
-                if len(plist) == 1:
-                    metrics.final[m.partial_name] = plist
-                else:
-                    metrics.final[m.long_name] = metrics.by_long_name[m.long_name]
+                metrics.final[m.long_name] = metrics.by_long_name[m.long_name]
 
     rows = []
     if metrics.final:
