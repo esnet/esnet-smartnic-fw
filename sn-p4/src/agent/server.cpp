@@ -56,16 +56,17 @@ bool SmartnicP4Impl::get_server_times(struct timespec* start, struct timespec* u
 
 //--------------------------------------------------------------------------------------------------
 extern "C" {
-    enum ServerStat {
+    enum ServerStatusStat {
         START_TIME,
         UP_TIME,
     };
 
-    static void server_stats_read_metric(const struct stats_block_spec* bspec,
-                                         const struct stats_metric_spec* mspec,
-                                         uint64_t* value,
-                                         [[maybe_unused]] void* data) {
+    static void server_status_stats_read_metric(const struct stats_block_spec* bspec,
+                                                const struct stats_metric_spec* mspec,
+                                                uint64_t* value,
+                                                [[maybe_unused]] void* data) {
         SmartnicP4Impl* impl = (typeof(impl))bspec->io.data.ptr;
+        ServerStatusStat stat = (typeof(stat))mspec->io.data.u64;
 
         struct timespec start;
         struct timespec up;
@@ -73,49 +74,113 @@ extern "C" {
             return;
         }
 
-        switch ((ServerStat)mspec->io.data.u64) {
-        case ServerStat::START_TIME:
+        switch (stat) {
+        case ServerStatusStat::START_TIME:
             *value = start.tv_sec;
             break;
 
-        case ServerStat::UP_TIME:
+        case ServerStatusStat::UP_TIME:
             *value = up.tv_sec;
             break;
         }
+    }
+
+    static void server_info_stats_read_metric(
+        [[maybe_unused]] const struct stats_block_spec* bspec,
+        [[maybe_unused]] const struct stats_metric_spec* mspec,
+        uint64_t* value,
+        [[maybe_unused]] void* data) {
+        *value = 1;
     }
 }
 
 //--------------------------------------------------------------------------------------------------
 void SmartnicP4Impl::init_server_stats(void) {
-    struct stats_metric_spec mspecs[2];
+#define NBLOCKS 2
+    struct stats_block_spec bspecs[NBLOCKS];
+    memset(bspecs, 0, sizeof(bspecs));
+    auto bspec = bspecs;
+
+#define NMETRICS 3
+    struct stats_metric_spec mspecs[NMETRICS];
     memset(mspecs, 0, sizeof(mspecs));
     auto mspec = mspecs;
+
+#define NLABELS 3
+    struct stats_label_spec lspecs[NLABELS];
+    memset(lspecs, 0, sizeof(lspecs));
+    auto lspec = lspecs;
+
+    size_t nmetrics = 0;
+    size_t nlabels = 0;
 
     mspec->name = "start_time_sec";
     mspec->type = stats_metric_type_GAUGE;
     mspec->flags = STATS_METRIC_FLAG_MASK(NEVER_CLEAR);
-    mspec->io.data.u64 = ServerStat::START_TIME;
+    mspec->io.data.u64 = ServerStatusStat::START_TIME;
     mspec += 1;
+    nmetrics += 1;
 
     mspec->name = "up_time_sec";
     mspec->type = stats_metric_type_GAUGE;
     mspec->flags = STATS_METRIC_FLAG_MASK(NEVER_CLEAR);
-    mspec->io.data.u64 = ServerStat::UP_TIME;
+    mspec->io.data.u64 = ServerStatusStat::UP_TIME;
     mspec += 1;
+    nmetrics += 1;
 
-    struct stats_block_spec bspec;
-    memset(&bspec, 0, sizeof(bspec));
-    bspec.name = "status";
-    bspec.metrics = mspecs;
-    bspec.nmetrics = sizeof(mspecs) / sizeof(mspecs[0]);
-    bspec.read_metric = server_stats_read_metric;
-    bspec.io.data.ptr = this;
+    bspec->name = "status";
+    bspec->metrics = mspec - nmetrics;
+    bspec->nmetrics = nmetrics;
+    bspec->read_metric = server_status_stats_read_metric;
+    bspec->io.data.ptr = this;
+    bspec += 1;
+    nmetrics = 0;
+
+    lspec->key = "hw_ver";
+    lspec->value = getenv("SN_HW_VER");
+    if (lspec->value == NULL) {
+        lspec->value = "NONE";
+    }
+    lspec += 1;
+    nlabels += 1;
+
+    lspec->key = "fw_ver";
+    lspec->value = getenv("SN_FW_VER");
+    if (lspec->value == NULL) {
+        lspec->value = "NONE";
+    }
+    lspec += 1;
+    nlabels += 1;
+
+    lspec->key = "sw_ver";
+    lspec->value = getenv("SN_SW_VER");
+    if (lspec->value == NULL) {
+        lspec->value = "NONE";
+    }
+    lspec += 1;
+    nlabels += 1;
+
+    mspec->name = "build_info";
+    mspec->type = stats_metric_type_FLAG;
+    mspec->flags = STATS_METRIC_FLAG_MASK(NEVER_CLEAR);
+    mspec->labels = lspec - nlabels;
+    mspec->nlabels = nlabels;
+    mspec += 1;
+    nmetrics += 1;
+    nlabels = 0;
+
+    bspec->name = "info";
+    bspec->metrics = mspec - nmetrics;
+    bspec->nmetrics = nmetrics;
+    bspec->read_metric = server_info_stats_read_metric;
+    bspec += 1;
+    nmetrics = 0;
 
     struct stats_zone_spec zspec;
     memset(&zspec, 0, sizeof(zspec));
     zspec.name = "server";
-    zspec.blocks = &bspec;
-    zspec.nblocks = 1;
+    zspec.blocks = bspecs;
+    zspec.nblocks = sizeof(bspecs) / sizeof(bspecs[0]);
 
     auto stats = new ServerStats;
     stats->zone = stats_zone_alloc(server_stats.domain, &zspec);
@@ -126,6 +191,10 @@ void SmartnicP4Impl::init_server_stats(void) {
 
     server_stats.status = stats;
     SERVER_LOG_LINE_INIT(server, INFO, "Setup server status");
+
+#undef NBLOCKS
+#undef NMETRICS
+#undef NLABELS
 }
 
 //--------------------------------------------------------------------------------------------------

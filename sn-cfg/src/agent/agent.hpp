@@ -104,6 +104,7 @@ private:
 
     struct ServerStats {
         struct stats_zone* zone;
+        vector<string*> strings;
     };
     struct {
         struct stats_domain* domain;
