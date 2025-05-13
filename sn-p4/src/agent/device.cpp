@@ -86,6 +86,14 @@ void SmartnicP4Impl::get_device_info(
             build->add_dna(syscfg->dna[d]);
         }
 
+        auto hw_ver = getenv("SN_HW_VER");
+        auto fw_ver = getenv("SN_FW_VER");
+        auto sw_ver = getenv("SN_SW_VER");
+        auto env = build->mutable_env();
+        env->set_hw_version(hw_ver != NULL ? hw_ver : "NONE");
+        env->set_fw_version(fw_ver != NULL ? fw_ver : "NONE");
+        env->set_sw_version(sw_ver != NULL ? sw_ver : "NONE");
+
         resp.set_error_code(err);
         resp.set_dev_id(dev_id);
 
