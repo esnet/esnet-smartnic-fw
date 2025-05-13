@@ -288,7 +288,7 @@ def configure_host_options(fn):
         device_id_option,
         host_id_option,
         click.option(
-            '--dma-queues', '-d',
+            '--dma-queues', '-q',
             type=DmaQueues(),
             multiple=True,
             help='''
