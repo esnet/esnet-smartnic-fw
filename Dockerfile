@@ -157,13 +157,13 @@ EOF
 # Install the MinIO client command line tool.
 ADD \
     --chmod=755 \
-    https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2024-11-21T17-21-54Z \
+    https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2025-05-21T01-59-54Z \
     /usr/local/bin/mc
 
 # Install the gRPC health-check command line tool.
 ADD \
     --chmod=755 \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.37/grpc_health_probe-linux-amd64 \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.38/grpc_health_probe-linux-amd64 \
     /usr/local/bin/grpc_health_probe
 
 # Install gRPC debug tool (uncomment for inclusion).
