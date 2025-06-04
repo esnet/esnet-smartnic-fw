@@ -16,10 +16,12 @@ rule_files:
 scrape_configs:
   # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
   - job_name: 'smartnic-cfg'
+    fallback_scrape_protocol: PrometheusText0.0.4
     static_configs:
       - targets:
           - 'smartnic-cfg:8000'
   - job_name: 'smartnic-p4'
+    fallback_scrape_protocol: PrometheusText0.0.4
     static_configs:
       - targets:
           - 'smartnic-p4:8000'
