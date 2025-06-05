@@ -13,6 +13,11 @@
 
 #include "vitisnetp4drv-intf.h"	/* Vitis driver wrapper */
 
+struct snp4_counter_block {
+  XilVitisNetP4CounterCtx ctx;
+  size_t num_counters;
+};
+
 struct snp4_user_context {
   struct {
     bool enabled;
@@ -22,7 +27,7 @@ struct snp4_user_context {
   uintptr_t base_addr;
   XilVitisNetP4EnvIf env;
   XilVitisNetP4TargetCtx target;
-  XilVitisNetP4CounterCtx * counter_blocks;
+  struct snp4_counter_block * counter_blocks;
   unsigned int sdnet_idx;
   const struct vitis_net_p4_drv_intf* intf;
 };
@@ -107,7 +112,7 @@ static bool snp4_init_counter_blocks(struct snp4_user_context * snp4_user)
     return true;
   }
 
-  XilVitisNetP4CounterCtx * blocks = calloc(tcfg->CounterListSize, sizeof(*blocks));
+  struct snp4_counter_block * blocks = calloc(tcfg->CounterListSize, sizeof(*blocks));
   if (blocks == NULL) {
     return false;
   }
@@ -118,14 +123,17 @@ static bool snp4_init_counter_blocks(struct snp4_user_context * snp4_user)
 
   unsigned int n;
   for (n = 0; n < tcfg->CounterListSize; ++n) {
+    XilVitisNetP4TargetCounterConfig * cnt = tcfg->CounterListPtr[n];
+    struct snp4_counter_block * block = &blocks[n];
+
 #ifdef SDNETCONFIG_DEBUG
-    const XilVitisNetP4TargetCounterConfig * cnt = tcfg->CounterListPtr[n];
     printf("    DEBUG[%s]: idx=%u, name='%s', base=0x%016lx, counter_type=%u, num_counters=%u, "
            "width=%u\n", __func__, n, cnt->NameStringPtr, cnt->Config.BaseAddr,
            cnt->Config.CounterType, cnt->Config.NumCounters, cnt->Config.Width);
 #endif
 
-    if (intf->counter.init(&blocks[n], &snp4_user->env, &tcfg->CounterListPtr[n]->Config) != XIL_VITIS_NET_P4_SUCCESS) {
+    block->num_counters = cnt->Config.NumCounters;
+    if (intf->counter.init(&block->ctx, &snp4_user->env, &cnt->Config) != XIL_VITIS_NET_P4_SUCCESS) {
       goto out_free_blocks;
     }
   }
@@ -135,7 +143,7 @@ static bool snp4_init_counter_blocks(struct snp4_user_context * snp4_user)
 
  out_free_blocks:
   for (unsigned int b = 0; b < n; ++b) {
-      intf->counter.exit(&blocks[b]);
+      intf->counter.exit(&blocks[b].ctx);
   }
   free(blocks);
   return false;
@@ -147,7 +155,7 @@ static void snp4_deinit_counter_blocks(struct snp4_user_context * snp4_user)
   const XilVitisNetP4TargetConfig * tcfg = intf->target.config;
 
   for (unsigned int n = 0; n < tcfg->CounterListSize; ++n) {
-    intf->counter.exit(&snp4_user->counter_blocks[n]);
+    intf->counter.exit(&snp4_user->counter_blocks[n].ctx);
   }
 
   free(snp4_user->counter_blocks);
@@ -575,7 +583,7 @@ bool snp4_table_ecc_counters_read(void * snp4_handle,
 }
 
 
-static XilVitisNetP4CounterCtx * snp4_counter_block_by_name(struct snp4_user_context * snp4_user, const char * block_name)
+static struct snp4_counter_block * snp4_counter_block_by_name(struct snp4_user_context * snp4_user, const char * block_name)
 {
   const XilVitisNetP4TargetConfig * tcfg = snp4_user->intf->target.config;
   for (unsigned int n = 0; n < tcfg->CounterListSize; ++n) {
@@ -589,89 +597,89 @@ static XilVitisNetP4CounterCtx * snp4_counter_block_by_name(struct snp4_user_con
 bool snp4_counter_simple_read(void * snp4_handle, const char * block_name, uint32_t index, uint64_t * value)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
-  XilVitisNetP4CounterCtx * block = snp4_counter_block_by_name(snp4_user, block_name);
-  if (block == NULL || index >= block->Config.NumCounters) {
+  struct snp4_counter_block * block = snp4_counter_block_by_name(snp4_user, block_name);
+  if (block == NULL || index >= block->num_counters) {
     return false;
   }
 
-  return snp4_user->intf->counter.simple_read(block, index, value) == XIL_VITIS_NET_P4_SUCCESS;
+  return snp4_user->intf->counter.simple_read(&block->ctx, index, value) == XIL_VITIS_NET_P4_SUCCESS;
 }
 
 bool snp4_counter_simple_write(void * snp4_handle, const char * block_name, uint32_t index, uint64_t value)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
-  XilVitisNetP4CounterCtx * block = snp4_counter_block_by_name(snp4_user, block_name);
-  if (block == NULL || index >= block->Config.NumCounters) {
+  struct snp4_counter_block * block = snp4_counter_block_by_name(snp4_user, block_name);
+  if (block == NULL || index >= block->num_counters) {
     return false;
   }
 
-  return snp4_user->intf->counter.simple_write(block, index, value) == XIL_VITIS_NET_P4_SUCCESS;
+  return snp4_user->intf->counter.simple_write(&block->ctx, index, value) == XIL_VITIS_NET_P4_SUCCESS;
 }
 
 bool snp4_counter_combo_read(void * snp4_handle, const char * block_name, uint32_t index, uint64_t * packets, uint64_t * bytes)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
-  XilVitisNetP4CounterCtx * block = snp4_counter_block_by_name(snp4_user, block_name);
-  if (block == NULL || index >= block->Config.NumCounters) {
+  struct snp4_counter_block * block = snp4_counter_block_by_name(snp4_user, block_name);
+  if (block == NULL || index >= block->num_counters) {
     return false;
   }
 
-  return snp4_user->intf->counter.combo_read(block, index, packets, bytes) == XIL_VITIS_NET_P4_SUCCESS;
+  return snp4_user->intf->counter.combo_read(&block->ctx, index, packets, bytes) == XIL_VITIS_NET_P4_SUCCESS;
 }
 
 bool snp4_counter_combo_write(void * snp4_handle, const char * block_name, uint32_t index, uint64_t packets, uint64_t bytes)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
-  XilVitisNetP4CounterCtx * block = snp4_counter_block_by_name(snp4_user, block_name);
-  if (block == NULL || index >= block->Config.NumCounters) {
+  struct snp4_counter_block * block = snp4_counter_block_by_name(snp4_user, block_name);
+  if (block == NULL || index >= block->num_counters) {
     return false;
   }
 
-  return snp4_user->intf->counter.combo_write(block, index, packets, bytes) == XIL_VITIS_NET_P4_SUCCESS;
+  return snp4_user->intf->counter.combo_write(&block->ctx, index, packets, bytes) == XIL_VITIS_NET_P4_SUCCESS;
 }
 
 bool snp4_counter_block_simple_read(void * snp4_handle, const char * block_name, uint64_t * counts, size_t ncounts)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
-  XilVitisNetP4CounterCtx * block = snp4_counter_block_by_name(snp4_user, block_name);
+  struct snp4_counter_block * block = snp4_counter_block_by_name(snp4_user, block_name);
   if (block == NULL) {
     return false;
   }
 
-  if (ncounts > block->Config.NumCounters) {
-    memset(&counts[block->Config.NumCounters], 0, sizeof(counts[0]) * (ncounts - block->Config.NumCounters));
-    ncounts = block->Config.NumCounters;
+  if (ncounts > block->num_counters) {
+    memset(&counts[block->num_counters], 0, sizeof(counts[0]) * (ncounts - block->num_counters));
+    ncounts = block->num_counters;
   }
 
-  return snp4_user->intf->counter.collect_simple_read(block, 0, ncounts, counts) == XIL_VITIS_NET_P4_SUCCESS;
+  return snp4_user->intf->counter.collect_simple_read(&block->ctx, 0, ncounts, counts) == XIL_VITIS_NET_P4_SUCCESS;
 }
 
 bool snp4_counter_block_combo_read(void * snp4_handle, const char * block_name, uint64_t * packets, uint64_t * bytes, size_t ncounts)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
-  XilVitisNetP4CounterCtx * block = snp4_counter_block_by_name(snp4_user, block_name);
+  struct snp4_counter_block * block = snp4_counter_block_by_name(snp4_user, block_name);
   if (block == NULL) {
     return false;
   }
 
-  if (ncounts > block->Config.NumCounters) {
-    memset(&packets[block->Config.NumCounters], 0, sizeof(packets[0]) * (ncounts - block->Config.NumCounters));
-    memset(&bytes[block->Config.NumCounters], 0, sizeof(bytes[0]) * (ncounts - block->Config.NumCounters));
-    ncounts = block->Config.NumCounters;
+  if (ncounts > block->num_counters) {
+    memset(&packets[block->num_counters], 0, sizeof(packets[0]) * (ncounts - block->num_counters));
+    memset(&bytes[block->num_counters], 0, sizeof(bytes[0]) * (ncounts - block->num_counters));
+    ncounts = block->num_counters;
   }
 
-  return snp4_user->intf->counter.collect_combo_read(block, 0, ncounts, packets, bytes) == XIL_VITIS_NET_P4_SUCCESS;
+  return snp4_user->intf->counter.collect_combo_read(&block->ctx, 0, ncounts, packets, bytes) == XIL_VITIS_NET_P4_SUCCESS;
 }
 
 bool snp4_counter_block_reset(void * snp4_handle, const char * block_name)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
-  XilVitisNetP4CounterCtx * block = snp4_counter_block_by_name(snp4_user, block_name);
+  struct snp4_counter_block * block = snp4_counter_block_by_name(snp4_user, block_name);
   if (block == NULL) {
     return false;
   }
 
-  return snp4_user->intf->counter.reset(block) == XIL_VITIS_NET_P4_SUCCESS;
+  return snp4_user->intf->counter.reset(&block->ctx) == XIL_VITIS_NET_P4_SUCCESS;
 }
 
 bool snp4_counter_block_reset_all(void * snp4_handle)
@@ -679,7 +687,7 @@ bool snp4_counter_block_reset_all(void * snp4_handle)
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
   const XilVitisNetP4TargetConfig * tcfg = snp4_user->intf->target.config;
   for (unsigned int n = 0; n < tcfg->CounterListSize; ++n) {
-    if (snp4_user->intf->counter.reset(&snp4_user->counter_blocks[n]) != XIL_VITIS_NET_P4_SUCCESS) {
+    if (snp4_user->intf->counter.reset(&snp4_user->counter_blocks[n].ctx) != XIL_VITIS_NET_P4_SUCCESS) {
       return false;
     }
   }
