@@ -460,14 +460,3 @@ trigger_sw_ht:
     branch: main
   needs:
     - package
-
-trigger_sw_demo:
-  extends: .trigger_sw
-  variables:
-    SN_HW_EXPECTED_APP_NAME: p4_only
-    SN_SW_APP_NAME: demo
-  trigger:
-    project: ht/esnet-smartnic-sw-demo
-    branch: main
-  needs:
-    - package
