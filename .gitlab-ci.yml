@@ -29,10 +29,10 @@ variables:
   # These variables may be overridden by manual pipeline runs or from triggered
   # pipelines from other repos.
   SMARTNIC_DPDK_IMAGE_URI:
-    value: wharf.es.net/ht/smartnic-dpdk-docker:57593-gfd1ea53b
+    value: wharf.es.net/ht/smartnic-dpdk-docker:75184-g1c6e742c
     description: smartnic-dpdk-docker image to use as basis for DPDK builds
   LABTOOLS_IMAGE_URI:
-    value: wharf.es.net/ht/xilinx-labtools-docker:62879-gc43e5fb5
+    value: wharf.es.net/ht/xilinx-labtools-docker:75195-gc43e5fb5
     description: xilinx-labtools-docker image to use when deploying the sn-stack HW services
   SN_HW_GROUP:
     value: ht
