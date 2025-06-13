@@ -19,7 +19,7 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 const char* device_stats_domain_name(DeviceStatsDomain dom) {
     switch (dom) {
-    case DeviceStatsDomain::COUNTERS: return "COUNTERS";
+    case DeviceStatsDomain::COUNTERS: return "counters_stats";
 
     case DeviceStatsDomain::NDOMAINS:
         break;

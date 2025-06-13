@@ -22,9 +22,9 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 const char* device_stats_domain_name(DeviceStatsDomain dom) {
     switch (dom) {
-    case DeviceStatsDomain::COUNTERS: return "COUNTERS";
-    case DeviceStatsDomain::MONITORS: return "MONITORS";
-    case DeviceStatsDomain::MODULES: return "MODULES";
+    case DeviceStatsDomain::COUNTERS: return "counters_stats";
+    case DeviceStatsDomain::MONITORS: return "monitors_stats";
+    case DeviceStatsDomain::MODULES: return "modules_stats";
 
     case DeviceStatsDomain::NDOMAINS:
         break;
