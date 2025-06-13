@@ -968,6 +968,12 @@ void stats_domain_start(struct stats_domain* domain) {
         if (rv != 0) {
             log_panic(rv, "pthread_create failed for domain %s", domain->spec.name);
         }
+
+        if (domain->spec.thread.name != NULL) {
+            rv = pthread_setname_np(domain->thread.handle, domain->spec.thread.name);
+            log_err(rv, "pthread_setname_np failed for domain %s, thread name '%s'",
+                    domain->spec.name, domain->spec.thread.name);
+        }
     }
 }
 

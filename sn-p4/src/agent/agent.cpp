@@ -116,7 +116,10 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids, unsigned int prome
 
         struct stats_domain_spec spec = {
             .name = dev->bus_id.c_str(),
-            .thread = {},
+            .thread = {
+                .name = NULL,
+                .interval_ms = 0,
+            },
             .prometheus = {
                 .registry = prometheus.registry,
             },
@@ -135,6 +138,7 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids, unsigned int prome
                 break;
             }
             spec.thread.interval_ms = seconds * 1000;
+            spec.thread.name = dname;
 
             SERVER_LOG_LINE_INIT(ctor, INFO,
                 "Allocating statistics domain '" << dname << "' on device " << bus_id);
@@ -162,6 +166,7 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids, unsigned int prome
     struct stats_domain_spec server_spec = {
         .name = "sn-p4",
         .thread = {
+            .name = "server_stats",
             .interval_ms = 1000,
         },
         .prometheus = {

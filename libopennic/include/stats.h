@@ -199,7 +199,9 @@ struct stats_zone_spec {
 //--------------------------------------------------------------------------------------------------
 struct stats_domain_spec {
     const char* name;
+
     struct {
+        const char* name;
         unsigned int interval_ms;
     } thread;
 

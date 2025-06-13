@@ -1,6 +1,7 @@
 #include "agent.hpp"
 
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -21,9 +22,9 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 const char* device_stats_domain_name(DeviceStatsDomain dom) {
     switch (dom) {
-    case DeviceStatsDomain::COUNTERS: return "COUNTERS";
-    case DeviceStatsDomain::MONITORS: return "MONITORS";
-    case DeviceStatsDomain::MODULES: return "MODULES";
+    case DeviceStatsDomain::COUNTERS: return "counters_stats";
+    case DeviceStatsDomain::MONITORS: return "monitors_stats";
+    case DeviceStatsDomain::MODULES: return "modules_stats";
 
     case DeviceStatsDomain::NDOMAINS:
         break;
@@ -248,6 +249,14 @@ void SmartnicConfigImpl::get_device_info(
         for (auto d = 0; d < SYSCFG_DNA_COUNT; ++d) {
             build->add_dna(syscfg->dna[d]);
         }
+
+        auto hw_ver = getenv("SN_HW_VER");
+        auto fw_ver = getenv("SN_FW_VER");
+        auto sw_ver = getenv("SN_SW_VER");
+        auto env = build->mutable_env();
+        env->set_hw_version(hw_ver != NULL ? hw_ver : "NONE");
+        env->set_fw_version(fw_ver != NULL ? fw_ver : "NONE");
+        env->set_sw_version(sw_ver != NULL ? sw_ver : "NONE");
 
         err = add_card_info(dev, info);
 

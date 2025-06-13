@@ -196,14 +196,14 @@ def configure_server_options(fn):
     debug_flag_choice = click.Choice(['all'] + sorted(name for name in DEBUG_FLAG_RMAP))
     options = (
         click.option(
-            '--debug-enable', '-e',
+            '--debug-enable',
             'debug_enables',
             type=debug_flag_choice,
             multiple=True,
             help='Enable debug flag.',
         ),
         click.option(
-            '--debug-disable', '-d',
+            '--debug-disable',
             'debug_disables',
             type=debug_flag_choice,
             multiple=True,

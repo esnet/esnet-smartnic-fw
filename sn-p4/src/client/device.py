@@ -52,6 +52,19 @@ def _show_device_info(dev_id, info):
     rows.append(f'    Vendor ID: 0x{pci.vendor_id:04x}')
     rows.append(f'    Device ID: 0x{pci.device_id:04x}')
 
+    build = info.build
+    rows.append('Build:')
+    rows.append(f'    Number: {build.number}')
+    rows.append(f'    Status: 0x{build.status:08x}')
+    for i, d in enumerate(build.dna):
+        rows.append(f'    DNA[{i}]: 0x{d:08x}')
+
+    env = build.env
+    rows.append( '    Environment:')
+    rows.append(f'        HW Version: {env.hw_version}')
+    rows.append(f'        FW Version: {env.fw_version}')
+    rows.append(f'        SW Version: {env.sw_version}')
+
     click.echo('\n'.join(rows))
 
 #---------------------------------------------------------------------------------------------------

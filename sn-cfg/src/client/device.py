@@ -56,10 +56,16 @@ def _show_device_info(dev_id, info):
 
     build = info.build
     rows.append('Build:')
-    rows.append(f'    Number: 0x{build.number:08x}')
+    rows.append(f'    Number: {build.number}')
     rows.append(f'    Status: 0x{build.status:08x}')
     for i, d in enumerate(build.dna):
         rows.append(f'    DNA[{i}]: 0x{d:08x}')
+
+    env = build.env
+    rows.append( '    Environment:')
+    rows.append(f'        HW Version: {env.hw_version}')
+    rows.append(f'        FW Version: {env.fw_version}')
+    rows.append(f'        SW Version: {env.sw_version}')
 
     card = info.card
     rows.append('Card:')

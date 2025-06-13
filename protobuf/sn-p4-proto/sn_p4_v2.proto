@@ -262,10 +262,17 @@ message DevicePciInfo {
     uint32 device_id = 3; // Only low 16-bits are valid (uint16 not supported by protobuf).
 }
 
+message DeviceBuildEnvironment {
+    string hw_version = 1;
+    string fw_version = 2;
+    string sw_version = 3;
+}
+
 message DeviceBuildInfo {
     uint32 number = 1; // Value from syscfg.usr_access.
     uint32 status = 2; // Value from syscfg.build_status.
     repeated uint32 dna = 3; // Array of length 3, value from syscfg.dna[3] (same ordering).
+    DeviceBuildEnvironment env = 4; // Environment variables used during the build.
 }
 
 message DeviceInfo {
