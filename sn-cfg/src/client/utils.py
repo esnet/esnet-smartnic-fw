@@ -37,7 +37,7 @@ class ChoiceFields(click.ParamType):
         self.field_converts = tuple(convert for _, _, convert in fields)
         self.nfields = len(fields)
 
-    def get_metavar(self, param):
+    def get_metavar(self, param, ctx):
         names = self.sep.join(f'<{name}>' for name in self.field_names)
         choices = self.sep.join('<' + '|'.join(choices) + '>' for choices in self.field_choices)
         metavar = f'{names} = {choices}'
