@@ -52,11 +52,55 @@ static const struct vitis_net_p4_drv_metadata_counter_block* counter_blocks[] = 
 };
     {%- endif %}
 
+    {%- if metadata.register_blocks: %}
+        {%- for name, blk in metadata.register_blocks | dictsort: %}
+            {%- if blk.registers: %}
+                {%- set aliases = {} %}
+                {%- for index, register in blk.registers | dictsort: %}
+                    {%- if register.alias: %}
+                        {%- set _ = aliases.update({index: register.alias}) %}
+                    {%- endif %}
+                {%- endfor %}
+
+                {%- if aliases: %}
+
+/*----------------------------------------------------------------------------*/
+static const char* register_block_{{ name }}_aliases[] = {
+                    {%- for index, alias in aliases | dictsort: %}
+    [{{ index }}] = "{{ alias }}",
+                    {%- endfor %}
+};
+                {%- endif %}
+            {%- endif %}
+
+/*----------------------------------------------------------------------------*/
+static const struct vitis_net_p4_drv_metadata_register_block register_block_{{ name }} = {
+    .name = "{{ name }}",
+
+            {%- if aliases: %}
+    .aliases = register_block_{{ name }}_aliases,
+    .num_aliases = ARRAY_SIZE(register_block_{{ name }}_aliases),
+            {%- endif %}
+};
+        {%- endfor %}
+
+/*----------------------------------------------------------------------------*/
+static const struct vitis_net_p4_drv_metadata_register_block* register_blocks[] = {
+        {%- for name in metadata.register_blocks | sort: %}
+    &register_block_{{ name }},
+        {%- endfor %}
+};
+    {%- endif %}
+
 /*----------------------------------------------------------------------------*/
 static const struct vitis_net_p4_drv_metadata metadata = {
     {%- if metadata.counter_blocks: %}
     .counter_blocks = counter_blocks,
     .num_counter_blocks = ARRAY_SIZE(counter_blocks),
+    {%- endif %}
+    {%- if metadata.register_blocks: %}
+    .register_blocks = register_blocks,
+    .num_register_blocks = ARRAY_SIZE(register_blocks),
     {%- endif %}
 };
 {%- endif %}
@@ -85,6 +129,14 @@ const struct vitis_net_p4_drv_intf vitis_net_p4_drv_intf_{{ ip_name }} = {
         .combo_write = XilVitisNetP4CounterComboWrite,
         .collect_simple_read = XilVitisNetP4CounterCollectRead,
         .collect_combo_read = XilVitisNetP4CounterCollectComboRead,
+    },
+
+    .registers = {
+        .init = XilVitisNetP4RegisterInit,
+        .exit = XilVitisNetP4RegisterExit,
+        .reset = XilVitisNetP4RegisterReset,
+        .read = XilVitisNetP4RegisterRead,
+        .write = XilVitisNetP4RegisterWrite,
     },
 
     .table = {

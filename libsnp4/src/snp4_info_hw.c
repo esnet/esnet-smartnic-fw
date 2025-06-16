@@ -428,6 +428,44 @@ static enum snp4_status snp4_info_get_counter_blocks(struct snp4_info_counter_bl
   return SNP4_STATUS_OK;
 }
 
+static enum snp4_status snp4_info_get_register_blocks(struct snp4_info_register_block * register_blocks,
+                                                      uint16_t max_register_blocks,
+                                                      uint16_t * num_register_blocks,
+                                                      XilVitisNetP4TargetRegisterConfig * cfg_registers[],
+                                                      unsigned int size,
+                                                      const struct vitis_net_p4_drv_metadata * metadata) {
+  // Make sure our info struct will hold all of this pipeline's counter blocks
+  if (size > max_register_blocks) {
+    return SNP4_STATUS_INFO_TOO_MANY_REGISTER_BLOCKS;
+  }
+  *num_register_blocks = size;
+
+  for (unsigned int idx = 0; idx < size; idx++) {
+    XilVitisNetP4TargetRegisterConfig *xc = cfg_registers[idx];
+    struct snp4_info_register_block * block = &register_blocks[idx];
+
+    block->name = xc->NameStringPtr;
+    block->width = xc->Config.data_size;
+    block->num_registers = xc->Config.largest_index + 1;
+    block->mem_type = xc->Config.dram ?
+        SNP4_INFO_REGISTER_MEMORY_TYPE_DRAM :
+        SNP4_INFO_REGISTER_MEMORY_TYPE_SRAM;
+
+    if (metadata != NULL) {
+      for (unsigned int b = 0; b < metadata->num_register_blocks; ++b) {
+        const struct vitis_net_p4_drv_metadata_register_block * mrb = metadata->register_blocks[b];
+        if (strcmp(block->name, mrb->name) == 0) {
+          block->aliases = mrb->aliases;
+          block->num_aliases = mrb->num_aliases;
+          break;
+        }
+      }
+    }
+  }
+
+  return SNP4_STATUS_OK;
+}
+
 enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info_pipeline * pipeline)
 {
   const struct vitis_net_p4_drv_intf *intf = vitis_net_p4_drv_intf_get(sdnet_idx);
@@ -449,10 +487,20 @@ enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info
       return rc;
   }
 
-  return snp4_info_get_counter_blocks(pipeline->counter_blocks,
-                                      ARRAY_SIZE(pipeline->counter_blocks),
-                                      &pipeline->num_counter_blocks,
-                                      cfg->CounterListPtr,
-                                      cfg->CounterListSize,
-                                      intf->info.metadata);
+  rc = snp4_info_get_counter_blocks(pipeline->counter_blocks,
+                                    ARRAY_SIZE(pipeline->counter_blocks),
+                                    &pipeline->num_counter_blocks,
+                                    cfg->CounterListPtr,
+                                    cfg->CounterListSize,
+                                    intf->info.metadata);
+  if (rc != SNP4_STATUS_OK) {
+      return rc;
+  }
+
+  return snp4_info_get_register_blocks(pipeline->register_blocks,
+                                       ARRAY_SIZE(pipeline->register_blocks),
+                                       &pipeline->num_register_blocks,
+                                       cfg->RegisterListPtr,
+                                       cfg->RegisterListSize,
+                                       intf->info.metadata);
 }
