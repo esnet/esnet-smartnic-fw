@@ -14,8 +14,9 @@ from sn_p4_proto.v2 import (
     ErrorCode,
     MatchType,
     PipelineInfoRequest,
-    StatsFilters,
     PipelineStatsRequest,
+    RegisterMemoryType,
+    StatsFilters,
     TableEndian,
     TableMode,
 )
@@ -71,6 +72,13 @@ COUNTER_TYPE_MAP = {
 }
 COUNTER_TYPE_RMAP = dict((name, enum) for enum, name in COUNTER_TYPE_MAP.items())
 
+REGISTER_MEMORY_TYPE_MAP = {
+    RegisterMemoryType.REGISTER_MEMORY_TYPE_UNKNOWN: 'unknown',
+    RegisterMemoryType.REGISTER_MEMORY_TYPE_DRAM: 'DRAM',
+    RegisterMemoryType.REGISTER_MEMORY_TYPE_SRAM: 'SRAM',
+}
+REGISTER_MEMORY_TYPE_RMAP = dict((name, enum) for enum, name in REGISTER_MEMORY_TYPE_MAP.items())
+
 #---------------------------------------------------------------------------------------------------
 def pipeline_info_req(dev_id, pipeline_id, **kargs):
     return PipelineInfoRequest(dev_id=dev_id, pipeline_id=pipeline_id)
@@ -115,6 +123,7 @@ def _show_pipeline_info(dev_id, pipeline_id, info):
     add_row(0, 'Name', info.name)
     add_row(0, 'Number of Tables', len(info.tables))
     add_row(0, 'Number of Counter Blocks', len(info.counter_blocks))
+    add_row(0, 'Number of Register Blocks', len(info.register_blocks))
 
     add_row(0, 'Tables', None)
     for table in info.tables:
@@ -160,6 +169,15 @@ def _show_pipeline_info(dev_id, pipeline_id, info):
             add_row(1, 'Type', COUNTER_TYPE_MAP[block.type])
             add_row(1, 'Width', block.width)
             add_row(1, 'Number of Counters', block.num_counters)
+
+    if info.register_blocks:
+        add_row(0, 'Register Blocks', None)
+        for block in info.register_blocks:
+            add_sep_row(1)
+            add_row(1, 'Name', block.name)
+            add_row(1, 'Memory Type', REGISTER_MEMORY_TYPE_MAP[block.mem_type])
+            add_row(1, 'Width', block.width)
+            add_row(1, 'Number of Reigsters', block.num_registers)
 
     click.echo('\n'.join(rows))
 

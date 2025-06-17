@@ -45,6 +45,14 @@ public:
     Status DeleteTableRule(
         ServerContext*, const TableRuleRequest*, ServerWriter<TableRuleResponse>*) override;
 
+    // Register configuration.
+    Status ClearRegisters(
+        ServerContext*, const RegistersRequest*, ServerWriter<RegistersResponse>*) override;
+    Status GetRegisters(
+        ServerContext*, const RegistersRequest*, ServerWriter<RegistersResponse>*) override;
+    Status SetRegisters(
+        ServerContext*, const RegistersRequest*, ServerWriter<RegistersResponse>*) override;
+
     // Server configuration.
     Status GetServerConfig(
         ServerContext*, const ServerConfigRequest*, ServerWriter<ServerConfigResponse>*) override;
@@ -147,6 +155,22 @@ private:
         const TableRuleRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_delete_table_rule(
         const TableRuleRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+
+    ErrorCode register_block_get_index(
+        const struct snp4_info_register_block* blk, const RegisterId& id, unsigned int* index,
+        ServerDebugFlag debug_flag);
+    ErrorCode register_get_index(
+        const DevicePipeline* pipeline, const string& block_name, const RegisterId& id,
+        unsigned int* index, ServerDebugFlag debug_flag);
+    void clear_registers(const RegistersRequest&, function<void(const RegistersResponse&)>);
+    void batch_clear_registers(
+        const RegistersRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void get_registers(const RegistersRequest&, function<void(const RegistersResponse&)>);
+    void batch_get_registers(
+        const RegistersRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    void set_registers(const RegistersRequest&, function<void(const RegistersResponse&)>);
+    void batch_set_registers(
+        const RegistersRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
     void init_server(void);
     void init_server_debug(const vector<string>& debug_flags);
