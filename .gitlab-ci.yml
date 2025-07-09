@@ -29,7 +29,7 @@ variables:
   # These variables may be overridden by manual pipeline runs or from triggered
   # pipelines from other repos.
   SMARTNIC_DPDK_IMAGE_URI:
-    value: wharf.es.net/ht/smartnic-dpdk-docker:75184-g1c6e742c
+    value: wharf.es.net/ht/smartnic-dpdk-docker:80224-g260bd1ce
     description: smartnic-dpdk-docker image to use as basis for DPDK builds
   LABTOOLS_IMAGE_URI:
     value: wharf.es.net/ht/xilinx-labtools-docker:75195-gc43e5fb5
