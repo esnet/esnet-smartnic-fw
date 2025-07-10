@@ -260,6 +260,9 @@ ftap:
     # EXTRA_VAR_FOO: "baz"
 
     EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
+
+    # Run on port 443 on single card systems in the ftap environment so prometheus can scrape them
+    EXTRA_VAR_STACK_SN_INGRESS_PORT: 443
   rules:
     - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
       when: never
