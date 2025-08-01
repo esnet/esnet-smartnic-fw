@@ -1,14 +1,18 @@
 if { $argc != 3 } {
-    puts "The script requires a path of the mcsfile."
-    puts "For example, vivado -mode batch -source program_card.tcl -tclargs /tmp/fpga.mcs"
+    puts "Missing required arguments to this script."
+    puts "Usage: vivado -mode batch -source program_flash.tcl -tclargs <hw_server_url> <hw_target_serial> <mcsfile_path>"
     puts "Please try again."
     exit 1
 }
 
+set hw_server_url [lindex $argv 0]
+set hw_target_serial [lindex $argv 1]
+set mcsfile_path [lindex $argv 2]
+
 # Set up the hw manager
-puts "Connecting to hw_server at: [lindex $argv 0]"
+puts "Connecting to hw_server at: $hw_server_url"
 open_hw_manager -verbose
-connect_hw_server -url [lindex $argv 0] -verbose
+connect_hw_server -url $hw_server_url -verbose
 
 # Let's see what's attached
 puts "Available Hardware Targets:"
@@ -17,14 +21,11 @@ foreach {target} [get_hw_targets] {
 }
 
 # Select the specific device that the user wants us to use
-puts -nonewline "Selecting Hardware Target Serial: "
-puts [lindex $argv 1]
-current_hw_target -verbose [get_hw_targets -verbose [format "*/xilinx_tcf/Xilinx/%s" [lindex $argv 1]]]
-puts -nonewline "Selected Hardware Target: "
-puts [current_hw_target]
+puts "Selecting Hardware Target Serial: $hw_target_serial"
+current_hw_target -verbose [get_hw_targets -verbose [format "*/xilinx_tcf/Xilinx/%s" $hw_target_serial]]
+puts "Selected Hardware Target: [current_hw_target]"
 open_hw_target -verbose
-puts -nonewline "Selected Hardware Device: "
-puts [current_hw_device]
+puts "Selected Hardware Device: [current_hw_device]"
 
 # Find out how we booted to see if we should write the flash
 puts "Boot status"
@@ -39,13 +40,13 @@ puts "  VALID      [get_property {REGISTER.BOOT_STATUS.SLR0.BIT[08]_1_STATUS_VAL
 
 #### Can't tell the difference btw flash boot of gold vs jtag boot
 
-puts "About to flash the following bitfile: [lindex $argv 2]"
+puts "About to flash the following bitfile: $mcsfile_path"
 
 # create a hw_cfgmem object for the correct flash part for the u280
 create_hw_cfgmem    -hw_device [current_hw_device] [lindex [get_cfgmem_parts {mt25qu01g-spi-x1_x2_x4}] 0]
 
 # configure hw_cfgmem object to erase/program/verify flash
-set_property PROGRAM.FILES                  [lindex $argv 2]  [current_hw_cfgmem]
+set_property PROGRAM.FILES                  $mcsfile_path     [current_hw_cfgmem]
 set_property PROGRAM.ADDRESS_RANGE          {use_file}        [current_hw_cfgmem]
 set_property PROGRAM.UNUSED_PIN_TERMINATION {pull-none}       [current_hw_cfgmem]
 set_property PROGRAM.BLANK_CHECK            0                 [current_hw_cfgmem]

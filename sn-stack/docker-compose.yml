@@ -105,7 +105,18 @@ services:
       - -x
       - |
         rm -f /bitfiles/ok
-        cp -a /usr/local/lib/firmware/esnet-smartnic/esnet-smartnic.{bit,mcs} /bitfiles
+        fw_dir=/usr/local/lib/firmware/esnet-smartnic
+        cp -a $${fw_dir}/esnet-smartnic.{bit,mcs} /bitfiles
+
+        probes=$${fw_dir}/debug_nets.ltx
+        if [ -e $${probes} ]; then
+          cp -a $${probes} /bitfiles
+        else
+          # Cleanup leftovers in a pre-existing volume when moving
+          # from an FPGA with VIOs to one without them.
+          rm -f /bitfiles/$$(basename $${probes})
+        fi
+
         touch /bitfiles/ok
         sleep infinity
 
@@ -262,6 +273,7 @@ services:
           xilinx-hwserver:3121 \
           "${HW_TARGET_SERIAL:-*}" \
           /bitfiles/esnet-smartnic.bit \
+          /bitfiles/debug_nets.ltx \
           $FPGA_PCIE_DEV \
           # FORCE
         if [ $$? ] ; then

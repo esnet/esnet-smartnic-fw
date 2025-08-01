@@ -2,19 +2,20 @@
 
 function usage() {
     echo ""
-    echo "Usage: $(basename $0) <hw_server_url> <hw_target_serial> <bitfile_path> <pcie_device_addr> [FORCE]"
+    echo "Usage: $(basename $0) <hw_server_url> <hw_target_serial> <bitfile_path> <probes_path> <pcie_device_addr> [FORCE]"
     echo "  hw_server_url: host:port for xilinx hw_server (e.g. xilinx-hwserver:3121)"
     echo "  hw_target_serial: serial number of serial JTAG device (e.g. 21770205K01Y)"
     echo "     can be discovered with: lsusb -v -d 0403:6011 | grep iSerial"
     echo "     can be set to '*' to select the first serial JTAG device that is found"
     echo "  bitfile_path: full path to the .bit file to be loaded into the fpga"
+    echo "  probes_path: full path to the .ltx debug probes file containing the VIOs for resetting the PCIe endpoint. If the file does not exist, the reset is skipped"
     echo "  pcie_device_addr: pcie domain:bus:device (e.g. 0000:81:00)"
     echo "  FORCE: optionally force a reload even if the USERCODE/UserID fields match"
     echo ""
 }
 
 # Make sure the caller has provided the required parameters
-if [ "$#" -lt 4 ] ; then
+if [ "$#" -lt 5 ] ; then
     echo "ERROR: Missing required parameter(s)"
     usage
     exit 1
@@ -54,6 +55,10 @@ echo "    $(file -b $1)"
 BITFILE_PATH=$1
 shift
 
+echo "Using debug probes file: $1"
+PROBES_PATH=$1
+shift
+
 # Grab the FPGA device address
 echo "Expecting to reprogram PCIe device: $1"
 FPGA_PCIE_DEV=$1
@@ -71,16 +76,18 @@ fi
 
 # Check if we're running on an AMD system and FORCE the FPGA to be reloaded even if USERCODE/UserID registers match
 # This is necessary due to many AMD systems not providing a proper PCIe hot-reset to the cards
-case $(lscpu --json | jq -r '.lscpu[] | select(.field == "Vendor ID:") | .data') in
-    AuthenticAMD)
-	echo "NOTE: Detected AMD CPU/chipset, enabling workaround for missing PCIe Hot Reset.  FPGA will be reloaded even if USERCODE/UserID registers match."
-	FORCE=1
-	;;
-    GenuineIntel)
-	;;
-    *)
-	;;
-esac
+if ! [ -e $PROBES_PATH ]; then
+    case $(lscpu --json | jq -r '.lscpu[] | select(.field == "Vendor ID:") | .data') in
+        AuthenticAMD)
+            echo "NOTE: Detected AMD CPU/chipset, enabling workaround for missing PCIe Hot Reset.  FPGA will be reloaded even if USERCODE/UserID registers match."
+            FORCE=1
+            ;;
+        GenuineIntel)
+            ;;
+        *)
+            ;;
+    esac
+fi
 
 # Make note of any extra, ignored command line parameters
 if [ "$#" -gt 0 ] ; then
@@ -134,6 +141,30 @@ else
 	    exit 1
 	fi
     fi
+fi
+
+if [ -e $PROBES_PATH ]; then
+    # Disconnect any devices from the kernel
+    for i in $(lspci -Dmm -s $FPGA_PCIE_DEV | cut -d' ' -f 1) ; do
+	echo 1 > /sys/bus/pci/devices/$i/remove
+    done
+
+    # Perform the reset of the PCIe endpoint via VIOs.
+    vivado_lab \
+        -nolog \
+        -nojournal \
+        -tempDir /tmp/ \
+        -mode batch \
+        -notrace \
+        -quiet \
+        -source /scripts/pcie_reset.tcl \
+        -tclargs "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$PROBES_PATH"
+    if [ $? -ne 0 ] ; then
+        echo "Failed to reset PCIe endpoint, bailing out"
+        exit 1
+    fi
+else
+    echo "Skipping reset of PCIe endpoint due to not having probes"
 fi
 
 # Always rescan the PCIe bus
