@@ -76,5 +76,5 @@ if [ $? -ne 0 ] ; then
     exit 1
 fi
 
-# Always rescan the PCIe bus
-echo 1 > /sys/bus/pci/rescan
+# Always rescan the PCIe bus under the parent port for this FPGA card
+/scripts/rescan_pcie_bus.sh ${FPGA_PCIE_DEV}
