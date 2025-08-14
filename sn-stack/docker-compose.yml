@@ -319,8 +319,6 @@ services:
       - pipefail
       - -x
       - |
-        echo 1 > /sys/bus/pci/rescan
-        sleep 1
         # Unbind the kernel driver (if any) from each FPGA PF
         dpdk-devbind.py -u $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
         dpdk-devbind.py --status
@@ -366,8 +364,6 @@ services:
       - |
         # When vfio-pci is not builtin, ensure that it is loaded
         modinfo vfio-pci | egrep -q '^filename:\s+\(builtin\)$' || modprobe vfio-pci
-        echo 1 > /sys/bus/pci/rescan
-        sleep 1
         # Bind the vfio-pci driver to each FPGA PF
         dpdk-devbind.py -b vfio-pci $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
         dpdk-devbind.py --status
