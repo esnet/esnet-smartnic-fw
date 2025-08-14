@@ -635,7 +635,7 @@ services:
       - 'traefik.enable=true'
 
       # Expose SmartnicConfig grpc API via traefik
-      - 'traefik.http.routers.smartnic-cfg.rule=PathPrefix(`/sn_cfg.v1.SmartnicConfig`)'
+      - 'traefik.http.routers.smartnic-cfg.rule=PathPrefix(`/sn_cfg.v2.SmartnicConfig`)'
       - 'traefik.http.routers.smartnic-cfg.service=smartnic-cfg'
 
       # Expose grpc reflection API via traefik
