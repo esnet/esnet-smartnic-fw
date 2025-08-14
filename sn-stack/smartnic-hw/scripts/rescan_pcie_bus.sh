@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eo pipefail
+
 function usage() {
     echo ""
     echo "Usage: $(basename $0) <pcie_device_addr>"
