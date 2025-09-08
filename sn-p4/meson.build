@@ -5,7 +5,19 @@ libgmp_dep = cc.find_library('gmp')
 libgrpcpp_reflection_dep = cpp.find_library('grpc++_reflection')
 
 cli11_dep = dependency('cli11')
-jsoncpp_dep = dependency('jsoncpp')
+jsoncpp_dep = dependency('jsoncpp',
+    # Recent versions of meson (1.8.4+) have started to respect the subproject's "buildtype" option.  Since
+    # jsoncpp sets buildtype=release, the c++ compiler runs with -O3 and is now reporting a warning in jsoncpp
+    # due to stringop-overflow.  Temporarily override the subproject build to run with -O2 to avoid the warning
+    # and (due to werror, a compile failure).
+    #
+    # This override should be removed (or reduced) once either jsoncpp is fixed or meson grows the ability to
+    # pass cpp_args to a subproject to disable only one warning.
+    default_options : [
+        'buildtype=custom',
+	'optimization=2',
+    ],
+)
 libprom_dep = dependency('prom')
 libpromhttp_dep = dependency('promhttp')
 regmap_dep = dependency('regmap')
