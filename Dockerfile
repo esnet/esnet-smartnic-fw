@@ -1,7 +1,12 @@
 # syntax=docker/dockerfile:1
 
+#
+# Create a stage that provides a runtime base customized to select the ESnet package mirrors
+# Do this only once so we can re-use it for future stages
+#
+
 ARG DOCKERHUB_PROXY
-FROM ${DOCKERHUB_PROXY:-}library/ubuntu:jammy
+FROM ${DOCKERHUB_PROXY:-}library/ubuntu:jammy AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LC_ALL=C.UTF-8
@@ -9,39 +14,68 @@ ENV LANG=C.UTF-8
 
 # Configure local ubuntu mirror as package source
 RUN \
-  sed -i -re 's|(http://)([^/]+.*)/|\1linux.mirrors.es.net/ubuntu|g' /etc/apt/sources.list
+    sed -i -re 's|(http://)([^/]+.*)/|\1linux.mirrors.es.net/ubuntu|g' /etc/apt/sources.list
 
-RUN \
-  ln -fs /usr/share/zoneinfo/UTC /etc/localtime && \
-  apt-get update -y && \
-  apt-get upgrade -y && \
-  apt-get install -y --no-install-recommends \
-    build-essential \
-    libbpf-dev \
-    libbsd-dev \
-    libnuma-dev \
-    libpcap-dev \
-    libssl-dev \
-    locales \
-    ninja-build \
-    pkg-config \
-    python3 \
-    python3-pip \
-    python3-pyelftools \
-    python3-requests \
-    python3-setuptools \
-    python3-wheel \
-    wget \
-    zlib1g-dev \
-    && \
-  pip3 install \
+RUN <<EOF
+    set -ex
+    ln -fs /usr/share/zoneinfo/UTC /etc/localtime
+    apt update -y
+
+    apt install -y --no-install-recommends \
+      locales \
+
+    locale-gen en_US.UTF-8
+    update-locale LANG=en_US.UTF-8
+    rm -rf /var/lib/apt/lists/*
+EOF
+
+#
+# Create a stage that provides a full build environment
+# Do this only once so we can re-use it for future build stages
+#
+
+FROM base AS builder
+
+RUN <<EOF
+    set -ex
+    apt update -y
+
+    apt install -y --no-install-recommends \
+      build-essential \
+      pkg-config \
+      python3 \
+      python3-pip \
+      python3-setuptools \
+      python3-wheel \
+      wget
+EOF
+
+RUN pip3 install --no-cache-dir \
     meson \
-    && \
-  apt-get autoclean && \
-  apt-get autoremove && \
-  locale-gen en_US.UTF-8 && \
-  update-locale LANG=en_US.UTF-8 && \
-  rm -rf /var/lib/apt/lists/*
+    ninja
+
+#
+# Build DPDK
+#
+
+FROM builder AS dpdk
+
+# Install build dependencies for DPDK
+# See: https://doc.dpdk.org/guides/linux_gsg/sys_reqs.html#compilation-of-the-dpdk
+
+RUN <<EOF
+    set -ex
+    apt update -y
+
+    apt install -y --no-install-recommends \
+      libbpf-dev \
+      libbsd-dev \
+      libnuma-dev \
+      libpcap-dev \
+      libssl-dev \
+      python3-pyelftools \
+      zlib1g-dev
+EOF
 
 COPY xilinx-qdma-for-opennic/QDMA/DPDK /QDMA/DPDK
 COPY patches /patches
@@ -54,47 +88,75 @@ ARG DPDK_TOPDIR="dpdk-stable-${DPDK_VER}"
 ARG DPDK_PLATFORM
 ARG DPDK_CPU_INSTRUCTION_SET
 
-RUN \
-  wget -q $DPDK_BASE_URL/dpdk-$DPDK_VER.tar.xz && \
-    tar xf dpdk-$DPDK_VER.tar.xz && \
-    rm dpdk-$DPDK_VER.tar.xz && \
-    cd $DPDK_TOPDIR && \
-    ln -s /QDMA/DPDK/drivers/net/qdma ./drivers/net && \
-    patch -p 1 < /patches/0000-dpdk-include-xilinx-qdma-driver.patch && \
-    meson setup build -Dplatform=${DPDK_PLATFORM:-native} -Dcpu_instruction_set=${DPDK_CPU_INSTRUCTION_SET:-native} -Denable_drivers=net/af_packet,net/pcap,net/qdma,net/ring,net/tap,net/virtio && \
-    cd build && \
-    ninja && \
-    ninja install && \
-    ldconfig && \
-    cd ../../ && \
+RUN <<EOF
+    set -ex
+    wget -q $DPDK_BASE_URL/dpdk-$DPDK_VER.tar.xz
+    tar xf dpdk-$DPDK_VER.tar.xz
+    rm dpdk-$DPDK_VER.tar.xz
+    cd $DPDK_TOPDIR
+    ln -s /QDMA/DPDK/drivers/net/qdma ./drivers/net
+    patch -p 1 < /patches/0000-dpdk-include-xilinx-qdma-driver.patch
+
+    meson setup build \
+      -Dplatform=${DPDK_PLATFORM:-native} \
+      -Dcpu_instruction_set=${DPDK_CPU_INSTRUCTION_SET:-native} \
+      -Denable_drivers=net/af_packet,net/pcap,net/qdma,net/ring,net/tap,net/virtio \
+      -Denable_apps=dumpcap,pdump,proc-info,test-cmdline,test-pmd
+
+    cd build
+    ninja
+    meson install --destdir /dpdk-install-root
+    cd ../../
     rm -r $DPDK_TOPDIR
+EOF
+
+#
+# Build pktgen-dpdk
+#
+
+FROM builder AS pktgen
+
+# Import build artifacts from dpdk stage
+COPY --from=dpdk /dpdk-install-root/ /
+RUN ldconfig
+
+# Install the build dependencies for libdpdk
+RUN <<EOF
+    set -ex
+    apt update -y
+
+    apt install -y --no-install-recommends \
+      libbsd-dev \
+      libelf-dev \
+      libnuma-dev \
+      libpcap-dev
+EOF
+
+# Install the build dependencies for pktgen
+RUN <<EOF
+    set -ex
+    apt update -y
+
+    apt install -y --no-install-recommends \
+      liblua5.3-dev \
+      make
+EOF
 
 # Build and install pktgen-dpdk
-RUN \
-  ln -fs /usr/share/zoneinfo/UTC /etc/localtime && \
-  apt-get update -y && \
-  apt-get upgrade -y && \
-  apt-get install -y --no-install-recommends \
-    liblua5.3-dev \
-    make \
-    && \
-  apt-get autoclean && \
-  apt-get autoremove && \
-  rm -rf /var/lib/apt/lists/*
-
 ARG PKTGEN_BASE_URL="https://github.com/pktgen/Pktgen-DPDK/archive/refs/tags"
 ARG PKTGEN_VER=23.03.0
 ARG PKTGEN_TOPDIR="Pktgen-DPDK-pktgen-${PKTGEN_VER}"
-RUN \
-  wget -q $PKTGEN_BASE_URL/pktgen-$PKTGEN_VER.tar.gz && \
-    tar xaf pktgen-$PKTGEN_VER.tar.gz && \
-    rm pktgen-$PKTGEN_VER.tar.gz && \
-    cd $PKTGEN_TOPDIR && \
-    export PKTGEN_DESTDIR=/ && \
-    make buildlua && \
-    make install && \
-    cd .. && \
+RUN <<EOF
+    wget -q $PKTGEN_BASE_URL/pktgen-$PKTGEN_VER.tar.gz
+    tar xaf pktgen-$PKTGEN_VER.tar.gz
+    rm pktgen-$PKTGEN_VER.tar.gz
+    cd $PKTGEN_TOPDIR
+    export PKTGEN_DESTDIR=/pktgen-install-root
+    make buildlua
+    make install
+    cd ..
     rm -r $PKTGEN_TOPDIR
+EOF
 
 # Install some useful tools to have inside of this container
 RUN \
