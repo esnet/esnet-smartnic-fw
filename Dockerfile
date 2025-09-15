@@ -158,75 +158,222 @@ RUN <<EOF
     rm -r $PKTGEN_TOPDIR
 EOF
 
-# Install some useful tools to have inside of this container
-RUN \
-  ln -fs /usr/share/zoneinfo/UTC /etc/localtime && \
-  apt-get update -y && \
-  apt-get upgrade -y && \
-  apt-get install -y --no-install-recommends \
-    iproute2 \
-    jq \
-    lsb-release \
-    pciutils \
-    python3-scapy \
-    tcpreplay \
-    tshark \
-    unzip \
-    vim-tiny \
-    zstd \
-    && \
-  pip3 install \
-    yq \
-    && \
-  apt-get autoclean && \
-  apt-get autoremove && \
-  rm -rf /var/lib/apt/lists/*
+#
+# Build the firmware tools
+#
 
+FROM builder AS firmware
 
-RUN <<EOT
+# Install build deps for the firmware tools
+RUN <<EOF
     set -ex
-    ln -fs /usr/share/zoneinfo/UTC /etc/localtime
     apt update -y
-    apt upgrade -y
+
+    apt install -y --no-install-recommends \
+      libgmp-dev \
+      libgrpc++-dev \
+      libmicrohttpd-dev \
+      libprotobuf-dev \
+      libpython3-dev \
+      protobuf-compiler \
+      protobuf-compiler-grpc \
+      zstd
+EOF
+
+RUN pip3 install --no-cache-dir \
+    grpcio-tools \
+    poetry
+
+COPY . /sn-fw/source
+WORKDIR /sn-fw/source
+
+# Build and install the Python regmap library.
+WORKDIR regio
+RUN poetry build
+RUN pip3 install --no-cache-dir \
+    --find-links \
+    ./dist \
+    regio[shells]
+
+# Set up env vars that point us to the hardware artifact
+ARG SN_HW_BOARD
+ARG SN_HW_APP_NAME
+ARG SN_HW_VER
+
+ENV SN_HW_BOARD=${SN_HW_BOARD}
+ENV SN_HW_APP_NAME=${SN_HW_APP_NAME}
+ENV SN_HW_VER=${SN_HW_VER}
+
+WORKDIR /sn-fw/source
+RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
+    set -ex
+    meson subprojects purge --confirm
+    ln -fs \
+      ${PWD}/sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
+      subprojects/packagefiles/esnet-smartnic-hwapi.zip
+    meson subprojects download
+    meson setup /sn-fw/build /sn-fw/source
+    meson compile --clean -C /sn-fw/build
+    meson install -C /sn-fw/build --destdir /firmware-install-root
+EOF
+
+
+#
+# Provide a functional runtime environment
+#
+
+FROM base AS runtime
+
+# Install the downstream build dependencies for libdpdk and runtime deps for pktgen
+RUN <<EOF
+    set -ex
+    apt update -y
+
+    apt install -y --no-install-recommends \
+      libbsd-dev \
+      libelf-dev \
+      libpcap-dev \
+      libnuma-dev \
+      \
+      liblua5.3-0
+
+    apt autoclean
+    apt autoremove
+    rm -rf /var/lib/apt/lists/*
+EOF
+
+# Install runtime deps for the firmware tools
+RUN <<EOF
+    set -ex
+    apt update -y
 
     apt install -y --no-install-recommends \
       bash-completion \
-      build-essential \
-      cdbs \
       curl \
-      devscripts \
-      equivs \
-      fakeroot \
       kmod \
       less \
-      libdistro-info-perl \
-      libmicrohttpd-dev \
-      libpython3-dev \
       lsof \
       net-tools \
-      ninja-build \
-      libgmp-dev \
-      libprotobuf-dev \
-      libgrpc++-dev \
       libgrpc++1 \
-      protobuf-compiler \
-      protobuf-compiler-grpc \
-      pkg-config \
+      libmicrohttpd12 \
+      python3 \
+      python3-pip \
       screen \
       socat \
       tree
 
+    apt autoclean
+    apt autoremove
+    rm -rf /var/lib/apt/lists/*
+EOF
+
+RUN pip3 install --no-cache-dir \
+    grpcio-tools
+
+# Import the build artifacts from the firmware
+# Do this as late as possible to allow the firmware build stage to run in parallel with this stage
+COPY --from=firmware /firmware-install-root/ /
+COPY --from=firmware /sn-fw/source/regio/dist/ /usr/local/share/esnet-smartnic/python
+RUN ldconfig
+
+# Install the generated Python regmap and configuration client.
+RUN pip3 install --no-cache-dir \
+    --find-links /usr/local/share/esnet-smartnic/python \
+    regio[shells] \
+    regmap_esnet_smartnic \
+    sn_cfg \
+    sn_p4
+
+# Install bash completions.
+RUN regio-esnet-smartnic -t zero -p none completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
+RUN sn-cfg completions bash >/usr/share/bash-completion/completions/sn-cfg
+RUN sn-p4 completions bash >/usr/share/bash-completion/completions/sn-p4
+
+RUN cat <<EOF >> /root/.bashrc
+
+# Enable bash completion for non-login interactive shells.
+if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
+    . /etc/bash_completion
+fi
+EOF
+
+# RUN <<EOF
+#     set -ex
+#     cat <<'_EOF' >>/root/.bashrc
+
+# # Enable bash completion for non-login interactive shells.
+# if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
+#     . /etc/bash_completion
+# fi
+# _EOF
+# EOF
+
+# Setup the test automation framework.
+# Install Python dependencies for the test automation libraries.
+COPY ./sn-stack/test/ /test
+WORKDIR /test
+RUN <<EOF
+    set -ex
+    for req in $(find . -type f -name pip-requirements.txt); do
+        pip3 install --no-cache-dir --no-deps --requirement="${req}"
+    done
+EOF
+
+# Install the MinIO client command line tool.
+ADD \
+    --chmod=755 \
+    https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2025-05-21T01-59-54Z \
+    /usr/local/bin/mc
+
+# Install the gRPC health-check command line tool.
+ADD \
+    --chmod=755 \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.39/grpc_health_probe-linux-amd64 \
+    /usr/local/bin/grpc_health_probe
+
+# Install gRPC debug tool (uncomment for inclusion).
+# RUN <<EOF
+#     set -ex
+#     cd /tmp
+#     wget -Ogrpcurl.deb https://github.com/fullstorydev/grpcurl/releases/download/v1.9.2/grpcurl_1.9.2_linux_amd64.deb
+#     apt install ./grpcurl.deb
+#     rm -f grpcurl.deb
+# EOF
+
+# Install some useful tools to have inside of this container
+RUN <<EOF
+    set -ex
+    apt update -y
+
     apt install -y --no-install-recommends \
+      iproute2 \
+      jq \
+      lsb-release \
+      pciutils \
+      python3 \
       python3-pip \
-      python3-setuptools
+      python3-scapy \
+      tcpreplay \
+      tshark \
+      unzip \
+      vim-tiny \
+      zstd
 
-    pip3 install \
-      grpcio-tools \
-      meson \
-      poetry \
-      yq
-EOT
+    apt autoclean
+    apt autoremove
+    rm -rf /var/lib/apt/lists/*
+EOF
 
+RUN pip3 install --no-cache-dir \
+    yq
+
+# Import the build artifacts from both dpdk and pktgen layers
+# Do this very late to allow dpdk and pktgen build stages to run in parallel to this stage
+COPY --from=dpdk /dpdk-install-root/ /
+COPY --from=pktgen /pktgen-install-root/ /
+RUN ldconfig
+
+# Set up the buildinfo.env file inside of the container
 ARG SN_HW_GROUP
 ARG SN_HW_REPO
 ARG SN_HW_BRANCH
@@ -257,99 +404,22 @@ ENV SN_FW_APP_NAME=${SN_FW_APP_NAME}
 ENV SN_FW_VER=${SN_FW_VER}
 ENV SN_FW_COMMIT=${SN_FW_COMMIT}
 
-COPY . /sn-fw/source
-WORKDIR /sn-fw/source
-
-# Build and install the Python regmap library.
-RUN <<EOF
-    set -ex
-    cd regio
-    poetry build
-    pip3 install --find-links ./dist regio[shells]
-EOF
-
-RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
-    set -ex
-    meson subprojects purge --confirm
-    ln -fs \
-      ${PWD}/sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
-      subprojects/packagefiles/esnet-smartnic-hwapi.zip
-    meson subprojects download
-    meson setup /sn-fw/build /sn-fw/source
-    meson compile --clean -C /sn-fw/build
-    meson install -C /sn-fw/build
-    ldconfig
-
-    # Install the generated Python regmap and configuration client.
-    pip3 install \
-      --find-links /usr/local/share/esnet-smartnic/python \
-      regmap_esnet_smartnic \
-      sn_cfg \
-      sn_p4
-
-    # Install bash completions.
-    regio-esnet-smartnic -t zero -p none completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
-    sn-cfg completions bash >/usr/share/bash-completion/completions/sn-cfg
-    sn-p4 completions bash >/usr/share/bash-completion/completions/sn-p4
-
-    cat <<'_EOF' >>/root/.bashrc
-
-# Enable bash completion for non-login interactive shells.
-if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
-    . /etc/bash_completion
-fi
-_EOF
-EOF
-
-COPY <<EOF /sn-fw/buildinfo.env
-SN_FW_GROUP=${SN_FW_GROUP}
-SN_FW_REPO=${SN_FW_REPO}
-SN_FW_BRANCH=${SN_FW_BRANCH}
-SN_FW_APP_NAME=${SN_FW_APP_NAME}
-SN_FW_VER=${SN_FW_VER}
-SN_FW_COMMIT=${SN_FW_COMMIT}
-SN_HW_GROUP=${SN_HW_GROUP}
-SN_HW_REPO=${SN_HW_REPO}
-SN_HW_BRANCH=${SN_HW_BRANCH}
-SN_HW_BOARD=${SN_HW_BOARD}
-SN_HW_APP_NAME=${SN_HW_APP_NAME}
-SN_HW_VER=${SN_HW_VER}
-SN_HW_COMMIT=${SN_HW_COMMIT}
-EOF
-
-# Setup the test automation framework.
-WORKDIR sn-stack/test
-RUN <<EOF
-    set -ex
-    mkdir /test
-    cp entrypoint.sh /test/.
-
-    # Install Python dependencies for the test automation libraries.
-    for req in $(find . -type f -name pip-requirements.txt); do
-        pip3 install --no-deps --requirement="${req}"
-    done
-EOF
-
-# Install the MinIO client command line tool.
-ADD \
-    --chmod=755 \
-    https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2025-05-21T01-59-54Z \
-    /usr/local/bin/mc
-
-# Install the gRPC health-check command line tool.
-ADD \
-    --chmod=755 \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.39/grpc_health_probe-linux-amd64 \
-    /usr/local/bin/grpc_health_probe
-
-# Install gRPC debug tool (uncomment for inclusion).
-# RUN <<EOF
-#     set -ex
-#     cd /tmp
-#     wget -Ogrpcurl.deb https://github.com/fullstorydev/grpcurl/releases/download/v1.9.2/grpcurl_1.9.2_linux_amd64.deb
-#     apt install ./grpcurl.deb
-#     rm -f grpcurl.deb
+# COPY <<EOF /sn-fw/buildinfo.env
+# SN_FW_GROUP=${SN_FW_GROUP}
+# SN_FW_REPO=${SN_FW_REPO}
+# SN_FW_BRANCH=${SN_FW_BRANCH}
+# SN_FW_APP_NAME=${SN_FW_APP_NAME}
+# SN_FW_VER=${SN_FW_VER}
+# SN_FW_COMMIT=${SN_FW_COMMIT}
+# SN_HW_GROUP=${SN_HW_GROUP}
+# SN_HW_REPO=${SN_HW_REPO}
+# SN_HW_BRANCH=${SN_HW_BRANCH}
+# SN_HW_BOARD=${SN_HW_BOARD}
+# SN_HW_APP_NAME=${SN_HW_APP_NAME}
+# SN_HW_VER=${SN_HW_VER}
+# SN_HW_COMMIT=${SN_HW_COMMIT}
 # EOF
 
 WORKDIR /
-CMD ["/bin/bash"]
+CMD ["/bin/bash", "-l"]
+
