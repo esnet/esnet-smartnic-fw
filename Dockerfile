@@ -217,6 +217,18 @@ RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
     meson install -C /sn-fw/build --destdir /firmware-install-root
 EOF
 
+# Compress the raw FPGA .bit and .mcs files to reduce the container size.
+# This is a temporary step until all of the hardware builds compress these files in their artifacts
+RUN <<EOF
+    set -ex
+    fw_dir=/firmware-install-root/usr/local/lib/firmware/esnet-smartnic
+    for f in ${fw_dir}/esnet-smartnic.bit ${fw_dir}/esnet-smartnic.mcs ; do
+      if [ -e ${f} ] ; then
+        # found an uncompressed file, compress it to save space in the image
+        zstd -9 --rm ${f}
+      fi
+    done
+EOF
 
 #
 # Provide a functional runtime environment

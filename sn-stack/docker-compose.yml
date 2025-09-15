@@ -102,7 +102,15 @@ services:
       - |
         rm -f /bitfiles/ok
         fw_dir=/usr/local/lib/firmware/esnet-smartnic
-        cp -a $${fw_dir}/esnet-smartnic.{bit,mcs} /bitfiles
+        for f in $${fw_dir}/esnet-smartnic.{bit,mcs} ; do
+          if [ -e $${f}.zst ] ; then
+            # input file is compressed, uncompress to output
+            unzstd --force --output-dir-flat /bitfiles $${f}.zst
+          else
+            # input file is not compressed, just copy it to output
+            cp -a $${f} /bitfiles
+          fi
+        done
 
         probes=$${fw_dir}/debug_nets.ltx
         if [ -e $${probes} ]; then
