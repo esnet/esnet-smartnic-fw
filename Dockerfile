@@ -3,9 +3,9 @@
 ARG DOCKERHUB_PROXY
 FROM ${DOCKERHUB_PROXY:-}library/ubuntu:jammy
 
-ENV DEBIAN_FRONTEND noninteractive
-ENV LC_ALL C.UTF-8
-ENV LANG C.UTF-8
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
 
 # Configure local ubuntu mirror as package source
 RUN \
@@ -120,9 +120,6 @@ RUN \
   apt-get autoremove && \
   rm -rf /var/lib/apt/lists/*
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV LC_ALL=C.UTF-8
-ENV LANG=C.UTF-8
 
 RUN <<EOT
     set -ex
