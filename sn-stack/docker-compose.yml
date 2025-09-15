@@ -6,10 +6,6 @@ x-smartnic-fw-service: &smartnic-fw-service
   image: ${SMARTNIC_FW_IMAGE_URI-esnet-smartnic-fw:$USER-dev}
   restart: unless-stopped
 
-x-smartnic-dpdk-service: &smartnic-dpdk-service
-  image: ${SMARTNIC_DPDK_IMAGE_URI-smartnic-dpdk-docker:$USER-dev}
-  restart: unless-stopped
-
 # https://github.com/traefik/traefik/releases
 # https://traefik.io/traefik/
 # https://hub.docker.com/_/traefik/
@@ -410,7 +406,7 @@ services:
       - smartnic-mgr-vfio-unlock
 
   smartnic-dpdk:
-    <<: *smartnic-dpdk-service
+    <<: *smartnic-fw-service
     hostname: smartnic-dpdk
     init: true
     user: root
@@ -443,7 +439,7 @@ services:
       - smartnic-mgr-dpdk-manual
 
   smartnic-dpdk-portlink:
-    <<: *smartnic-dpdk-service
+    <<: *smartnic-fw-service
     hostname: smartnic-dpdk-portlink
     init: true
     user: root

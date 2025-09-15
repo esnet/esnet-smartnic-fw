@@ -28,9 +28,6 @@ stages:
 variables:
   # These variables may be overridden by manual pipeline runs or from triggered
   # pipelines from other repos.
-  SMARTNIC_DPDK_IMAGE_URI:
-    value: wharf.es.net/ht/smartnic-dpdk-docker:82634-g8647cccc-generic
-    description: smartnic-dpdk-docker image to use as basis for DPDK builds
   LABTOOLS_IMAGE_URI:
     value: wharf.es.net/ht/xilinx-labtools-docker:75195-gc43e5fb5
     description: xilinx-labtools-docker image to use when deploying the sn-stack HW services
@@ -120,7 +117,6 @@ package:
     # Set up the build environment
     - |
       cat <<_EOF > .env
-      SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}
       LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}
       SN_HW_GROUP=${SN_HW_GROUP}
       SN_HW_REPO=${SN_HW_REPO}

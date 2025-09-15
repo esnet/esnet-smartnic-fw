@@ -28,7 +28,6 @@ fi
 echo "Building container '${IMAGE_URI}'"
 
 # Make sure these variables are **only** taken from the .env file
-unset SMARTNIC_DPDK_IMAGE_URI
 unset LABTOOLS_IMAGE_URI
 unset SN_HW_GROUP
 unset SN_HW_REPO
@@ -48,7 +47,6 @@ unset SN_FW_COMMIT
 source .env
 
 # Check for missing mandatory build-arguments and fill in default values for optional arguments
-SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI:-smartnic-dpdk-docker:${USER}-dev}
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI:-xilinx-labtools-docker:${USER}-dev}
 
 SN_HW_GROUP="${SN_HW_GROUP:-unset}"
@@ -81,7 +79,6 @@ SN_FW_COMMIT="${SN_FW_COMMIT:-unset}"
 export DOCKER_BUILDKIT=1
 docker build \
 	--progress=plain \
-	--build-arg SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI} \
 	--build-arg SN_HW_GROUP=${SN_HW_GROUP} \
 	--build-arg SN_HW_REPO=${SN_HW_REPO} \
 	--build-arg SN_HW_BRANCH=${SN_HW_BRANCH} \
@@ -110,7 +107,6 @@ fi
 cat <<_EOF > sn-stack/buildinfo.env
 SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}
-SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}
 SN_FW_GROUP=${SN_FW_GROUP}
 SN_FW_REPO=${SN_FW_REPO}
 SN_FW_BRANCH=${SN_FW_BRANCH}
@@ -145,7 +141,6 @@ if egrep -q "^${ENV_BLOCK_TOP}\$" sn-stack/.env ; then
 ${ENV_BLOCK_TOP}\n\
 SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}\n\
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}\n\
-SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}\n\
 ${ENV_BLOCK_BOT}" \
 	sn-stack/.env
 else
@@ -155,7 +150,6 @@ else
 ${ENV_BLOCK_TOP}
 SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}
-SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}
 ${ENV_BLOCK_BOT}
 EOF
 fi
