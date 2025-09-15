@@ -78,7 +78,7 @@ RUN <<EOF
 EOF
 
 COPY xilinx-qdma-for-opennic/QDMA/DPDK /QDMA/DPDK
-COPY patches /patches
+COPY dpdk-patches /dpdk-patches
 
 # Download build and install DPDK
 ARG DPDK_BASE_URL="https://fast.dpdk.org/rel"
@@ -95,7 +95,7 @@ RUN <<EOF
     rm dpdk-$DPDK_VER.tar.xz
     cd $DPDK_TOPDIR
     ln -s /QDMA/DPDK/drivers/net/qdma ./drivers/net
-    patch -p 1 < /patches/0000-dpdk-include-xilinx-qdma-driver.patch
+    patch -p 1 < /dpdk-patches/0000-dpdk-include-xilinx-qdma-driver.patch
 
     meson setup build \
       -Dplatform=${DPDK_PLATFORM:-native} \
