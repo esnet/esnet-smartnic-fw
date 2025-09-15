@@ -10,7 +10,7 @@ x-smartnic-fw-service: &smartnic-fw-service
 # https://traefik.io/traefik/
 # https://hub.docker.com/_/traefik/
 x-traefik-service: &traefik-service
-  image: '${DOCKERHUB_PROXY-}library/traefik:3.4.1'
+  image: '${DOCKERHUB_PROXY-}library/traefik:3.5.2'
   restart: unless-stopped
 
 # https://github.com/prometheus/prometheus/releases
