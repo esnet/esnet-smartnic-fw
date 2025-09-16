@@ -42,6 +42,8 @@ unset SN_FW_BRANCH
 unset SN_FW_APP_NAME
 unset SN_FW_VER
 unset SN_FW_COMMIT
+unset DPDK_PLATFORM
+unset DPDK_CPU_INSTRUCTION_SET
 
 # Read build-time arguments from .env
 source .env
@@ -75,6 +77,9 @@ SN_FW_APP_NAME="${SN_FW_APP_NAME:-unset}"
 SN_FW_VER="${SN_FW_VER:-unset}"
 SN_FW_COMMIT="${SN_FW_COMMIT:-unset}"
 
+DPDK_PLATFORM="${DPDK_PLATFORM:-generic}"
+DPDK_CPU_INSTRUCTION_SET="${DPDK_CPU_INSTRUCTION_SET:-auto}"
+
 # Build the image
 export DOCKER_BUILDKIT=1
 docker build \
@@ -92,6 +97,8 @@ docker build \
 	--build-arg SN_FW_APP_NAME=${SN_FW_APP_NAME} \
 	--build-arg SN_FW_VER=${SN_FW_VER} \
 	--build-arg SN_FW_COMMIT=${SN_FW_COMMIT} \
+	--build-arg DPDK_PLATFORM=${DPDK_PLATFORM} \
+	--build-arg DPDK_CPU_INSTRUCTION_SET=${DPDK_CPU_INSTRUCTION_SET} \
 	-t ${IMAGE_URI} .
 if [ $? -ne 0 ] ; then
     echo "ERROR: Failed to build container"
@@ -120,6 +127,8 @@ SN_HW_BOARD=${SN_HW_BOARD}
 SN_HW_APP_NAME=${SN_HW_APP_NAME}
 SN_HW_VER=${SN_HW_VER}
 SN_HW_COMMIT=${SN_HW_COMMIT}
+DPDK_PLATFORM=${DPDK_PLATFORM}
+DPDK_CPU_INSTRUCTION_SET=${DPDK_CPU_INSTRUCTION_SET}
 _EOF
 
 # Update or create the user's sn-stack/.env file to refer to the container image URLs used during this build
