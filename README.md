@@ -99,13 +99,6 @@ The firmware build depends on the result of a smartnic hardware (FPGA) build.  T
 This file will be called `artifacts.<board>.<app_name>.0.zip` and should be placed in the `sn-hw` directory in your source tree before starting the firmware build.
 
 
-Create 'smartnic-dpdk-docker' Image
------------------------------------
-
-This docker image can be built locally by cloning the https://github.com/esnet/smartnic-dpdk-docker.git repo and following the README instructions.
-Alternatively, this image can be retrieved from a remote registry by setting the SMARTNIC_DPDK_IMAGE_URI variable in the .env file (see below).
-
-
 Create 'xilinx-labtools-docker' Image
 -------------------------------------
 
