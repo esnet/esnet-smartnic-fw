@@ -98,8 +98,8 @@ RUN <<EOF
     patch -p 1 < /dpdk-patches/0000-dpdk-include-xilinx-qdma-driver.patch
 
     meson setup build \
-      -Dplatform=${DPDK_PLATFORM:-native} \
-      -Dcpu_instruction_set=${DPDK_CPU_INSTRUCTION_SET:-native} \
+      -Dplatform=${DPDK_PLATFORM:-generic} \
+      -Dcpu_instruction_set=${DPDK_CPU_INSTRUCTION_SET:-auto} \
       -Denable_drivers=net/af_packet,net/pcap,net/qdma,net/ring,net/tap,net/virtio \
       -Denable_apps=dumpcap,pdump,proc-info,test-cmdline,test-pmd
 
