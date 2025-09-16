@@ -111,6 +111,9 @@ package:
     SN_FW_PIPELINE_ID: ${CI_PIPELINE_ID}
     SN_FW_API_JOB: ${CI_JOB_NAME}
 
+    # Make sure we see the full output
+    BUILDKIT_PROGRESS: plain
+
     # Target all x86_64 targets generically
     DPDK_PLATFORM: generic
     DPDK_CPU_INSTRUCTION_SET: auto

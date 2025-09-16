@@ -83,7 +83,6 @@ DPDK_CPU_INSTRUCTION_SET="${DPDK_CPU_INSTRUCTION_SET:-auto}"
 # Build the image
 export DOCKER_BUILDKIT=1
 docker build \
-	--progress=plain \
 	--build-arg SN_HW_GROUP=${SN_HW_GROUP} \
 	--build-arg SN_HW_REPO=${SN_HW_REPO} \
 	--build-arg SN_HW_BRANCH=${SN_HW_BRANCH} \
