@@ -28,7 +28,6 @@ fi
 echo "Building container '${IMAGE_URI}'"
 
 # Make sure these variables are **only** taken from the .env file
-unset SMARTNIC_DPDK_IMAGE_URI
 unset LABTOOLS_IMAGE_URI
 unset SN_HW_GROUP
 unset SN_HW_REPO
@@ -43,12 +42,13 @@ unset SN_FW_BRANCH
 unset SN_FW_APP_NAME
 unset SN_FW_VER
 unset SN_FW_COMMIT
+unset DPDK_PLATFORM
+unset DPDK_CPU_INSTRUCTION_SET
 
 # Read build-time arguments from .env
 source .env
 
 # Check for missing mandatory build-arguments and fill in default values for optional arguments
-SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI:-smartnic-dpdk-docker:${USER}-dev}
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI:-xilinx-labtools-docker:${USER}-dev}
 
 SN_HW_GROUP="${SN_HW_GROUP:-unset}"
@@ -77,11 +77,12 @@ SN_FW_APP_NAME="${SN_FW_APP_NAME:-unset}"
 SN_FW_VER="${SN_FW_VER:-unset}"
 SN_FW_COMMIT="${SN_FW_COMMIT:-unset}"
 
+DPDK_PLATFORM="${DPDK_PLATFORM:-generic}"
+DPDK_CPU_INSTRUCTION_SET="${DPDK_CPU_INSTRUCTION_SET:-auto}"
+
 # Build the image
 export DOCKER_BUILDKIT=1
 docker build \
-	--progress=plain \
-	--build-arg SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI} \
 	--build-arg SN_HW_GROUP=${SN_HW_GROUP} \
 	--build-arg SN_HW_REPO=${SN_HW_REPO} \
 	--build-arg SN_HW_BRANCH=${SN_HW_BRANCH} \
@@ -95,6 +96,8 @@ docker build \
 	--build-arg SN_FW_APP_NAME=${SN_FW_APP_NAME} \
 	--build-arg SN_FW_VER=${SN_FW_VER} \
 	--build-arg SN_FW_COMMIT=${SN_FW_COMMIT} \
+	--build-arg DPDK_PLATFORM=${DPDK_PLATFORM} \
+	--build-arg DPDK_CPU_INSTRUCTION_SET=${DPDK_CPU_INSTRUCTION_SET} \
 	-t ${IMAGE_URI} .
 if [ $? -ne 0 ] ; then
     echo "ERROR: Failed to build container"
@@ -110,7 +113,6 @@ fi
 cat <<_EOF > sn-stack/buildinfo.env
 SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}
-SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}
 SN_FW_GROUP=${SN_FW_GROUP}
 SN_FW_REPO=${SN_FW_REPO}
 SN_FW_BRANCH=${SN_FW_BRANCH}
@@ -124,6 +126,8 @@ SN_HW_BOARD=${SN_HW_BOARD}
 SN_HW_APP_NAME=${SN_HW_APP_NAME}
 SN_HW_VER=${SN_HW_VER}
 SN_HW_COMMIT=${SN_HW_COMMIT}
+DPDK_PLATFORM=${DPDK_PLATFORM}
+DPDK_CPU_INSTRUCTION_SET=${DPDK_CPU_INSTRUCTION_SET}
 _EOF
 
 # Update or create the user's sn-stack/.env file to refer to the container image URLs used during this build
@@ -145,7 +149,6 @@ if egrep -q "^${ENV_BLOCK_TOP}\$" sn-stack/.env ; then
 ${ENV_BLOCK_TOP}\n\
 SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}\n\
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}\n\
-SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}\n\
 ${ENV_BLOCK_BOT}" \
 	sn-stack/.env
 else
@@ -155,7 +158,6 @@ else
 ${ENV_BLOCK_TOP}
 SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}
 LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}
-SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}
 ${ENV_BLOCK_BOT}
 EOF
 fi

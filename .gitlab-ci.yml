@@ -28,9 +28,6 @@ stages:
 variables:
   # These variables may be overridden by manual pipeline runs or from triggered
   # pipelines from other repos.
-  SMARTNIC_DPDK_IMAGE_URI:
-    value: wharf.es.net/ht/smartnic-dpdk-docker:82634-g8647cccc-generic
-    description: smartnic-dpdk-docker image to use as basis for DPDK builds
   LABTOOLS_IMAGE_URI:
     value: wharf.es.net/ht/xilinx-labtools-docker:75195-gc43e5fb5
     description: xilinx-labtools-docker image to use when deploying the sn-stack HW services
@@ -113,6 +110,21 @@ package:
     SN_FW_COMMIT: ${CI_COMMIT_SHORT_SHA}
     SN_FW_PIPELINE_ID: ${CI_PIPELINE_ID}
     SN_FW_API_JOB: ${CI_JOB_NAME}
+
+    # Make sure we see the full output
+    BUILDKIT_PROGRESS: plain
+
+    # Target all x86_64 targets generically
+    DPDK_PLATFORM: generic
+    DPDK_CPU_INSTRUCTION_SET: auto
+
+    # Target Intel specifically
+    #DPDK_PLATFORM: native
+    #DPDK_CPU_INSTRUCTION_SET: cascadelake
+
+    # Target AMD specifically
+    #DPDK_PLATFORM: native
+    #DPDK_CPU_INSTRUCTION_SET: znver2
   before_script:
     # Install bash and GNU find (with full regex support).
     - apk add bash findutils
@@ -120,7 +132,6 @@ package:
     # Set up the build environment
     - |
       cat <<_EOF > .env
-      SMARTNIC_DPDK_IMAGE_URI=${SMARTNIC_DPDK_IMAGE_URI}
       LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}
       SN_HW_GROUP=${SN_HW_GROUP}
       SN_HW_REPO=${SN_HW_REPO}
@@ -135,6 +146,8 @@ package:
       SN_FW_APP_NAME=${SN_FW_APP_NAME}
       SN_FW_VER=${SN_FW_VER}
       SN_FW_COMMIT=${SN_FW_COMMIT}
+      DPDK_PLATFORM=${DPDK_PLATFORM}
+      DPDK_CPU_INSTRUCTION_SET=${DPDK_CPU_INSTRUCTION_SET}
       _EOF
     - cat .env
 

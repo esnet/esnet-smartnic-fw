@@ -6,20 +6,16 @@ x-smartnic-fw-service: &smartnic-fw-service
   image: ${SMARTNIC_FW_IMAGE_URI-esnet-smartnic-fw:$USER-dev}
   restart: unless-stopped
 
-x-smartnic-dpdk-service: &smartnic-dpdk-service
-  image: ${SMARTNIC_DPDK_IMAGE_URI-smartnic-dpdk-docker:$USER-dev}
-  restart: unless-stopped
-
 # https://github.com/traefik/traefik/releases
 # https://traefik.io/traefik/
 # https://hub.docker.com/_/traefik/
 x-traefik-service: &traefik-service
-  image: '${DOCKERHUB_PROXY-}library/traefik:3.4.1'
+  image: '${DOCKERHUB_PROXY-}library/traefik:3.5.2'
   restart: unless-stopped
 
 # https://github.com/prometheus/prometheus/releases
 x-prometheus-service: &prometheus-service
-  image: '${DOCKERHUB_PROXY-}prom/prometheus:v3.4.2'
+  image: '${DOCKERHUB_PROXY-}prom/prometheus:v3.5.0'
   restart: unless-stopped
 
 services:
@@ -106,7 +102,15 @@ services:
       - |
         rm -f /bitfiles/ok
         fw_dir=/usr/local/lib/firmware/esnet-smartnic
-        cp -a $${fw_dir}/esnet-smartnic.{bit,mcs} /bitfiles
+        for f in $${fw_dir}/esnet-smartnic.{bit,mcs} ; do
+          if [ -e $${f}.zst ] ; then
+            # input file is compressed, uncompress to output
+            unzstd --force --output-dir-flat /bitfiles $${f}.zst
+          else
+            # input file is not compressed, just copy it to output
+            cp -a $${f} /bitfiles
+          fi
+        done
 
         probes=$${fw_dir}/debug_nets.ltx
         if [ -e $${probes} ]; then
@@ -410,7 +414,7 @@ services:
       - smartnic-mgr-vfio-unlock
 
   smartnic-dpdk:
-    <<: *smartnic-dpdk-service
+    <<: *smartnic-fw-service
     hostname: smartnic-dpdk
     init: true
     user: root
@@ -443,7 +447,7 @@ services:
       - smartnic-mgr-dpdk-manual
 
   smartnic-dpdk-portlink:
-    <<: *smartnic-dpdk-service
+    <<: *smartnic-fw-service
     hostname: smartnic-dpdk-portlink
     init: true
     user: root

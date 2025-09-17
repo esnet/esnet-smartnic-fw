@@ -1,10 +1,5 @@
 #! /usr/bin/env python3
 
-# filter out Cryptography Deprecation Warnings from Scapy
-import warnings
-from cryptography.utils import CryptographyDeprecationWarning
-warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
-
 import click
 import time
 from scapy.all import *

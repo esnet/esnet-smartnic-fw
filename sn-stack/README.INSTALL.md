@@ -730,9 +730,9 @@ A hardware application can optionally supply their own test suites and library. 
 A regular test run is started with:
 ```
 cd sn-stack
-./test/run.sh
+./run-tests.sh
 ```
-Extra options can be passed to both the docker and robot command lines. Refer to `./test/run.sh --help` for details.
+Extra options can be passed to both the docker and robot command lines. Refer to `./run-tests.sh --help` for details.
 
 A test run will produce three output files, located in `sn-stack/scratch`.
 - `report.html`: Summarizes a test execution run and provides links into the verbose `log.html` file.
@@ -754,4 +754,4 @@ There are two primary methods for developing tests:
     - `SN_FW_TEST_ROOT`: Path to alternate firmware test files to be mounted at `/test/fw` within the container.
     - `SN_HW_TEST_ROOT`: Path to alternate hardware test files to be mounted at `/test/hw` within the container.
 
-In both cases, any new Python package dependencies added to a `pip-requirements.txt` file can be installed into the container prior to executing the tests when the `--pip-install` (`-p`) option is passed to `./test/run.sh`. Note that this doesn't modify the container image, only the running instance. Adding new dependencies is only possible when network connectivity is available and the Python package index is accessible by the container.
+In both cases, any new Python package dependencies added to a `pip-requirements.txt` file can be installed into the container prior to executing the tests when the `--pip-install` (`-p`) option is passed to `./run-tests.sh`. Note that this doesn't modify the container image, only the running instance. Adding new dependencies is only possible when network connectivity is available and the Python package index is accessible by the container.

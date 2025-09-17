@@ -8,15 +8,16 @@ FPGA files imported from the FPGA hardware (HW) build are embedded into the firm
 $ tree /usr/local/lib/firmware/esnet-smartnic/
 /usr/local/lib/firmware/esnet-smartnic/
 ├── debug_nets.ltx          <------------ chipscope probe points
-├── esnet-smartnic.bit      <------------ FPGA bit file to be loaded over JTAG
-├── esnet-smartnic.mcs      <------------ FPGA flash image to be loaded into FLASH
-├── esnet-smartnic.p4       <------------ copy of the user's P4 program built into this FPGA
+├── esnet-smartnic-igr.p4   <------------ copy of the user's ingress P4 program built into this FPGA
+├── esnet-smartnic.bit.zst  <------------ FPGA bit file to be loaded over JTAG
+├── esnet-smartnic.mcs.zst  <------------ FPGA flash image to be loaded into FLASH
 └── open_nic_shell.ltx      <------------ chipscope probe points
- 
-$ tree /usr/local/share/esnet-smartnic/
+
+$ tree -L 1 /usr/local/share/esnet-smartnic/
 /usr/local/share/esnet-smartnic/
-└── esnet-smartnic-top-ir.yaml    <------ PCIe register map definition used to directly read/write registers for debug using regio tool
- 
+├── esnet-smartnic-top-ir.yaml    <------ PCIe register map definition used to directly read/write registers for debug using regio tool
+└── python                        <------ python package installers for smartnic components
+
 $ tree /usr/local/share/esnet-smartnic-dev/
 /usr/local/share/esnet-smartnic-dev/
 └── spec                          <------ original yaml definitions for registers within blocks/decoders (informational only)
@@ -25,6 +26,7 @@ $ tree /usr/local/share/esnet-smartnic-dev/
     ├── cmac.yaml
     ├── cmac_adapter.yaml
     ├── cmac_decoder.yaml
+    ├── cms.yaml
     ├── esnet-smartnic-top.yaml
     ├── qdma_decoder.yaml
     ├── qdma_device_csrs.yaml
@@ -33,6 +35,7 @@ $ tree /usr/local/share/esnet-smartnic-dev/
     ├── qdma_pf_decoder.yaml
     ├── qdma_subsystem.yaml
     ├── qsfp28_i2c.yaml
+    ├── qspi.yaml
     ├── syscfg.yaml
     ├── sysmon.yaml
     └── sysmon_decoder.yaml
@@ -51,42 +54,39 @@ $ tree /usr/local/bin/
 ├── dpdk-proc-info
 ├── dpdk-telemetry.py
 ├── dpdk-test
-├── dpdk-test-acl
-├── dpdk-test-bbdev
 ├── dpdk-test-cmdline
-├── dpdk-test-compress-perf
-├── dpdk-test-crypto-perf
-├── dpdk-test-eventdev
-├── dpdk-test-fib
-├── dpdk-test-flow-perf
-├── dpdk-test-gpudev
-├── dpdk-test-pipeline
-├── dpdk-test-regex
-├── dpdk-test-sad
 ├── dpdk-testpmd
-├── meson                   <------------ meson build tool used during firmware and software build
+├── ipython
+├── ipython3
 ├── pktgen                  <------------ pktgen-dpdk packet generator
-├── regio                   <------------ regio tool for reading/writing FPGA registers over PCIe
+├── ptipython
+├── ptpython
 ├── regio-elaborate         <------------ regio tools used for regmap parsing during firmware build
+├── regio-esnet-smartnic    <------------ regio tool for reading/writing FPGA registers over PCIe
+├── regio-flatten
 ├── regio-generate
 ├── regio-info
+├── register-python-argcomplete
+├── robot                   <------------ test framework used for unit tests and regression testing
 ├── sn-cfg                  <------------ smartnic platform configuration gRPC client which can send commands to the agent for operating on the esnet-smartnic FPGA
-├── sn-cfg-agent            <------------ smartnic platform configuration gRPC server which is automatically started and listens for commands for operating on the esnet-smartnic FPGA
+├── sn-cfg-agent            <------------ smartnic platform configuration gRPC server which is automatically started and listens for commands for operating on the esnet-smartnic FPGA            
+├── sn-cfg-client-test
 ├── sn-p4                   <------------ smartnic p4 gRPC client which can send commands to the p4 agent for table inserts/deletes
-└── sn-p4-agent             <------------ smartnic p4 gRPC server which is automatically started and listens for p4 table commands
+├── sn-p4-agent             <------------ smartnic p4 gRPC server which is automatically started and listens for p4 table commands
+└── sn-p4-client-test
 ```
 
 Python packages
 ```
-$ tree -L 1 /usr/local/lib/python3.8/dist-packages
-/usr/local/lib/python3.8/dist-packages
+$ tree -L 1 /usr/local/lib/python3.10/dist-packages 
+/usr/local/lib/python3.10/dist-packages
 ...
 ├── regio                   <------------ library for programmatic register accesses
 ├── regmap_esnet_smartnic   <------------ auto-generated programmatic register map for the esnet-smartnic FPGA
 ├── sn_cfg                  <------------ library for the sn-cfg gRPC client tool
 ├── sn_cfg_proto            <------------ library wrapper for the sn-cfg auto-generated protobuf and gRPC code
-├── sn_cfg_v1_pb2.py        <------------ auto-generated protobuf code for the messages supported by sn-cfg-agent
-├── sn_cfg_v1_pb2_grpc.py   <------------ auto-generated gRPC code for use by clients of sn-cfg-agent
+├── sn_cfg_v2_pb2.py        <------------ auto-generated protobuf code for the messages supported by sn-cfg-agent
+├── sn_cfg_v2_pb2_grpc.py   <------------ auto-generated gRPC code for use by clients of sn-cfg-agent
 ├── sn_p4                   <------------ library for the sn-p4 gRPC client tool
 ├── sn_p4_proto             <------------ library wrapper for the sn-p4 auto-generated probotbuf and gRPC code
 ├── sn_p4_v2_pb2.py         <------------ auto-generated protobuf code for the messages supported by sn-p4-agent
@@ -102,17 +102,18 @@ C language header files used during builds
 
 pkgconfig files used during builds
 ```
-tree /usr/local/lib/x86_64-linux-gnu/pkgconfig/
+$ tree /usr/local/lib/x86_64-linux-gnu/pkgconfig/
 /usr/local/lib/x86_64-linux-gnu/pkgconfig/
+├── jsoncpp.pc
 ├── libdpdk-libs.pc
 ├── libdpdk.pc
 ├── opennic.pc
+├── prom.pc
+├── promhttp.pc
+├── sn_cfg_client.pc
+├── sn_cfg_proto.pc
+├── sn_p4_client.pc
+├── sn_p4_proto.pc
 ├── snp4.pc
 └── snutil.pc
 ```
-
-Source code used to build the firmware
-```
-/sn-fw
-```
-This is included in the container to allow source-level debug inside the container using gdb
