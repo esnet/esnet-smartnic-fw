@@ -332,12 +332,12 @@ ftap:
   needs:
     - package
 
-ejfat-staging:
+ejfat-ci-test:
   extends: .ejfat
   parallel:
     matrix:
       # node4.fpga.es.net
-      - GL_ENV_NAME: node4/0/staging
+      - GL_ENV_NAME: node4/0/ci-test
         SYSTEM_HW_BOARD: au280
         AAP_LIMIT: node4.fpga.es.net
         EXTRA_VAR_STACK_UNIQUE: 0
