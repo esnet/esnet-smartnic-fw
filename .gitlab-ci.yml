@@ -331,6 +331,7 @@ ftap:
       allow_failure: true
   needs:
     - package
+  resource_group: ${AAP_LIMIT}/${EXTRA_VAR_STACK_UNIQUE}
 
 ejfat-ci-test:
   extends: .ejfat
