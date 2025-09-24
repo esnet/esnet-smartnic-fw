@@ -704,7 +704,7 @@ void SmartnicP4Impl::get_or_clear_stats(
 
         for (auto domain : dev->stats.domains) {
             if (do_clear) {
-                stats_domain_clear_metrics(domain);
+                stats_domain_clear_metrics(domain, NULL);
             } else {
                 stats_domain_for_each_metric(domain, get_stats_for_each_metric, &ctx);
             }

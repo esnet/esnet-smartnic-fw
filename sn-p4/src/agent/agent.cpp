@@ -154,7 +154,7 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids, unsigned int prome
 
         SERVER_LOG_LINE_INIT(ctor, INFO, "Starting statistics collection on device " << bus_id);
         for (auto domain : dev->stats.domains) {
-            stats_domain_clear_metrics(domain);
+            stats_domain_clear_metrics(domain, NULL);
             stats_domain_start(domain);
         }
 
@@ -182,7 +182,7 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids, unsigned int prome
     init_server();
 
     SERVER_LOG_LINE_INIT(ctor, INFO, "Starting statistics collection for server");
-    stats_domain_clear_metrics(server_stats.domain);
+    stats_domain_clear_metrics(server_stats.domain, NULL);
     stats_domain_start(server_stats.domain);
 
     SERVER_LOG_LINE_INIT(ctor, INFO, "Starting Prometheus daemon on port " << prometheus_port);

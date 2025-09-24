@@ -547,8 +547,10 @@ static size_t stats_block_get_values(struct stats_block* blk,
     return n;
 }
 
+
 //--------------------------------------------------------------------------------------------------
-static void stats_block_update_metrics(struct stats_block* blk, bool clear) {
+static void stats_block_update_metrics(struct stats_block* blk,
+                                       const struct stats_clear_filter* filter) {
     const struct stats_block_spec* spec = &blk->spec;
 
     stats_block_lock(blk);
@@ -572,6 +574,8 @@ static void stats_block_update_metrics(struct stats_block* blk, bool clear) {
     for (struct stats_metric** m = blk->metrics; m < &blk->metrics[spec->nmetrics]; ++m) {
         struct stats_metric* metric = *m;
         const struct stats_metric_spec* mspec = &metric->spec;
+        bool is_clear_on_read = STATS_METRIC_FLAG_TEST(mspec->flags, CLEAR_ON_READ);
+        bool is_never_clear = STATS_METRIC_FLAG_TEST(mspec->flags, NEVER_CLEAR);
 
         uint64_t values[metric->nelements];
         if (spec->read_metric != NULL) {
@@ -580,10 +584,35 @@ static void stats_block_update_metrics(struct stats_block* blk, bool clear) {
             stats_metric_read(metric, values);
         }
 
-        bool is_clear_on_read = STATS_METRIC_FLAG_TEST(mspec->flags, CLEAR_ON_READ);
-        bool do_clear = clear && !STATS_METRIC_FLAG_TEST(mspec->flags, NEVER_CLEAR);
+        struct stats_metric_value filter_values[metric->nelements];
+        if (filter != NULL) {
+            stats_metric_lock(metric);
+            for (unsigned int n = 0; n < metric->nelements; ++n) {
+                filter_values[n] = metric->elements[n].value;
+            }
+            stats_metric_unlock(metric);
+        }
+        const struct stats_clear_filter_spec fspec = {
+            .domain = &blk->zone->domain->spec,
+            .zone = &blk->zone->spec,
+            .block = spec,
+            .metric = mspec,
+            .values = filter_values,
+            .nvalues = metric->nelements,
+        };
+        if (filter != NULL && filter->setup != NULL) {
+            filter->setup(&fspec, filter->arg);
+        }
+
         for (unsigned int n = 0; n < metric->nelements; ++n) {
             struct stats_metric_element* e = &metric->elements[n];
+            bool do_clear =
+                !is_never_clear &&
+                filter != NULL &&
+                (
+                    filter->match == NULL ||              /* Wildcard to clear all. */
+                    filter->match(&fspec, n, filter->arg) /* Selective clear. */
+                );
 
             stats_metric_lock(metric);
             switch (mspec->type) {
@@ -639,6 +668,10 @@ static void stats_block_update_metrics(struct stats_block* blk, bool clear) {
                 }
             }
             prom_gauge_set(metric->prometheus.metric, f64, public_label_values);
+        }
+
+        if (filter != NULL && filter->teardown != NULL) {
+            filter->teardown(&fspec, filter->arg);
         }
     }
 
@@ -842,14 +875,19 @@ void stats_zone_update_metrics(struct stats_zone* zone) {
     }
 
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
-        stats_block_update_metrics(*blk, false);
+        stats_block_update_metrics(*blk, NULL);
     }
 }
 
 //--------------------------------------------------------------------------------------------------
-void stats_zone_clear_metrics(struct stats_zone* zone) {
+void stats_zone_clear_metrics(struct stats_zone* zone, const struct stats_clear_filter* filter) {
+    struct stats_clear_filter clear_all = {.match = NULL};
+    if (filter == NULL) {
+        filter = &clear_all;
+    }
+
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
-        stats_block_update_metrics(*blk, true);
+        stats_block_update_metrics(*blk, filter);
     }
 }
 
@@ -967,10 +1005,11 @@ void stats_domain_update_metrics(struct stats_domain* domain) {
 }
 
 //--------------------------------------------------------------------------------------------------
-void stats_domain_clear_metrics(struct stats_domain* domain) {
+void stats_domain_clear_metrics(struct stats_domain* domain,
+                                const struct stats_clear_filter* filter) {
     struct stats_zone* zone = NULL;
     while (stats_domain_get_next_zone(domain, &zone)) {
-        stats_zone_clear_metrics(zone);
+        stats_zone_clear_metrics(zone, filter);
     }
 }
 
