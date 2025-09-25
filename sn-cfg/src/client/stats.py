@@ -1,6 +1,7 @@
 #---------------------------------------------------------------------------------------------------
 __all__ = (
     'add_sub_command',
+    'stats_clear_base_options',
     'stats_req_kargs',
     'stats_show_base_options',
     'stats_show_format',
@@ -47,26 +48,29 @@ METRIC_TYPE_RMAP = dict((name, enum) for enum, name in METRIC_TYPE_MAP.items())
 def stats_req_kargs(dev_id, stats_kargs):
     req_kargs = {'dev_id': dev_id}
     if stats_kargs:
-        root = StatsMetricFilter()
-
         filters = stats_kargs.get('filters')
-        if filters:
-            root.all_set.members.extend(filters)
-
         metric_types = stats_kargs.get('metric_types')
-        if metric_types:
-            type_filters = root.all_set.members.add()
-            for mt in metric_types:
-                tf = type_filters.any_set.members.add()
-                tf.match.type = METRIC_TYPE_RMAP[mt]
-
         units = stats_kargs.get('units')
-        if units:
-            units_filters = root.all_set.members.add()
-            for u in units:
-                uf = units_filters.any_set.members.add()
-                uf.match.label.key.exact = 'units'
-                uf.match.label.value.exact = u
+
+        root = None
+        if filters or metric_types or units:
+            root = StatsMetricFilter()
+
+            if filters:
+                root.all_set.members.extend(filters)
+
+            if metric_types:
+                type_filters = root.all_set.members.add()
+                for mt in metric_types:
+                    tf = type_filters.any_set.members.add()
+                    tf.match.type = METRIC_TYPE_RMAP[mt]
+
+            if units:
+                units_filters = root.all_set.members.add()
+                for u in units:
+                    uf = units_filters.any_set.members.add()
+                    uf.match.label.key.exact = 'units'
+                    uf.match.label.value.exact = u
 
         req_kargs['filters'] = StatsFilters(
             non_zero=not stats_kargs.get('zeroes'),
@@ -261,9 +265,19 @@ def rpc_stats_view(op, **kargs):
     except grpc.RpcError as e:
         raise click.ClickException(str(e))
 
+def rpc_clear_stats_view(stub, **kargs):
+    kargs['bytes'] = True
+    for resp in rpc_stats_view(stub.ClearStats, **kargs):
+        yield resp.dev_id
+
 def rpc_get_stats_view(stub, **kargs):
     for resp in rpc_stats_view(stub.GetStats, **kargs):
         yield resp.dev_id, resp.stats
+
+#---------------------------------------------------------------------------------------------------
+def clear_stats_view(client, **kargs):
+    for dev_id in rpc_clear_stats_view(client.stub, **kargs):
+        click.echo(f'Cleared statistics view for device ID {dev_id}.')
 
 #---------------------------------------------------------------------------------------------------
 def _show_stats_view(dev_id, stats, kargs):
@@ -406,6 +420,8 @@ def show_stats_view(client, **kargs):
 
 #---------------------------------------------------------------------------------------------------
 def batch_generate_stats_view_req(op, **kargs):
+    if op == BatchOperation.BOP_CLEAR:
+        kargs['bytes'] = True
     yield BatchRequest(op=op, stats=stats_view_req(**kargs))
 
 def batch_process_stats_view_resp(kargs):
@@ -415,6 +431,7 @@ def batch_process_stats_view_resp(kargs):
 
         supported_ops = {
             BatchOperation.BOP_GET: 'Got',
+            BatchOperation.BOP_CLEAR: 'Cleared',
         }
         op = resp.op
         if op not in supported_ops:
@@ -427,6 +444,8 @@ def batch_process_stats_view_resp(kargs):
 
         if op == BatchOperation.BOP_GET:
             _show_stats_view(resp.dev_id, resp.stats, kargs)
+        else:
+            click.echo(f'{op_label} statistics view for device ID {resp.dev_id}.')
         return True
 
     return process
@@ -435,12 +454,6 @@ def batch_stats_view(op, **kargs):
     return batch_generate_stats_view_req(op, **kargs), batch_process_stats_view_resp(kargs)
 
 #---------------------------------------------------------------------------------------------------
-def clear_stats_options(fn):
-    options = (
-        device_id_option,
-    )
-    return apply_options(options, fn)
-
 class Filter(click.ParamType):
     # Needed for auto-generated help (or implement get_metavar method instead).
     name = 'filter'
@@ -801,6 +814,41 @@ Example 4: Filter to select only metrics counting packets on the output side of
 
         return ns
 
+def stats_clear_base_options():
+    return (
+        click.option(
+            '--metric-type', '-m',
+            'metric_types',
+            type=click.Choice(sorted(name for name in METRIC_TYPE_RMAP)),
+            multiple=True,
+            help='''
+            Filter to restrict statistic metrics to the given type(s). Multiple options will result
+            in the logical OR of the given types. The set of all the given types will be logically
+            ANDed with other filtering options.
+            ''',
+        ),
+        click.option(
+            '--filter', '-f',
+            'filters',
+            type=Filter(),
+            multiple=True,
+            help='''
+            Custom expression for filtering metrics. Multiple options will result in the logical AND
+            of the given filters, along with any other filtering options.
+            ''',
+        ),
+        click.option(
+            '--units', '-u',
+            multiple=True,
+            help='''
+            Filter to restrict statistic metrics to the given units (only applicable to metrics that
+            have been defined with the "units" label). Common units are "packets" and "bytes".
+            Multiple options will result in the logical OR of the given units. The set of all the
+            given units will be logically ANDed with other filtering options.
+            ''',
+        ),
+    )
+
 def stats_show_base_options():
     return (
         click.option(
@@ -865,6 +913,12 @@ def stats_show_base_options():
         ),
     )
 
+def clear_stats_options(fn):
+    options = (
+        device_id_option,
+    ) + stats_clear_base_options()
+    return apply_options(options, fn)
+
 def show_stats_options(fn):
     options = (
         device_id_option,
@@ -900,6 +954,27 @@ class ViewFilter(click.ParamType):
             fields.extend((self.NFIELDS - nfields)*[self.FIELD_GLOB_RE])
 
         return '^' + self.FIELD_SEP.join(fields) + '$'
+
+def clear_stats_view_options(fn):
+    options = (
+        device_id_option,
+        click.option(
+            '--view-filter', '-v',
+            'view_filters',
+            type=ViewFilter(),
+            multiple=True,
+            default=('*',),
+            show_default=True,
+            help = '''
+            A filter to select which metrics to clear based on their view specifications. A view
+            specification filter is a triplet of the form <name>:<port>:<direction>, where <name> is
+            a "." separated sequence of SmartNIC datapath components naming the view (any of which
+            may be globbed using "*"), <port> is 0, 1 or "*" for any, and <direction> is "in", "out"
+            or "*" for any.
+            ''',
+        ),
+    )
+    return apply_options(options, fn)
 
 def show_stats_view_options(fn):
     options = (
@@ -944,6 +1019,14 @@ def add_batch_commands(cmd):
         '''
         return batch_stats(BatchOperation.BOP_CLEAR, **kargs)
 
+    @cmd.command(name='clear-stats-view')
+    @clear_stats_options
+    def clear_stats_view(**kargs):
+        '''
+        Clear SmartNIC statistics by view.
+        '''
+        return batch_stats_view(BatchOperation.BOP_CLEAR, **kargs)
+
     @cmd.command(name='show-stats')
     @show_stats_options
     def show_stats(**kargs):
@@ -961,15 +1044,29 @@ def add_batch_commands(cmd):
         return batch_stats_view(BatchOperation.BOP_GET, **kargs)
 
 #---------------------------------------------------------------------------------------------------
-def add_clear_commands(cmd):
-    @cmd.command
+def add_clear_commands(cmd, settings):
+    filter_help = Filter.HELP.format(**settings)
+    @cmd.group(
+        invoke_without_command=True,
+        help=f'''
+Clear SmartNIC statistics.
+{filter_help}
+''',
+    )
     @clear_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
+        if ctx.invoked_subcommand is None:
+            clear_stats(ctx.obj, **kargs)
+
+    @stats.command
+    @clear_stats_view_options
+    @click.pass_context
+    def view(ctx, **kargs):
         '''
-        Clear SmartNIC statistics.
+        Clear SmartNIC statistics by view.
         '''
-        clear_stats(ctx.obj, **kargs)
+        clear_stats_view(ctx.obj, **kargs)
 
 #---------------------------------------------------------------------------------------------------
 def add_show_commands(cmd, settings):
@@ -999,5 +1096,5 @@ Display SmartNIC statistics.
 #---------------------------------------------------------------------------------------------------
 def add_sub_commands(cmds):
     add_batch_commands(cmds.batch)
-    add_clear_commands(cmds.clear)
+    add_clear_commands(cmds.clear, cmds.settings)
     add_show_commands(cmds.show, cmds.settings)

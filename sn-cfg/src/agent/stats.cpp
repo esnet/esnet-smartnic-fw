@@ -660,6 +660,99 @@ extern "C" {
 
         return 0;
     }
+
+    struct ClearStatsContext {
+        const StatsFilters& filters;
+        BitArray* valid;
+    };
+
+    void clear_stats_filter_setup(const struct stats_clear_filter_spec* spec, void* arg) {
+        ClearStatsContext* ctx = static_cast<typeof(ctx)>(arg);
+
+        StatsMetricType type;
+        switch (spec->metric->type) {
+        case stats_metric_type_COUNTER:
+            type = StatsMetricType::STATS_METRIC_TYPE_COUNTER;
+            break;
+
+        case stats_metric_type_GAUGE:
+            type = StatsMetricType::STATS_METRIC_TYPE_GAUGE;
+            break;
+
+        case stats_metric_type_FLAG:
+            type = StatsMetricType::STATS_METRIC_TYPE_FLAG;
+            break;
+
+        default:
+            type = StatsMetricType::STATS_METRIC_TYPE_UNKNOWN;
+            break;
+        }
+
+        struct stats_for_each_spec for_each_spec = {
+            .domain = spec->domain,
+            .zone = spec->zone,
+            .block = spec->block,
+            .metric = spec->metric,
+            .values = spec->values,
+            .nvalues = spec->nvalues,
+            .last_update = {},
+            .arg = NULL,
+        };
+        ctx->valid = new BitArray(spec->nvalues);
+        apply_metric_filter(&for_each_spec, ctx->filters.metric_filter(), type, *ctx->valid);
+    }
+
+    void clear_stats_filter_teardown([[maybe_unused]] const struct stats_clear_filter_spec* spec,
+                                     void* arg) {
+        ClearStatsContext* ctx = static_cast<typeof(ctx)>(arg);
+        delete ctx->valid;
+        ctx->valid = NULL;
+    }
+
+    bool clear_stats_filter_match([[maybe_unused]] const struct stats_clear_filter_spec* spec,
+                                  unsigned int value_idx,
+                                  void* arg) {
+        ClearStatsContext* ctx = static_cast<typeof(ctx)>(arg);
+        return ctx->valid->is_bit_set(value_idx);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+static void clear_stats_domain(struct stats_domain* domain, const StatsFilters& filters) {
+    if (filters.has_metric_filter()) {
+        ClearStatsContext ctx{
+            .filters = filters,
+            .valid = NULL,
+        };
+        struct stats_clear_filter clear_filter{
+            .setup = clear_stats_filter_setup,
+            .teardown = clear_stats_filter_teardown,
+            .match = clear_stats_filter_match,
+            .arg = &ctx,
+        };
+        stats_domain_clear_metrics(domain, &clear_filter);
+    } else {
+        stats_domain_clear_metrics(domain, NULL);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void clear_stats_zone(struct stats_zone* zone, const StatsFilters& filters) {
+    if (filters.has_metric_filter()) {
+        ClearStatsContext ctx{
+            .filters = filters,
+            .valid = NULL,
+        };
+        struct stats_clear_filter clear_filter{
+            .setup = clear_stats_filter_setup,
+            .teardown = clear_stats_filter_teardown,
+            .match = clear_stats_filter_match,
+            .arg = &ctx,
+        };
+        stats_zone_clear_metrics(zone, &clear_filter);
+    } else {
+        stats_zone_clear_metrics(zone, NULL);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -689,10 +782,8 @@ void SmartnicConfigImpl::get_or_clear_stats(
         .stats = NULL,
     };
 
-    if (!do_clear) {
-        SERVER_LOG_IF_DEBUG(debug_flag, INFO,
-            "---> Filters:" << endl << ctx.filters.DebugString());
-    }
+    SERVER_LOG_IF_DEBUG(debug_flag, INFO,
+        "---> Filters:" << endl << ctx.filters.DebugString());
 
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
@@ -702,11 +793,17 @@ void SmartnicConfigImpl::get_or_clear_stats(
             ctx.stats = resp.mutable_stats();
         }
 
-        for (auto domain : dev->stats.domains) {
+        for (auto dom = 0; dom < DeviceStatsDomain::NDOMAINS; ++dom) {
+            auto domain = dev->stats.domains[dom];
+            auto dname = device_stats_domain_name((DeviceStatsDomain)dom);
             if (do_clear) {
-                stats_domain_clear_metrics(domain, NULL);
+                clear_stats_domain(domain, ctx.filters);
+                SERVER_LOG_IF_DEBUG(debug_flag, INFO,
+                    "Cleared stats metrics in domain " << dname << " on device ID " << dev_id);
             } else {
                 stats_domain_for_each_metric(domain, get_stats_for_each_metric, &ctx);
+                SERVER_LOG_IF_DEBUG(debug_flag, INFO,
+                    "Retrieved stats metrics in domain " << dname << " on device ID " << dev_id);
             }
         }
 

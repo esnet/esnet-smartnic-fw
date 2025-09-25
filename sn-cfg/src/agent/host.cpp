@@ -440,7 +440,7 @@ void SmartnicConfigImpl::get_or_clear_host_stats(
             HostStatsResponse resp;
 
             if (do_clear) {
-                stats_zone_clear_metrics(zones[host_id]->zone, NULL);
+                clear_stats_zone(zones[host_id]->zone, ctx.filters);
             } else {
                 ctx.stats = resp.mutable_stats();
                 stats_zone_for_each_metric(zones[host_id]->zone, get_stats_for_each_metric, &ctx);

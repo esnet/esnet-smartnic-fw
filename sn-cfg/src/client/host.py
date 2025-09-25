@@ -21,7 +21,12 @@ from sn_cfg_proto import (
 
 from .device import device_id_option
 from .error import error_code_str
-from .stats import stats_req_kargs, stats_show_base_options, stats_show_format
+from .stats import (
+    stats_clear_base_options,
+    stats_req_kargs,
+    stats_show_base_options,
+    stats_show_format,
+)
 from .utils import apply_options, FLOW_CONTROL_THRESHOLD, format_timestamp, natural_sort_key
 
 HEADER_SEP = '-' * 40
@@ -233,7 +238,7 @@ def clear_host_stats_options(fn):
     options = (
         device_id_option,
         host_id_option,
-    )
+    ) + stats_clear_base_options()
     return apply_options(options, fn)
 
 class DmaQueues(click.ParamType):

@@ -481,7 +481,7 @@ void SmartnicConfigImpl::get_or_clear_port_stats(
             PortStatsResponse resp;
 
             if (do_clear) {
-                stats_zone_clear_metrics(zones[port_id]->zone, NULL);
+                clear_stats_zone(zones[port_id]->zone, ctx.filters);
             } else {
                 ctx.stats = resp.mutable_stats();
                 stats_zone_for_each_metric(zones[port_id]->zone, get_stats_for_each_metric, &ctx);
