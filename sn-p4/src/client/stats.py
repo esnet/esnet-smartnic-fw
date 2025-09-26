@@ -46,26 +46,29 @@ METRIC_TYPE_RMAP = dict((name, enum) for enum, name in METRIC_TYPE_MAP.items())
 def stats_req_kargs(dev_id, stats_kargs):
     req_kargs = {'dev_id': dev_id}
     if stats_kargs:
-        root = StatsMetricFilter()
-
         filters = stats_kargs.get('filters')
-        if filters:
-            root.all_set.members.extend(filters)
-
         metric_types = stats_kargs.get('metric_types')
-        if metric_types:
-            type_filters = root.all_set.members.add()
-            for mt in metric_types:
-                tf = type_filters.any_set.members.add()
-                tf.match.type = METRIC_TYPE_RMAP[mt]
-
         units = stats_kargs.get('units')
-        if units:
-            units_filters = root.all_set.members.add()
-            for u in units:
-                uf = units_filters.any_set.members.add()
-                uf.match.label.key.exact = 'units'
-                uf.match.label.value.exact = u
+
+        root = None
+        if filters or metric_types or units:
+            root = StatsMetricFilter()
+
+            if filters:
+                root.all_set.members.extend(filters)
+
+            if metric_types:
+                type_filters = root.all_set.members.add()
+                for mt in metric_types:
+                    tf = type_filters.any_set.members.add()
+                    tf.match.type = METRIC_TYPE_RMAP[mt]
+
+            if units:
+                units_filters = root.all_set.members.add()
+                for u in units:
+                    uf = units_filters.any_set.members.add()
+                    uf.match.label.key.exact = 'units'
+                    uf.match.label.value.exact = u
 
         req_kargs['filters'] = StatsFilters(
             non_zero=not stats_kargs.get('zeroes'),
@@ -231,12 +234,6 @@ def batch_stats(op, **kargs):
     return batch_generate_stats_req(op, **kargs), batch_process_stats_resp(kargs)
 
 #---------------------------------------------------------------------------------------------------
-def clear_stats_options(fn):
-    options = (
-        device_id_option,
-    )
-    return apply_options(options, fn)
-
 class Filter(click.ParamType):
     # Needed for auto-generated help (or implement get_metavar method instead).
     name = 'filter'
@@ -550,6 +547,41 @@ Example 3: Various custom filters to select metrics by array indices.
 
         return ns
 
+def stats_clear_base_options():
+    return (
+        click.option(
+            '--metric-type', '-m',
+            'metric_types',
+            type=click.Choice(sorted(name for name in METRIC_TYPE_RMAP)),
+            multiple=True,
+            help='''
+            Filter to restrict statistic metrics to the given type(s). Multiple options will result
+            in the logical OR of the given types. The set of all the given types will be logically
+            ANDed with other filtering options.
+            ''',
+        ),
+        click.option(
+            '--filter', '-f',
+            'filters',
+            type=Filter(),
+            multiple=True,
+            help='''
+            Custom expression for filtering metrics. Multiple options will result in the logical AND
+            of the given filters, along with any other filtering options.
+            ''',
+        ),
+        click.option(
+            '--units', '-u',
+            multiple=True,
+            help='''
+            Filter to restrict statistic metrics to the given units (only applicable to metrics that
+            have been defined with the "units" label). Common units are "packets" and "bytes".
+            Multiple options will result in the logical OR of the given units. The set of all the
+            given units will be logically ANDed with other filtering options.
+            ''',
+        ),
+    )
+
 def stats_show_base_options():
     return (
         click.option(
@@ -614,6 +646,12 @@ def stats_show_base_options():
         ),
     )
 
+def clear_stats_options(fn):
+    options = (
+        device_id_option,
+    ) + stats_clear_base_options()
+    return apply_options(options, fn)
+
 def show_stats_options(fn):
     options = (
         device_id_option,
@@ -641,14 +679,17 @@ def add_batch_commands(cmd):
         return batch_stats(BatchOperation.BOP_GET, **kargs)
 
 #---------------------------------------------------------------------------------------------------
-def add_clear_commands(cmd):
-    @cmd.command
+def add_clear_commands(cmd, settings):
+    filter_help = Filter.HELP.format(**settings)
+    @cmd.command(
+        help=f'''
+Clear SmartNIC statistics.
+{filter_help}
+''',
+    )
     @clear_stats_options
     @click.pass_context
     def stats(ctx, **kargs):
-        '''
-        Clear SmartNIC statistics.
-        '''
         clear_stats(ctx.obj, **kargs)
 
 #---------------------------------------------------------------------------------------------------
@@ -668,5 +709,5 @@ Display SmartNIC statistics.
 #---------------------------------------------------------------------------------------------------
 def add_sub_commands(cmds):
     add_batch_commands(cmds.batch)
-    add_clear_commands(cmds.clear)
+    add_clear_commands(cmds.clear, cmds.settings)
     add_show_commands(cmds.show, cmds.settings)

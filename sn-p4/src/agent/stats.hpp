@@ -16,4 +16,6 @@ extern "C" {
 int get_stats_for_each_metric(const struct stats_for_each_spec* spec);
 }
 
+void clear_stats_zone(struct stats_zone* zone, const StatsFilters& filters);
+
 #endif // STATS_HPP
