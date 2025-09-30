@@ -2,8 +2,6 @@
 
 set -e -o pipefail
 
-source /sn-fw/buildinfo.env
-
 #-------------------------------------------------------------------------------
 # Build up the command line to invoke the Robot Framework engine.
 cmd=( 'robot' )
