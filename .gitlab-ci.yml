@@ -47,7 +47,7 @@ variables:
     value: au280
     description: board type for hwapi artifact
   SN_HW_APP_NAME:
-    value: esnet-smartnic-ht
+    value: hightouch
     description: app name for hwapi artifact
 
 pull_sn_hw:
