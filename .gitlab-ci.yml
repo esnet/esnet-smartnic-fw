@@ -516,20 +516,6 @@ ejfat-prod:
 trigger_sw_ht:
   extends: .trigger_sw
   variables:
-    SN_HW_EXPECTED_APP_NAME: hightouch
-    SN_SW_APP_NAME: hightouch
-  trigger:
-    project: ht/hightouch-xilinx
-    branch: main
-  needs:
-    - package
-
-# Deprecated
-#   This entry is for backward compatibility with branches that use a SN_HW_APP_NAME of esnet-smartnic-ht
-#   This entry can be safely removed any time after 1 Nov 2025.
-trigger_sw_ht_old:
-  extends: .trigger_sw
-  variables:
     SN_HW_EXPECTED_APP_NAME: esnet-smartnic-ht
     SN_SW_APP_NAME: hightouch
   trigger:
