@@ -702,6 +702,7 @@ static void stats_zone_attach(struct stats_zone* zone, struct stats_domain* doma
 
 //--------------------------------------------------------------------------------------------------
 static void stats_zone_detach(struct stats_zone* zone) {
+    size_t nvalues = zone->nvalues;
     for (struct stats_block** blk = zone->blocks; blk < &zone->blocks[zone->spec.nblocks]; ++blk) {
         stats_block_detach(*blk);
     }
@@ -721,7 +722,7 @@ static void stats_zone_detach(struct stats_zone* zone) {
     zone->next = NULL;
     zone->domain = NULL;
     zone->enabled = false;
-    domain->nvalues -= zone->nvalues;
+    domain->nvalues -= nvalues;
     stats_domain_unlock(domain);
 }
 
