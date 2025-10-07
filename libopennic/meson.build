@@ -19,11 +19,15 @@ ext_incdir = include_directories('include')
 libprom_dep = dependency('prom')
 threads_dep = dependency('threads')
 
+cc = meson.get_compiler('c')
+atomic_dep = cc.find_library('atomic')
+
 libopennic = shared_library(
   'opennic',
   sources,
   dependencies : [
     dependency('regmap'),
+    atomic_dep,
     libprom_dep,
     libsnutil_dep,
     threads_dep,

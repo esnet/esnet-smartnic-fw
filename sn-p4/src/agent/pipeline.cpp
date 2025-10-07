@@ -467,7 +467,7 @@ void SmartnicP4Impl::get_or_clear_pipeline_stats(
 
             if (pipeline->stats.counters != NULL) {
                 if (do_clear) {
-                    stats_zone_clear_metrics(pipeline->stats.counters->zone);
+                    clear_stats_zone(pipeline->stats.counters->zone, ctx.filters);
                 } else {
                     ctx.stats = resp.mutable_stats();
                     stats_zone_for_each_metric(

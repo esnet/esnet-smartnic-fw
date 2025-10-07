@@ -431,7 +431,7 @@ void SmartnicConfigImpl::get_or_clear_switch_stats(
         SwitchStatsResponse resp;
 
         if (do_clear) {
-            stats_zone_clear_metrics(zones[0]->zone);
+            clear_stats_zone(zones[0]->zone, ctx.filters);
         } else {
             ctx.stats = resp.mutable_stats();
             stats_zone_for_each_metric(zones[0]->zone, get_stats_for_each_metric, &ctx);

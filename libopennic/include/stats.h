@@ -223,6 +223,23 @@ struct stats_for_each_spec {
 };
 
 //--------------------------------------------------------------------------------------------------
+struct stats_clear_filter_spec {
+    const struct stats_domain_spec* domain;
+    const struct stats_zone_spec* zone;
+    const struct stats_block_spec* block;
+    const struct stats_metric_spec* metric;
+    const struct stats_metric_value* values;
+    size_t nvalues;
+};
+
+struct stats_clear_filter {
+    void (*setup)(const struct stats_clear_filter_spec* spec, void* arg);
+    void (*teardown)(const struct stats_clear_filter_spec* spec, void* arg);
+    bool (*match)(const struct stats_clear_filter_spec* spec, unsigned int value_idx, void* arg);
+    void* arg;
+};
+
+//--------------------------------------------------------------------------------------------------
 struct stats_zone* stats_zone_alloc(struct stats_domain* domain,
                                     const struct stats_zone_spec* spec);
 void stats_zone_free(struct stats_zone* zone);
@@ -232,7 +249,7 @@ size_t stats_zone_number_of_values(struct stats_zone* zone);
 size_t stats_zone_get_values(struct stats_zone* zone,
                              struct stats_metric_value* values, size_t nvalues);
 void stats_zone_update_metrics(struct stats_zone* zone);
-void stats_zone_clear_metrics(struct stats_zone* zone);
+void stats_zone_clear_metrics(struct stats_zone* zone, const struct stats_clear_filter* filter);
 int stats_zone_for_each_metric(struct stats_zone* zone,
                                int (*callback)(const struct stats_for_each_spec* spec),
                                void* arg);
@@ -246,7 +263,8 @@ size_t stats_domain_number_of_values(struct stats_domain* domain);
 size_t stats_domain_get_values(struct stats_domain* domain,
                                struct stats_metric_value* values, size_t nvalues);
 void stats_domain_update_metrics(struct stats_domain* domain);
-void stats_domain_clear_metrics(struct stats_domain* domain);
+void stats_domain_clear_metrics(struct stats_domain* domain,
+                                const struct stats_clear_filter* filter);
 int stats_domain_for_each_metric(struct stats_domain* domain,
                                  int (*callback)(const struct stats_for_each_spec* spec),
                                  void* arg);
