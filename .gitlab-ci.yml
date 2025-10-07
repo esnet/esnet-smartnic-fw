@@ -356,45 +356,45 @@ ejfat-staging:
     matrix:
       # ejfat-staging-dp1.es.net
 
-      # USB physical port 1 (left-most) -- temporarily plugged into lower built-in USB port
-      # USB hub logical port 3-2 (temporary)
-      # Bottom-Left FPGA card
+      # USB port 2 -- temporarily plugged into upper built-in USB port
+      # USB hub logical port 1-1.1 (temporary)
+      # Top-Left FPGA card (Chassis Slot #1)
       - GL_ENV_NAME: dp1/1/staging
         SYSTEM_HW_BOARD: au55c
         AAP_LIMIT: ejfat-staging-dp1.es.net
         EXTRA_VAR_STACK_UNIQUE: 1
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1VOLH0D0UA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:22:00"
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1KMC3RH2VA"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:21:00"
 
-      # USB port 2 -- temporarily plugged into upper built-in USB port
-      # USB hub logical port 1-1.1 (temporary)
-      # Top-Left FPGA card
+      # USB physical port 1 (left-most) -- temporarily plugged into lower built-in USB port
+      # USB hub logical port 3-2 (temporary)
+      # Bottom-Left FPGA card (Chassis Slot #2)
       - GL_ENV_NAME: dp1/2/staging
         SYSTEM_HW_BOARD: au55c
         AAP_LIMIT: ejfat-staging-dp1.es.net
         EXTRA_VAR_STACK_UNIQUE: 2
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1KMC3RH2VA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:21:00"
-
-      # USB port 3
-      # USB hub logical port 5-1
-      # Bottom-Right FPGA card
-      - GL_ENV_NAME: dp1/3/staging
-        SYSTEM_HW_BOARD: au55c
-        AAP_LIMIT: ejfat-staging-dp1.es.net
-        EXTRA_VAR_STACK_UNIQUE: 3
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1UE5CEXZ0A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1VOLH0D0UA"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:22:00"
 
       # USB port 4
       # USB hub logical port 5-2
-      # Top-Right FPGA card
+      # Top-Middle FPGA card (Chassis Slot #4)
       - GL_ENV_NAME: dp1/4/staging
         SYSTEM_HW_BOARD: au55c
         AAP_LIMIT: ejfat-staging-dp1.es.net
         EXTRA_VAR_STACK_UNIQUE: 4
         EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1MKLCIS3ZA"
         EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:82:00"
+
+      # USB port 3
+      # USB hub logical port 5-1
+      # Bottom-Middle FPGA card (Chassis Slot #5)
+      - GL_ENV_NAME: dp1/5/staging
+        SYSTEM_HW_BOARD: au55c
+        AAP_LIMIT: ejfat-staging-dp1.es.net
+        EXTRA_VAR_STACK_UNIQUE: 5
+        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1UE5CEXZ0A"
+        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
 
 ejfat-dev-multi:
   extends: .ejfat
