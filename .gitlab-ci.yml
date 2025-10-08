@@ -47,7 +47,7 @@ variables:
     value: au280
     description: board type for hwapi artifact
   SN_HW_APP_NAME:
-    value: esnet-smartnic-ht
+    value: hightouch
     description: app name for hwapi artifact
 
 pull_sn_hw:
@@ -100,7 +100,7 @@ package:
       alias: docker
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
-    PUBLISH_URI: $HSITE/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
+    PUBLISH_URI: $HSITE/$CI_PROJECT_NAMESPACE/$SN_HW_APP_NAME-fw:$CI_PIPELINE_ID-g$CI_COMMIT_SHORT_SHA
     SN_FW_GROUP: ${CI_PROJECT_NAMESPACE}
     SN_FW_REPO: ${CI_PROJECT_NAME}
     SN_FW_BRANCH: ${CI_COMMIT_BRANCH}
@@ -514,6 +514,20 @@ ejfat-prod:
       allow_failure: true
 
 trigger_sw_ht:
+  extends: .trigger_sw
+  variables:
+    SN_HW_EXPECTED_APP_NAME: hightouch
+    SN_SW_APP_NAME: hightouch
+  trigger:
+    project: ht/hightouch-xilinx
+    branch: main
+  needs:
+    - package
+
+# Deprecated
+#   This entry is for backward compatibility with branches that use a SN_HW_APP_NAME of esnet-smartnic-ht
+#   This entry can be safely removed any time after 1 Nov 2025.
+trigger_sw_ht_old:
   extends: .trigger_sw
   variables:
     SN_HW_EXPECTED_APP_NAME: esnet-smartnic-ht
