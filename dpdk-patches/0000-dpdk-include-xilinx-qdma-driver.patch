@@ -1,6 +1,17 @@
-diff -r -u dpdk-stable-22.11.2-pristine/drivers/net/meson.build dpdk-stable-22.11.2/drivers/net/meson.build
---- dpdk-stable-22.11.2-pristine/drivers/net/meson.build	2023-05-06 04:06:26.000000000 -0400
-+++ dpdk-stable-22.11.2/drivers/net/meson.build	2023-06-01 19:41:27.150015508 -0400
+diff -Naur dpdk-stable-22.11.2-pristine/config/rte_config.h dpdk-stable-22.11.2/config/rte_config.h
+--- dpdk-stable-22.11.2-pristine/config/rte_config.h	2023-05-06 08:06:26.000000000 +0000
++++ dpdk-stable-22.11.2/config/rte_config.h	2025-07-09 13:46:19.261907160 +0000
+@@ -133,4 +133,7 @@
+ /* DLB2 defines */
+ // RTE_LIBRTE_PMD_DLB2_QUELL_STATS is not set
+ 
++/* Xilinx QDMA defines */
++#define RTE_LIBRTE_QDMA_DEBUG_DRIVER 1
++
+ #endif /* _RTE_CONFIG_H_ */
+diff -Naur dpdk-stable-22.11.2-pristine/drivers/net/meson.build dpdk-stable-22.11.2/drivers/net/meson.build
+--- dpdk-stable-22.11.2-pristine/drivers/net/meson.build	2023-05-06 08:06:26.000000000 +0000
++++ dpdk-stable-22.11.2/drivers/net/meson.build	2025-07-09 13:45:14.980267127 +0000
 @@ -51,6 +51,7 @@
          'octeon_ep',
          'pcap',
@@ -9,10 +20,9 @@ diff -r -u dpdk-stable-22.11.2-pristine/drivers/net/meson.build dpdk-stable-22.1
          'qede',
          'ring',
          'sfc',
-Only in dpdk-stable-22.11.2/drivers/net: meson.build.orig
-diff -r -u dpdk-stable-22.11.2-pristine/usertools/dpdk-devbind.py dpdk-stable-22.11.2/usertools/dpdk-devbind.py
---- dpdk-stable-22.11.2-pristine/usertools/dpdk-devbind.py	2023-05-06 04:06:26.000000000 -0400
-+++ dpdk-stable-22.11.2/usertools/dpdk-devbind.py	2023-06-01 19:41:27.150015508 -0400
+diff -Naur dpdk-stable-22.11.2-pristine/usertools/dpdk-devbind.py dpdk-stable-22.11.2/usertools/dpdk-devbind.py
+--- dpdk-stable-22.11.2-pristine/usertools/dpdk-devbind.py	2023-05-06 08:06:26.000000000 +0000
++++ dpdk-stable-22.11.2/usertools/dpdk-devbind.py	2025-07-09 13:45:14.984266980 +0000
 @@ -75,7 +75,13 @@
  virtio_blk = {'Class': '01', 'Vendor': "1af4", 'Device': '1001,1042',
                      'SVendor': None, 'SDevice': None}
