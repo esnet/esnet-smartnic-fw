@@ -7,6 +7,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <regex>
 #include <vector>
 #include <unistd.h>
 
@@ -50,6 +51,12 @@ using namespace std;
                 "abc",
                 "def"
             ]
+        },
+        "debug": {
+            "flags": [
+                "first-flag",
+                "second-flag"
+            ]
         }
     }
 }
@@ -58,6 +65,7 @@ using namespace std;
 #define HELP_CONFIG_TLS_CERT_CHAIN "{\"server\":{\"tls\":{\"cert-chain\":\"<PATH-TO-PEM-FILE>\"}}}"
 #define HELP_CONFIG_TLS_KEY        "{\"server\":{\"tls\":{\"key\":\"<PATH-TO-PEM-FILE>\"}}}"
 #define HELP_CONFIG_AUTH_TOKENS    "{\"server\":{\"auth\":{\"tokens\":[\"<TOKEN1>\", ...]}}}"
+#define HELP_CONFIG_DEBUG_FLAGS    "{\"server\":{\"debug\":{\"flags\":[\"<FLAG1>\", ...]}}}"
 
 #define ENV_VAR_ADDRESS         "SN_CFG_SERVER_ADDRESS"
 #define ENV_VAR_PORT            "SN_CFG_SERVER_PORT"
@@ -65,6 +73,7 @@ using namespace std;
 #define ENV_VAR_TLS_CERT_CHAIN  "SN_CFG_SERVER_TLS_CERT_CHAIN"
 #define ENV_VAR_TLS_KEY         "SN_CFG_SERVER_TLS_KEY"
 #define ENV_VAR_AUTH_TOKENS     "SN_CFG_SERVER_AUTH_TOKENS"
+#define ENV_VAR_DEBUG_FLAGS     "SN_CFG_SERVER_DEBUG_FLAGS"
 
 //--------------------------------------------------------------------------------------------------
 struct Arguments {
@@ -83,6 +92,8 @@ struct Arguments {
 
         bool no_config_file;
         string config_file;
+
+        vector<string> debug_flags;
     } server;
 };
 
@@ -93,6 +104,7 @@ struct Command {
 
 //--------------------------------------------------------------------------------------------------
 SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
+                                       const vector<string>& debug_flags,
                                        unsigned int prometheus_port) {
     int rv = prom_collector_registry_default_init();
     if (rv != 0) {
@@ -194,7 +206,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         exit(EXIT_FAILURE);
     }
 
-    init_server();
+    init_server(debug_flags);
 
     SERVER_LOG_LINE_INIT(ctor, INFO, "Starting statistics collection for server");
     stats_domain_clear_metrics(server_stats.domain, NULL);
@@ -325,6 +337,18 @@ static bool load_config_file(const string& path, Json::Value& config) {
 }
 
 //--------------------------------------------------------------------------------------------------
+static void parse_env_list(const vector<string>& in_list, vector<string>& out_list) {
+    regex delim_re(":");
+    for (auto item : in_list) {
+        sregex_token_iterator parts(item.begin(), item.end(), delim_re, -1);
+        sregex_token_iterator parts_end;
+        for (; parts != parts_end; ++parts) {
+            out_list.push_back(*parts);
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
 static int agent_server_run(const Arguments& args) {
     // Load the configuration file.
     Json::Value config;
@@ -338,7 +362,29 @@ static int agent_server_run(const Arguments& args) {
     }
 
     auto config_auth = config["auth"];
+    auto config_debug = config["debug"];
     auto config_tls = config["tls"];
+
+    // Setup the debug flags to be enabled during init.
+    vector<string> debug_flags;
+    if (args.server.debug_flags.empty()) { // Get default from config file.
+        auto config_debug_flags = config_debug["flags"];
+        if (config_debug_flags != Json::Value::null) {
+            if (!config_debug_flags.isArray()) {
+                SERVER_LOG_LINE_INIT(agent, ERROR,
+                    "Invalid debug flags list. Specify the debug flags to use with one or more "
+                    "--debug-flag options, in the environment as " ENV_VAR_DEBUG_FLAGS " or add "
+                    "to the config file as " HELP_CONFIG_DEBUG_FLAGS);
+                exit(EXIT_FAILURE);
+            }
+
+            for (auto flag : config_debug_flags) {
+                debug_flags.push_back(flag.asString());
+            }
+        }
+    } else {
+        parse_env_list(args.server.debug_flags, debug_flags);
+    }
 
     // Setup the RPC authentication token(s).
     vector<string> auth_tokens = args.server.auth_tokens;
@@ -411,7 +457,7 @@ static int agent_server_run(const Arguments& args) {
     builder.AddListeningPort(address, credentials);
 
     // Attach the gRPC configuration service.
-    SmartnicConfigImpl service(args.server.bus_ids, args.server.prometheus_port);
+    SmartnicConfigImpl service(args.server.bus_ids, debug_flags, args.server.prometheus_port);
     builder.RegisterService(&service);
 
     // Create the server and bind it's address.
@@ -491,6 +537,13 @@ static void agent_server_add(CLI::App& app, Arguments::Server& args, vector<Comm
         "Server JSON configuration file.")->
         default_val(args.config_file);
 
+    cmd->add_option(
+        "--debug-flag", args.debug_flags,
+        "Name of a debug flag to enable automatically during init. By default, debug flags are "
+        "disabled. Can also be set as a colon-separated (:) list via the " ENV_VAR_DEBUG_FLAGS
+        " environment variable. Default taken from config file as " HELP_CONFIG_DEBUG_FLAGS ".")->
+        envname(ENV_VAR_DEBUG_FLAGS);
+
     // Setup the positional arguments.
     cmd->add_option(
         "bus-ids", args.bus_ids,
@@ -526,6 +579,8 @@ int main(int argc, char *argv[]) {
 
             .no_config_file = false,
             .config_file = "sn-cfg.json",
+
+            .debug_flags = {},
         },
     };
 

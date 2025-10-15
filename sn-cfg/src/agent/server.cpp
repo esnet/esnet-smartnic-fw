@@ -1,5 +1,6 @@
 #include "agent.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 #include <iomanip>
@@ -256,7 +257,7 @@ void SmartnicConfigImpl::init_server_stats(void) {
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::init_server(void) {
+void SmartnicConfigImpl::init_server(const vector<string>& debug_flags) {
     auto rv = timespec_get(&timestamp.start_wall, TIME_UTC);
     if (rv != TIME_UTC) {
         SERVER_LOG_LINE_INIT(server, ERROR, "timespec_get failed with " << rv);
@@ -283,6 +284,48 @@ void SmartnicConfigImpl::init_server(void) {
     for (auto flag = ServerControlStatsFlag_MIN + 1; flag <= ServerControlStatsFlag_MAX; ++flag) {
         if (ServerControlStatsFlag_IsValid(flag)) {
             control.stats_flags.set(flag);
+        }
+    }
+
+    for (auto flag : debug_flags) {
+        if (flag == "all") {
+            SERVER_LOG_LINE_INIT(server, INFO, "Enabling all debug flags:");
+            for (auto id = ServerDebugFlag_MIN + 1; id <= ServerDebugFlag_MAX; ++id) {
+                if (ServerDebugFlag_IsValid(id)) {
+                    SERVER_LOG_LINE_INIT(server, INFO,
+                        "--> " << debug_flag_label((ServerDebugFlag)id));
+                    debug.flags.set(id);
+                }
+            }
+            break;
+        }
+
+        bool matched = false;
+        for (auto id = ServerDebugFlag_MIN + 1; id <= ServerDebugFlag_MAX; ++id) {
+            if (!ServerDebugFlag_IsValid(id)) {
+                continue;
+            }
+
+            const char* label = debug_flag_label((ServerDebugFlag)id);
+            string name(label);
+
+            if (flag != name) {
+                transform(name.begin(), name.end(), name.begin(),
+                          [](char c){ return tolower(c); });
+                replace(name.begin(), name.end(), '_', '-');
+            }
+
+            if (flag == name) {
+                SERVER_LOG_LINE_INIT(server, INFO,
+                    "Enabled debug flag: " << label << " [" << flag << "]");
+                debug.flags.set(id);
+                matched = true;
+                break;
+            }
+        }
+
+        if (!matched) {
+            SERVER_LOG_LINE_INIT(server, INFO, "Unknown debug flag: " << flag);
         }
     }
 }
