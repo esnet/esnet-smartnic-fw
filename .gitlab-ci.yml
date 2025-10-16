@@ -324,7 +324,7 @@ ftap:
     EXTRA_VAR_STACK_ROOT_PATH: /usr/local/ejfat/${EXTRA_VAR_STACK_UNIQUE}
     EXTRA_VAR_STACK_COMPOSE_PROFILES: "smartnic-mgr-dpdk-portlink,smartnic-ingress,smartnic-metrics"
   rules:
-    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
       when: never
     - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
       when: manual
