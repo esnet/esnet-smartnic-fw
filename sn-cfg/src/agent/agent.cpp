@@ -387,22 +387,24 @@ static int agent_server_run(const Arguments& args) {
     }
 
     // Setup the RPC authentication token(s).
-    vector<string> auth_tokens = args.server.auth_tokens;
-    if (auth_tokens.empty()) { // Get default from config file.
+    vector<string> auth_tokens;
+    if (args.server.auth_tokens.empty()) { // Get default from config file.
         auto config_auth_tokens = config_auth["tokens"];
         if (config_auth_tokens == Json::Value::null ||
             !config_auth_tokens.isArray() ||
             config_auth_tokens.size() < 1) {
             SERVER_LOG_LINE_INIT(agent, ERROR,
                 "Missing tokens needed for authenticating clients. Specify the tokens to "
-                "use with one or more --auth-token options or add to the config file as "
-                HELP_CONFIG_AUTH_TOKENS);
+                "use with one or more --auth-token options, in the envionment as "
+                ENV_VAR_AUTH_TOKENS " or add to the config file as " HELP_CONFIG_AUTH_TOKENS);
             exit(EXIT_FAILURE);
         }
 
         for (auto token : config_auth_tokens) {
             auth_tokens.push_back(token.asString());
         }
+    } else {
+        parse_env_list(args.server.auth_tokens, auth_tokens);
     }
 
     // Setup the server's certificate chain to send to clients during TLS handshake.
@@ -525,7 +527,7 @@ static void agent_server_add(CLI::App& app, Arguments::Server& args, vector<Comm
     cmd->add_option(
         "--auth-token", args.auth_tokens,
         "Token to use for authenticating remote procedure calls received from clients. Repeat for "
-        "each token. Can also be set as a space-separated list via the " ENV_VAR_AUTH_TOKENS
+        "each token. Can also be set as a colon-separated (:) list via the " ENV_VAR_AUTH_TOKENS
         " environment variable. Default taken from config file as " HELP_CONFIG_AUTH_TOKENS ".")->
         envname(ENV_VAR_AUTH_TOKENS);
 
