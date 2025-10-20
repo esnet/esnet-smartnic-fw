@@ -18,7 +18,10 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 class SmartnicConfigImpl final : public SmartnicConfig::Service {
 public:
-    explicit SmartnicConfigImpl(const vector<string>& bus_ids, unsigned int prometheus_port);
+    explicit SmartnicConfigImpl(
+        const vector<string>& bus_ids,
+        const vector<string>& debug_flags,
+        unsigned int prometheus_port);
     ~SmartnicConfigImpl();
 
     // Batching of multiple RPCs.
@@ -215,7 +218,7 @@ private:
     void batch_clear_port_stats(
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
-    void init_server(void);
+    void init_server(const vector<string>& debug_flags);
     void init_server_stats(void);
     void deinit_server(void);
     void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
