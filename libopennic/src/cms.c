@@ -424,6 +424,20 @@ static volatile struct cms_mailbox* cms_mailbox_post(volatile struct cms_block* 
             log_err(EIO, "packet error %u (%s) [attempt=%u/%u]",
                     err, cms_msg_error_to_str(err), attempt, MAX_ATTEMPTS);
             mailbox = NULL;
+
+            /*
+             * By AMD/Xilinx recommendation, delay a little after detecting a QSFP related failure
+             * (refer to https://adaptivesupport.amd.com/s/article/000034270?language=en_US).
+             *
+             * Through experimentation:
+             * - A delay of 100ms was no different from the recommended delay of 1s.
+             * - A delay >1s was no different from 1s.
+             * - A delay <100ms resulted in increased rate of failure.
+             * - A delay <10ms was no different from no delay.
+             */
+            if (err == cms_msg_error_QSFP_FAIL) {
+                usleep(100 * 1000);
+            }
             // Fall through to capture error codes.
         }
 
