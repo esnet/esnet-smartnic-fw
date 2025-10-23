@@ -385,48 +385,59 @@ static inline volatile struct cms_mailbox* cms_mailbox_get(volatile struct cms_b
 static volatile struct cms_mailbox* cms_mailbox_post(volatile struct cms_block* cms,
                                                      const struct cms_mailbox* req,
                                                      size_t nwords) {
-    if (!cms_mailbox_is_ready(cms)) {
-        log_err(EBUSY, "mailbox ready timeout");
-        return NULL;
-    }
+#define MAX_ATTEMPTS 5
 
-    cms_error_clear(cms);
-    if (!cms_error_is_cleared(cms)) {
-        log_err(EBUSY, "error clear timeout");
-        return NULL;
-    }
+    volatile struct cms_mailbox* mailbox = NULL;
+    for (unsigned int attempt = 1; mailbox == NULL && attempt <= MAX_ATTEMPTS; ++attempt) {
+        if (!cms_mailbox_is_ready(cms)) {
+            log_err(EBUSY, "mailbox ready timeout [attempt=%u/%u]", attempt, MAX_ATTEMPTS);
+            break;
+        }
 
-    volatile struct cms_mailbox* mailbox = cms_mailbox_get(cms);
-    mailbox->header = req->header;
-    for (unsigned int n = 0; n < nwords; ++n) {
-        mailbox->payload[n] = req->payload[n];
-    }
-    barrier();
+        cms_error_clear(cms);
+        if (!cms_error_is_cleared(cms)) {
+            log_err(EBUSY, "error clear timeout [attempt=%u/%u]", attempt, MAX_ATTEMPTS);
+            break;
+        }
 
-    union cms_control_reg control = {._v = cms->control_reg._v};
-    control.mailbox_msg_status = 1;
-    cms->control_reg._v = control._v;
-    barrier();
+        mailbox = cms_mailbox_get(cms);
+        mailbox->header = req->header;
+        for (unsigned int n = 0; n < nwords; ++n) {
+            mailbox->payload[n] = req->payload[n];
+        }
+        barrier();
 
-    if (!cms_mailbox_is_ready(cms)) {
-        log_err(EBUSY, "mailbox done timeout");
-        mailbox = NULL;
-    }
+        union cms_control_reg control = {._v = cms->control_reg._v};
+        control.mailbox_msg_status = 1;
+        cms->control_reg._v = control._v;
+        barrier();
 
-    union cms_error_reg error = {._v = cms->error_reg._v};
-    if (error.pkt_error) {
-        enum cms_msg_error err = cms->host_msg_error_reg;
-        log_err(EIO, "packet error %u (%s)", err, cms_msg_error_to_str(err));
-        mailbox = NULL;
-    }
+        if (!cms_mailbox_is_ready(cms)) {
+            log_err(EBUSY, "mailbox done timeout [attempt=%u/%u]", attempt, MAX_ATTEMPTS);
+            mailbox = NULL;
+            // Fall through to capture error codes.
+        }
 
-    if (error.sat_ctrl_err) {
-        log_err(EIO, "satellite controller error %u (%s)", error.sat_ctrl_err_code,
-                cms_sc_error_to_str(error.sat_ctrl_err_code));
-        mailbox = NULL;
+        union cms_error_reg error = {._v = cms->error_reg._v};
+        if (error.pkt_error) {
+            enum cms_msg_error err = cms->host_msg_error_reg;
+            log_err(EIO, "packet error %u (%s) [attempt=%u/%u]",
+                    err, cms_msg_error_to_str(err), attempt, MAX_ATTEMPTS);
+            mailbox = NULL;
+            // Fall through to capture error codes.
+        }
+
+        if (error.sat_ctrl_err) {
+            log_err(EIO, "satellite controller error %u (%s) [attempt=%u/%u]",
+                    error.sat_ctrl_err_code, cms_sc_error_to_str(error.sat_ctrl_err_code),
+                    attempt, MAX_ATTEMPTS);
+            mailbox = NULL;
+        }
     }
 
     return mailbox;
+
+#undef MAX_ATTEMPTS
 }
 
 //--------------------------------------------------------------------------------------------------
