@@ -148,7 +148,8 @@ private:
     void batch_delete_table_rule(
         const TableRuleRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
-    void init_server(const vector<string>& debug_flags);
+    void init_server(void);
+    void init_server_debug(const vector<string>& debug_flags);
     void init_server_stats(void);
     void deinit_server(void);
     void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
