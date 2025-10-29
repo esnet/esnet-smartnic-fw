@@ -18,12 +18,17 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 const char* SmartnicConfigImpl::debug_flag_label(const ServerDebugFlag flag) {
     switch (flag) {
-    case ServerDebugFlag::DEBUG_FLAG_BATCH: return "BATCH";
-    case ServerDebugFlag::DEBUG_FLAG_STATS: return "STATS";
+#define CASE(_name) \
+    case ServerDebugFlag::DEBUG_FLAG_##_name: return #_name
+
+    CASE(BATCH);
+    CASE(STATS);
 
     case ServerDebugFlag::DEBUG_FLAG_UNKNOWN:
     default:
         break;
+
+#undef CASE
     }
     return "UNKNOWN";
 }
@@ -257,7 +262,7 @@ void SmartnicConfigImpl::init_server_stats(void) {
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::init_server(const vector<string>& debug_flags) {
+void SmartnicConfigImpl::init_server(void) {
     auto rv = timespec_get(&timestamp.start_wall, TIME_UTC);
     if (rv != TIME_UTC) {
         SERVER_LOG_LINE_INIT(server, ERROR, "timespec_get failed with " << rv);
@@ -286,7 +291,10 @@ void SmartnicConfigImpl::init_server(const vector<string>& debug_flags) {
             control.stats_flags.set(flag);
         }
     }
+}
 
+//--------------------------------------------------------------------------------------------------
+void SmartnicConfigImpl::init_server_debug(const vector<string>& debug_flags) {
     for (auto flag : debug_flags) {
         if (flag == "all") {
             SERVER_LOG_LINE_INIT(server, INFO, "Enabling all debug flags:");
