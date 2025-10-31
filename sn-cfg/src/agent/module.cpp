@@ -130,6 +130,9 @@ void SmartnicConfigImpl::init_module(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
+        if (!control.stats_flags.test(ServerControlStatsFlag::CTRL_STATS_FLAG_ZONE_MODULE_MONITORS)) {
+            stats_zone_disable(stats->zone);
+        }
         dev->stats.zones[DeviceStatsZone::MODULE_MONITORS].push_back(stats);
         SERVER_LOG_LINE_INIT(module, INFO,
             "Setup monitors for module ID " << mod_id << " on device " << dev->bus_id);

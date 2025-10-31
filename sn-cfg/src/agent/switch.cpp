@@ -26,6 +26,9 @@ void SmartnicConfigImpl::init_switch(Device* dev) {
         exit(EXIT_FAILURE);
     }
 
+    if (!control.stats_flags.test(ServerControlStatsFlag::CTRL_STATS_FLAG_ZONE_SWITCH_COUNTERS)) {
+        stats_zone_disable(stats->zone);
+    }
     dev->stats.zones[DeviceStatsZone::SWITCH_COUNTERS].push_back(stats);
     SERVER_LOG_LINE_INIT(switch, INFO, "Setup counters for switch on device " << dev->bus_id);
 }

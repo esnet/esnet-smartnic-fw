@@ -34,6 +34,31 @@ const char* SmartnicConfigImpl::debug_flag_label(const ServerDebugFlag flag) {
 }
 
 //--------------------------------------------------------------------------------------------------
+const char* SmartnicConfigImpl::stats_flag_label(const ServerControlStatsFlag flag) {
+    switch (flag) {
+#define CASE(_name) \
+    case ServerControlStatsFlag::CTRL_STATS_FLAG_##_name: return #_name
+
+    CASE(DOMAIN_COUNTERS);
+    CASE(DOMAIN_MONITORS);
+    CASE(DOMAIN_MODULES);
+    CASE(ZONE_CARD_MONITORS);
+    CASE(ZONE_SYSMON_MONITORS);
+    CASE(ZONE_HOST_COUNTERS);
+    CASE(ZONE_PORT_COUNTERS);
+    CASE(ZONE_SWITCH_COUNTERS);
+    CASE(ZONE_MODULE_MONITORS);
+
+    case ServerControlStatsFlag::CTRL_STATS_FLAG_UNKNOWN:
+    default:
+        break;
+
+#undef CASE
+    }
+    return "UNKNOWN";
+}
+
+//--------------------------------------------------------------------------------------------------
 bool SmartnicConfigImpl::get_server_times(struct timespec* start, struct timespec* up) {
     if (start != NULL) {
         start->tv_sec = timestamp.start_wall.tv_sec;
@@ -284,17 +309,12 @@ void SmartnicConfigImpl::init_server(void) {
         timestamp.start_wall.tv_sec << "s." <<
         timestamp.start_wall.tv_nsec << "ns" <<
         "]");
-
-    // All stats domains are enabled by default.
-    for (auto flag = ServerControlStatsFlag_MIN + 1; flag <= ServerControlStatsFlag_MAX; ++flag) {
-        if (ServerControlStatsFlag_IsValid(flag)) {
-            control.stats_flags.set(flag);
-        }
-    }
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::init_server_debug(const vector<string>& debug_flags) {
+void SmartnicConfigImpl::init_server_debug(const vector<string>& debug_flags,
+                                           const vector<string>& stats_flags_disable) {
+    // Selectively enable the requested debug flags.
     for (auto flag : debug_flags) {
         if (flag == "all") {
             SERVER_LOG_LINE_INIT(server, INFO, "Enabling all debug flags:");
@@ -334,6 +354,56 @@ void SmartnicConfigImpl::init_server_debug(const vector<string>& debug_flags) {
 
         if (!matched) {
             SERVER_LOG_LINE_INIT(server, INFO, "Unknown debug flag: " << flag);
+        }
+    }
+
+    // All stats are enabled by default.
+    for (auto id = ServerControlStatsFlag_MIN + 1; id <= ServerControlStatsFlag_MAX; ++id) {
+        if (ServerControlStatsFlag_IsValid(id)) {
+            control.stats_flags.set(id);
+        }
+    }
+
+    // Selectively disable the requested stats flags.
+    for (auto flag : stats_flags_disable) {
+        if (flag == "all") {
+            SERVER_LOG_LINE_INIT(server, INFO, "Disabling all stats flags:");
+            for (auto id = ServerControlStatsFlag_MIN + 1; id <= ServerControlStatsFlag_MAX; ++id) {
+                if (ServerControlStatsFlag_IsValid(id)) {
+                    SERVER_LOG_LINE_INIT(server, INFO,
+                        "--> " << stats_flag_label((ServerControlStatsFlag)id));
+                    control.stats_flags.reset(id);
+                }
+            }
+            break;
+        }
+
+        bool matched = false;
+        for (auto id = ServerControlStatsFlag_MIN + 1; id <= ServerControlStatsFlag_MAX; ++id) {
+            if (!ServerControlStatsFlag_IsValid(id)) {
+                continue;
+            }
+
+            const char* label = stats_flag_label((ServerControlStatsFlag)id);
+            string name(label);
+
+            if (flag != name) {
+                transform(name.begin(), name.end(), name.begin(),
+                          [](char c){ return tolower(c); });
+                replace(name.begin(), name.end(), '_', '-');
+            }
+
+            if (flag == name) {
+                SERVER_LOG_LINE_INIT(server, INFO,
+                    "Disabled stats flag: " << label << " [" << flag << "]");
+                control.stats_flags.reset(id);
+                matched = true;
+                break;
+            }
+        }
+
+        if (!matched) {
+            SERVER_LOG_LINE_INIT(server, INFO, "Unknown stats flag: " << flag);
         }
     }
 }
@@ -470,11 +540,12 @@ Status SmartnicConfigImpl::GetServerConfig(
 }
 
 //--------------------------------------------------------------------------------------------------
-ErrorCode SmartnicConfigImpl::apply_server_control_stats_flag(
-   ServerControlStatsFlag flag,
-   bool enable) {
-    auto domain = DeviceStatsDomain::NDOMAINS;
-    auto zone = DeviceStatsZone::NZONES;
+bool SmartnicConfigImpl::convert_server_control_stats_flag(
+    ServerControlStatsFlag flag,
+    DeviceStatsDomain& domain,
+    DeviceStatsZone& zone) {
+    domain = DeviceStatsDomain::NDOMAINS;
+    zone = DeviceStatsZone::NZONES;
     switch (flag) {
 #define CASE_DOMAIN_FLAG(_flag) \
     case ServerControlStatsFlag::CTRL_STATS_FLAG_DOMAIN_##_flag: \
@@ -497,10 +568,23 @@ ErrorCode SmartnicConfigImpl::apply_server_control_stats_flag(
     CASE_ZONE_FLAG(MODULE_MONITORS);
 
     default:
-        return ErrorCode::EC_SERVER_INVALID_CONTROL_STATS_FLAG;
+        return false;
 
 #undef CASE_DOMAIN_FLAG
 #undef CASE_ZONE_FLAG
+    }
+
+    return true;
+}
+
+//--------------------------------------------------------------------------------------------------
+ErrorCode SmartnicConfigImpl::apply_server_control_stats_flag(
+    ServerControlStatsFlag flag,
+    bool enable) {
+    DeviceStatsDomain domain;
+    DeviceStatsZone zone;
+    if (!convert_server_control_stats_flag(flag, domain, zone)) {
+        return ErrorCode::EC_SERVER_INVALID_CONTROL_STATS_FLAG;
     }
 
     if (enable) {

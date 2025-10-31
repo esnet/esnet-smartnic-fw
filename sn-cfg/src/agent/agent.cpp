@@ -57,6 +57,12 @@ using namespace std;
                 "first-flag",
                 "second-flag"
             ]
+        },
+        "stats": {
+            "flags-disable": [
+                "first-flag",
+                "second-flag"
+            ]
         }
     }
 }
@@ -66,14 +72,17 @@ using namespace std;
 #define HELP_CONFIG_TLS_KEY        "{\"server\":{\"tls\":{\"key\":\"<PATH-TO-PEM-FILE>\"}}}"
 #define HELP_CONFIG_AUTH_TOKENS    "{\"server\":{\"auth\":{\"tokens\":[\"<TOKEN1>\", ...]}}}"
 #define HELP_CONFIG_DEBUG_FLAGS    "{\"server\":{\"debug\":{\"flags\":[\"<FLAG1>\", ...]}}}"
+#define HELP_CONFIG_STATS_FLAGS_DISABLE \
+    "{\"server\":{\"stats\":{\"flags-disable\":[\"<FLAG1>\", ...]}}}"
 
-#define ENV_VAR_ADDRESS         "SN_CFG_SERVER_ADDRESS"
-#define ENV_VAR_PORT            "SN_CFG_SERVER_PORT"
-#define ENV_VAR_PROMETHEUS_PORT "SN_CFG_SERVER_PROMETHEUS_PORT"
-#define ENV_VAR_TLS_CERT_CHAIN  "SN_CFG_SERVER_TLS_CERT_CHAIN"
-#define ENV_VAR_TLS_KEY         "SN_CFG_SERVER_TLS_KEY"
-#define ENV_VAR_AUTH_TOKENS     "SN_CFG_SERVER_AUTH_TOKENS"
-#define ENV_VAR_DEBUG_FLAGS     "SN_CFG_SERVER_DEBUG_FLAGS"
+#define ENV_VAR_ADDRESS             "SN_CFG_SERVER_ADDRESS"
+#define ENV_VAR_PORT                "SN_CFG_SERVER_PORT"
+#define ENV_VAR_PROMETHEUS_PORT     "SN_CFG_SERVER_PROMETHEUS_PORT"
+#define ENV_VAR_TLS_CERT_CHAIN      "SN_CFG_SERVER_TLS_CERT_CHAIN"
+#define ENV_VAR_TLS_KEY             "SN_CFG_SERVER_TLS_KEY"
+#define ENV_VAR_AUTH_TOKENS         "SN_CFG_SERVER_AUTH_TOKENS"
+#define ENV_VAR_DEBUG_FLAGS         "SN_CFG_SERVER_DEBUG_FLAGS"
+#define ENV_VAR_STATS_FLAGS_DISABLE "SN_CFG_SERVER_STATS_FLAGS_DISABLE"
 
 //--------------------------------------------------------------------------------------------------
 struct Arguments {
@@ -94,6 +103,7 @@ struct Arguments {
         string config_file;
 
         vector<string> debug_flags;
+        vector<string> stats_flags_disable;
     } server;
 };
 
@@ -105,6 +115,7 @@ struct Command {
 //--------------------------------------------------------------------------------------------------
 SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
                                        const vector<string>& debug_flags,
+                                       const vector<string>& stats_flags_disable,
                                        unsigned int prometheus_port) {
     int rv = prom_collector_registry_default_init();
     if (rv != 0) {
@@ -114,7 +125,7 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
     prometheus.registry = PROM_COLLECTOR_REGISTRY_DEFAULT;
 
     // Process debug flags early to allow them to be used during device initialization.
-    init_server_debug(debug_flags);
+    init_server_debug(debug_flags, stats_flags_disable);
 
     for (auto bus_id : bus_ids) {
         SERVER_LOG_LINE_INIT(ctor, INFO, "Mapping PCIe BAR2 of device " << bus_id);
@@ -146,28 +157,39 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
             },
         };
 
+        bool domain_enabled[DeviceStatsDomain::NDOMAINS];
         for (auto dom = 0; dom < DeviceStatsDomain::NDOMAINS; ++dom) {
             const char* dname = device_stats_domain_name((DeviceStatsDomain)dom);
             unsigned int seconds;
+            ServerControlStatsFlag flag;
             switch (dom) {
             case DeviceStatsDomain::COUNTERS:
                 seconds = 1;
+                flag = ServerControlStatsFlag::CTRL_STATS_FLAG_DOMAIN_COUNTERS;
+                break;
+
+            case DeviceStatsDomain::MONITORS:
+                seconds = 10;
+                flag = ServerControlStatsFlag::CTRL_STATS_FLAG_DOMAIN_MONITORS;
                 break;
 
             case DeviceStatsDomain::MODULES:
                 seconds = 20;
+                flag = ServerControlStatsFlag::CTRL_STATS_FLAG_DOMAIN_MODULES;
                 break;
 
-            case DeviceStatsDomain::MONITORS:
+            case DeviceStatsDomain::NDOMAINS:
             default:
-                seconds = 10;
-                break;
+                SERVER_LOG_LINE_INIT(ctor, ERROR, "Missing config for unknown domain " << dom);
+                exit(EXIT_FAILURE);
             }
+            domain_enabled[dom] = control.stats_flags.test(flag);
             spec.thread.interval_ms = seconds * 1000;
             spec.thread.name = dname;
 
             SERVER_LOG_LINE_INIT(ctor, INFO,
-                "Allocating statistics domain '" << dname << "' on device " << bus_id);
+                "Allocating statistics domain '" << dname << "' [" <<
+                (domain_enabled[dom] ? "en" : "dis") << "abled] on device " << bus_id);
             dev->stats.domains[dom] = stats_domain_alloc(&spec);
             if (dev->stats.domains[dom] == NULL) {
                 SERVER_LOG_LINE_INIT(ctor, ERROR,
@@ -183,9 +205,12 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         init_switch(dev);
 
         SERVER_LOG_LINE_INIT(ctor, INFO, "Starting statistics collection on device " << bus_id);
-        for (auto domain : dev->stats.domains) {
-            stats_domain_clear_metrics(domain, NULL);
-            stats_domain_start(domain);
+        for (auto dom = 0; dom < DeviceStatsDomain::NDOMAINS; ++dom) {
+            if (domain_enabled[dom]) {
+                auto domain = dev->stats.domains[dom];
+                stats_domain_clear_metrics(domain, NULL);
+                stats_domain_start(domain);
+            }
         }
 
         devices.push_back(dev);
@@ -366,6 +391,7 @@ static int agent_server_run(const Arguments& args) {
 
     auto config_auth = config["auth"];
     auto config_debug = config["debug"];
+    auto config_stats = config["stats"];
     auto config_tls = config["tls"];
 
     // Setup the debug flags to be enabled during init.
@@ -387,6 +413,28 @@ static int agent_server_run(const Arguments& args) {
         }
     } else {
         parse_env_list(args.server.debug_flags, debug_flags);
+    }
+
+    // Setup the stats flags to be disabled during init.
+    vector<string> stats_flags_disable;
+    if (args.server.stats_flags_disable.empty()) { // Get default from config file.
+        auto config_stats_flags_disable = config_stats["flags-disable"];
+        if (config_stats_flags_disable != Json::Value::null) {
+            if (!config_stats_flags_disable.isArray()) {
+                SERVER_LOG_LINE_INIT(agent, ERROR,
+                    "Invalid list of stats flags to disable. Specify the flags with one "
+                    "or more --stats-flag-disable options, in the environment as "
+                    ENV_VAR_STATS_FLAGS_DISABLE " or add to the config file as "
+                    HELP_CONFIG_STATS_FLAGS_DISABLE);
+                exit(EXIT_FAILURE);
+            }
+
+            for (auto flag : config_stats_flags_disable) {
+                stats_flags_disable.push_back(flag.asString());
+            }
+        }
+    } else {
+        parse_env_list(args.server.stats_flags_disable, stats_flags_disable);
     }
 
     // Setup the RPC authentication token(s).
@@ -462,7 +510,8 @@ static int agent_server_run(const Arguments& args) {
     builder.AddListeningPort(address, credentials);
 
     // Attach the gRPC configuration service.
-    SmartnicConfigImpl service(args.server.bus_ids, debug_flags, args.server.prometheus_port);
+    SmartnicConfigImpl service(args.server.bus_ids, debug_flags, stats_flags_disable,
+                               args.server.prometheus_port);
     builder.RegisterService(&service);
 
     // Create the server and bind it's address.
@@ -548,6 +597,13 @@ static void agent_server_add(CLI::App& app, Arguments::Server& args, vector<Comm
         "disabled. Can also be set as a colon-separated (:) list via the " ENV_VAR_DEBUG_FLAGS
         " environment variable. Default taken from config file as " HELP_CONFIG_DEBUG_FLAGS ".")->
         envname(ENV_VAR_DEBUG_FLAGS);
+    cmd->add_option(
+        "--stats-flag-disable", args.stats_flags_disable,
+        "Name of a stats flag to disable automatically during init. By default, stats flags are "
+        "enabled. Can also be set as a colon-separated (:) list via the " ENV_VAR_STATS_FLAGS_DISABLE
+        " environment variable. Default taken from config file as "
+        HELP_CONFIG_STATS_FLAGS_DISABLE ".")->
+        envname(ENV_VAR_STATS_FLAGS_DISABLE);
 
     // Setup the positional arguments.
     cmd->add_option(
@@ -586,6 +642,7 @@ int main(int argc, char *argv[]) {
             .config_file = "sn-cfg.json",
 
             .debug_flags = {},
+            .stats_flags_disable = {},
         },
     };
 
