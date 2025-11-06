@@ -677,6 +677,7 @@ services:
       - SN_P4_CLI_ADDRESS=smartnic-p4
       - SN_P4_CLI_TLS_INSECURE=true
       - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
+      - SN_TEST_SUITE_NAME=${SN_TEST_SUITE_NAME:-esnet-smartnic-fw}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev

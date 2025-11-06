@@ -10,7 +10,7 @@ cmd=( 'robot' )
 cmd+=( '--outputdir=/scratch' )
 
 # Give the aggregated test suite a sane name.
-cmd+=( "--name=esnet-smartnic-fw-${SN_HW_BOARD}-${SN_HW_APP_NAME}-${SN_HW_VER}" )
+cmd+=( "--name=${SN_TEST_SUITE_NAME}" )
 
 # Setup the Python module search paths.
 cmd+=( $(find /test -type d -name library | sed -e 's:^:--pythonpath=:') )
