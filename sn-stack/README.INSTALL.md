@@ -753,5 +753,6 @@ There are two primary methods for developing tests:
     This method makes use of extra environment variables to point the container startup at alternate paths. They are:
     - `SN_FW_TEST_ROOT`: Path to alternate firmware test files to be mounted at `/test/fw` within the container.
     - `SN_HW_TEST_ROOT`: Path to alternate hardware test files to be mounted at `/test/hw` within the container.
+    - `SN_APP_TEST_ROOT`: Path to alternate application test files to be mounted at `/test/app` within the container.
 
 In both cases, any new Python package dependencies added to a `pip-requirements.txt` file can be installed into the container prior to executing the tests when the `--pip-install` (`-p`) option is passed to `./run-tests.sh`. Note that this doesn't modify the container image, only the running instance. Adding new dependencies is only possible when network connectivity is available and the Python package index is accessible by the container.

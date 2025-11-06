@@ -683,6 +683,7 @@ services:
       - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
       - ${SN_FW_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/fw}:/test/fw:ro
       - ${SN_HW_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/hw}:/test/hw:ro
+      - ${SN_APP_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/app}:/test/app:ro
     entrypoint:
       - /test/entrypoint.sh
     profiles:
