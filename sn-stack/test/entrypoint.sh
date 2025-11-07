@@ -15,14 +15,14 @@ cmd+=( "--name=${SN_TEST_SUITE_NAME}" )
 # Setup the Python module search paths.
 cmd+=( $(find /test -type d -name library | sed -e 's:^:--pythonpath=:') )
 
+# Extra options passed through the docker command line.
+cmd+=( "$@" )
+
 # Insert the global suite setup/teardown.
 cmd+=( '/test/fw/__init__.robot' )
 
 # Setup the Robot Test Data file search paths.
 cmd+=( $(find /test -type d -regex '.+/suites/[^/]+$') )
-
-# Extra options passed to the docker command line.
-cmd+=( "$@" )
 
 #-------------------------------------------------------------------------------
 # Install extra Python package dependencies if the package index is available.
