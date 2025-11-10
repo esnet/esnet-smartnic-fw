@@ -147,8 +147,9 @@ if egrep -q "^${ENV_BLOCK_TOP}\$" sn-stack/.env ; then
     sed -i -r \
         -e "/${ENV_BLOCK_TOP}/,/${ENV_BLOCK_BOT}/c\
 ${ENV_BLOCK_TOP}\n\
-SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}\n\
-LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}\n\
+# These settings provide sensible build-time default values when not overridden above\n\
+SMARTNIC_FW_IMAGE_URI=\${SMARTNIC_FW_IMAGE_URI-${IMAGE_URI}}\n\
+LABTOOLS_IMAGE_URI=\${LABTOOLS_IMAGE_URI-${LABTOOLS_IMAGE_URI}}\n\
 ${ENV_BLOCK_BOT}" \
 	sn-stack/.env
 else
@@ -156,8 +157,9 @@ else
     cat >>sn-stack/.env <<EOF
 
 ${ENV_BLOCK_TOP}
-SMARTNIC_FW_IMAGE_URI=${IMAGE_URI}
-LABTOOLS_IMAGE_URI=${LABTOOLS_IMAGE_URI}
+# These settings provide sensible build-time default values when not overridden above
+SMARTNIC_FW_IMAGE_URI=\${SMARTNIC_FW_IMAGE_URI-${IMAGE_URI}}
+LABTOOLS_IMAGE_URI=\${LABTOOLS_IMAGE_URI-${LABTOOLS_IMAGE_URI}}
 ${ENV_BLOCK_BOT}
 EOF
 fi
