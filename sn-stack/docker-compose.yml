@@ -15,7 +15,7 @@ x-traefik-service: &traefik-service
 
 # https://github.com/prometheus/prometheus/releases
 x-prometheus-service: &prometheus-service
-  image: '${DOCKERHUB_PROXY-}prom/prometheus:v3.5.0'
+  image: '${DOCKERHUB_PROXY-}prom/prometheus:v3.7.3'
   restart: unless-stopped
 
 services:
