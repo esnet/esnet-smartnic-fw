@@ -112,6 +112,9 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids,
     }
     prometheus.registry = PROM_COLLECTOR_REGISTRY_DEFAULT;
 
+    // Process debug flags early to allow them to be used during device initialization.
+    init_server_debug(debug_flags);
+
     for (auto bus_id : bus_ids) {
         SERVER_LOG_LINE_INIT(ctor, INFO, "Mapping PCIe BAR2 of device " << bus_id);
         volatile struct esnet_smartnic_bar2* bar2 = smartnic_map_bar2_by_pciaddr(bus_id.c_str());
@@ -192,7 +195,7 @@ SmartnicP4Impl::SmartnicP4Impl(const vector<string>& bus_ids,
         exit(EXIT_FAILURE);
     }
 
-    init_server(debug_flags);
+    init_server();
 
     SERVER_LOG_LINE_INIT(ctor, INFO, "Starting statistics collection for server");
     stats_domain_clear_metrics(server_stats.domain, NULL);

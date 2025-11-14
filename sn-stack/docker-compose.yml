@@ -621,8 +621,12 @@ services:
 
       - SN_CFG_SERVER_AUTH_TOKENS=${SN_CFG_AUTH_TOKEN}
       - SN_CFG_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
+
       # A colon-separated list of debug flags as shown by "sn-cfg show server config".
       #- SN_CFG_SERVER_DEBUG_FLAGS=all
+
+      # A colon-separated list of stats flags as show by "sn-cfg show server config".
+      #- SN_CFG_SERVER_STATS_FLAGS_DISABLE=all
 
       # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
       # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md

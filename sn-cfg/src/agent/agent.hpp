@@ -21,6 +21,7 @@ public:
     explicit SmartnicConfigImpl(
         const vector<string>& bus_ids,
         const vector<string>& debug_flags,
+        const vector<string>& stats_flags_disable,
         unsigned int prometheus_port);
     ~SmartnicConfigImpl();
 
@@ -150,6 +151,8 @@ private:
         bitset<ServerControlStatsFlag_MAX + 1> stats_flags;
     } control;
 
+    const char* stats_flag_label(const ServerControlStatsFlag flag);
+
     void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
     void batch_set_defaults(
         const DefaultsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
@@ -218,12 +221,16 @@ private:
     void batch_clear_port_stats(
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
-    void init_server(const vector<string>& debug_flags);
+    void init_server(void);
+    void init_server_debug(
+        const vector<string>& debug_flags, const vector<string>& stats_flags_disable);
     void init_server_stats(void);
     void deinit_server(void);
     void get_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
     void batch_get_server_config(
         const ServerConfigRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+    bool convert_server_control_stats_flag(
+        ServerControlStatsFlag flag, DeviceStatsDomain& domain, DeviceStatsZone& zone);
     ErrorCode apply_server_control_stats_flag(ServerControlStatsFlag flag, bool enable);
     void set_server_config(const ServerConfigRequest&, function<void(const ServerConfigResponse&)>);
     void batch_set_server_config(

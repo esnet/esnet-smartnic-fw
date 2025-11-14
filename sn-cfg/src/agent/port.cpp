@@ -43,6 +43,9 @@ void SmartnicConfigImpl::init_port(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
+        if (!control.stats_flags.test(ServerControlStatsFlag::CTRL_STATS_FLAG_ZONE_PORT_COUNTERS)) {
+            stats_zone_disable(stats->zone);
+        }
         dev->stats.zones[DeviceStatsZone::PORT_COUNTERS].push_back(stats);
         SERVER_LOG_LINE_INIT(port, INFO,
             "Setup counters for port ID " << port_id << " on device " << dev->bus_id);

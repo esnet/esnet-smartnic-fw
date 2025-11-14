@@ -46,6 +46,9 @@ void SmartnicConfigImpl::init_host(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
+        if (!control.stats_flags.test(ServerControlStatsFlag::CTRL_STATS_FLAG_ZONE_HOST_COUNTERS)) {
+            stats_zone_disable(stats->zone);
+        }
         dev->stats.zones[DeviceStatsZone::HOST_COUNTERS].push_back(stats);
         SERVER_LOG_LINE_INIT(host, INFO,
             "Setup counters for host ID " << host_id << " on device " << dev->bus_id);

@@ -16,16 +16,21 @@ using namespace std;
 //--------------------------------------------------------------------------------------------------
 const char* SmartnicP4Impl::debug_flag_label(const ServerDebugFlag flag) {
     switch (flag) {
-    case ServerDebugFlag::DEBUG_FLAG_TABLE_CLEAR: return "TABLE_CLEAR";
-    case ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_INSERT: return "TABLE_RULE_INSERT";
-    case ServerDebugFlag::DEBUG_FLAG_TABLE_RULE_DELETE: return "TABLE_RULE_DELETE";
-    case ServerDebugFlag::DEBUG_FLAG_PIPELINE_INFO: return "PIPELINE_INFO";
-    case ServerDebugFlag::DEBUG_FLAG_PIPELINE_DRIVER: return "PIPELINE_DRIVER";
-    case ServerDebugFlag::DEBUG_FLAG_STATS: return "STATS";
+#define CASE(_name) \
+    case ServerDebugFlag::DEBUG_FLAG_##_name: return #_name
+
+    CASE(TABLE_CLEAR);
+    CASE(TABLE_RULE_INSERT);
+    CASE(TABLE_RULE_DELETE);
+    CASE(PIPELINE_INFO);
+    CASE(PIPELINE_DRIVER);
+    CASE(STATS);
 
     case ServerDebugFlag::DEBUG_FLAG_UNKNOWN:
     default:
         break;
+
+#undef CASE
     }
     return "UNKNOWN";
 }
@@ -199,7 +204,7 @@ void SmartnicP4Impl::init_server_stats(void) {
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicP4Impl::init_server(const vector<string>& debug_flags) {
+void SmartnicP4Impl::init_server(void) {
     auto rv = timespec_get(&timestamp.start_wall, TIME_UTC);
     if (rv != TIME_UTC) {
         SERVER_LOG_LINE_INIT(server, ERROR, "timespec_get failed with " << rv);
@@ -221,7 +226,10 @@ void SmartnicP4Impl::init_server(const vector<string>& debug_flags) {
         timestamp.start_wall.tv_sec << "s." <<
         timestamp.start_wall.tv_nsec << "ns" <<
         "]");
+}
 
+//--------------------------------------------------------------------------------------------------
+void SmartnicP4Impl::init_server_debug(const vector<string>& debug_flags) {
     for (auto flag : debug_flags) {
         if (flag == "all") {
             SERVER_LOG_LINE_INIT(server, INFO, "Enabling all debug flags:");

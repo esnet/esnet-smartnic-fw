@@ -109,6 +109,9 @@ void SmartnicConfigImpl::init_device(Device* dev) {
             exit(EXIT_FAILURE);
         }
 
+        if (!control.stats_flags.test(ServerControlStatsFlag::CTRL_STATS_FLAG_ZONE_SYSMON_MONITORS)) {
+            stats_zone_disable(stats->zone);
+        }
         dev->stats.zones[DeviceStatsZone::SYSMON_MONITORS].push_back(stats);
         SERVER_LOG_LINE_INIT(device, INFO,
             "Setup monitors for sysmon " << n << " on device " << dev->bus_id);
@@ -130,6 +133,10 @@ void SmartnicConfigImpl::init_device(Device* dev) {
         SERVER_LOG_LINE_INIT(device, ERROR,
             "Failed to alloc CMS stats zone for device " << dev->bus_id);
         exit(EXIT_FAILURE);
+    }
+
+    if (!control.stats_flags.test(ServerControlStatsFlag::CTRL_STATS_FLAG_ZONE_CARD_MONITORS)) {
+        stats_zone_disable(stats->zone);
     }
     dev->stats.zones[DeviceStatsZone::CARD_MONITORS].push_back(stats);
     SERVER_LOG_LINE_INIT(device, INFO, "Setup monitors for CMS on device " << dev->bus_id);
