@@ -498,6 +498,7 @@ services:
     environment:
       - SN_LLDP_SLOTADDR=$FPGA_PCIE_DEV
       - SN_LLDP_HOST=${SN_HOST:-sn-host-unset}
+      - SN_LLDP_PHYS_SLOT=${SN_PHYS_SLOT:-${UNIQUE:-}}
       - SN_LLDP_TTL=20
     volumes:
       - ${SN_STACK_ROOT-${PWD}}/smartnic-lldp/scripts:/scripts:ro

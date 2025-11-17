@@ -18,6 +18,9 @@ load_contrib("lldp")
               help="Hostname FQDN (eg. lbnl59-ht1.es.net)",
               required=True,
 )
+@click.option('--phys-slot',
+              help="Physical slot number to prepend to the portid.",
+)
 @click.option('--sys-desc',
               help="LLDP System Description prefix to send",
               default="ESnet SmartNIC",
@@ -37,7 +40,7 @@ load_contrib("lldp")
               show_default=True,
 )
 
-def main(slotaddr, host, ttl, sys_desc, component, sw_ver):
+def main(slotaddr, host, phys_slot, ttl, sys_desc, component, sw_ver):
 
     print("=" * 30)
     print("LLDP Configuration")
@@ -106,6 +109,11 @@ def main(slotaddr, host, ttl, sys_desc, component, sw_ver):
         if sw_ver is not None:
             sys_desc_full += " SW={:s}".format(sw_ver)
 
+        if phys_slot is None or phys_slot == "":
+            portid_full = "{:s}".format(portid)
+        else:
+            portid_full = "{:s}/{:s}".format(phys_slot, portid)
+
         packet = (
             Ether(dst="01:80:c2:00:00:0e",
                   src=get_if_hwaddr(tapif)) /
@@ -113,7 +121,7 @@ def main(slotaddr, host, ttl, sys_desc, component, sw_ver):
             LLDPDUChassisID(subtype="chassis component",
                             id=component_full) /
             LLDPDUPortID(subtype="interface name",
-                         id=portid) /
+                         id=portid_full) /
             LLDPDUTimeToLive(ttl=ttl) /
             LLDPDUSystemName(system_name=host) /
             LLDPDUSystemDescription(description = sys_desc_full) /
