@@ -364,7 +364,6 @@ RUN <<EOF
       pciutils \
       python3 \
       python3-pip \
-      python3-scapy \
       tcpreplay \
       tshark \
       unzip \
@@ -377,6 +376,7 @@ RUN <<EOF
 EOF
 
 RUN pip3 install --no-cache-dir \
+    scapy \
     yq
 
 # Import the build artifacts from both dpdk and pktgen layers
