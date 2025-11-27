@@ -9,6 +9,9 @@ cmd=( 'robot' )
 # Redirect report and log files.
 cmd+=( '--outputdir=/scratch' )
 
+# Generate a report in the XUnit format along with the defaults.
+cmd+=( '--xunit=xunit.xml' )
+
 # Give the aggregated test suite a sane name.
 cmd+=( "--name=${SN_TEST_SUITE_NAME}" )
 
@@ -43,4 +46,10 @@ fi
 export PYTHONDONTWRITEBYTECODE=1
 
 # Run the tests.
-exec "${cmd[@]}"
+${cmd[@]} | tee /scratch/robot.log
+
+# Publish the test results to the S3 store.
+if [[ -e "/scratch/output.xml" ]]; then
+    results="/scratch/${TEST_FILENAME:-test-results.tar.gz}"
+    tar czf "${results}" -C /scratch output.xml log.html report.html xunit.xml robot.log
+fi

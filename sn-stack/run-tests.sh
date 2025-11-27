@@ -20,6 +20,10 @@ print_help() {
     echo "Options:"
     echo "    -c ARG, --compose-arg=ARG"
     echo "        Specify extra arguments to pass to 'docker compose'."
+    echo "    -f FILENAME, --filename FILENAME"
+    echo "        Name of the compressed tar archive to create containing the"
+    echo "        results of a test run."
+    echo "        [Default: test-results.tar.gz]"
     echo "    -h, --help"
     echo "        Show this help."
     echo "    -p, --pip-install"
@@ -37,11 +41,13 @@ print_help() {
 #-------------------------------------------------------------------------------
 compose_args=()
 run_args=( '--no-deps' '--rm' )
+test_filename="${TEST_FILENAME:-}"
 
 # Parse command line arguments.
 arguments=$(getopt -n "${PROG}" \
-                -o 'c:hpr:s' \
-                -l compose-arg: -l help -l pip-install -l run-arg: -l shell \
+                -o 'c:f:hpr:s' \
+                -l compose-arg: -l filename: -l help -l pip-install \
+                -l run-arg: -l shell \
                 -- "$@")
 eval set -- "${arguments}"
 
@@ -57,6 +63,11 @@ while true; do
 
         -c | --compose-arg)
             compose_args+=( "$1" )
+            shift
+            ;;
+
+        -f | --filename)
+            test_filename="$1"
             shift
             ;;
 
@@ -84,6 +95,10 @@ while true; do
             ;;
     esac
 done
+
+if [[ "${test_filename}" != "" ]]; then
+    run_args+=( "--env=TEST_FILENAME=${test_filename}" )
+fi
 
 # Capture all remaining arguments for the Robot command line.
 robot_args+=( "$@" )
