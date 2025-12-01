@@ -18,7 +18,10 @@ cmd+=( "--name=${SN_TEST_SUITE_NAME}" )
 # Setup the Python module search paths.
 cmd+=( $(find /test -type d -name library | sed -e 's:^:--pythonpath=:') )
 
-# Extra options passed through the docker command line.
+# Extra options passed through the docker environment and command line.
+if [[ "${TEST_OPTIONS}" != "" ]]; then
+    cmd+=( ${TEST_OPTIONS} )
+fi
 cmd+=( "$@" )
 
 # Insert the global suite setup/teardown.
