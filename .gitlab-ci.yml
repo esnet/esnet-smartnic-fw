@@ -3,7 +3,7 @@ include:
   - template: 'Workflows/Branch-Pipelines.gitlab-ci.yml'
   - project: 'security/container-scanning'
     file: '.ESnet-container-scan.yml'
-  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.3.0
+  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.3.3
     inputs:
       aap_host:  $AAP_HOST
       aap_token: $AAP_TOKEN
@@ -23,6 +23,7 @@ stages:
   - test
   - push
   - review
+  - review_test
   - trigger_downstream
 
 variables:
@@ -209,47 +210,108 @@ container_scanning:
     - pull_cve_allowlist
     - package
 
-ftap:
-  extends: .aap_run
-  stage: review
+# Pure mixin job intended to be used for augmenting a manually triggered review job with support
+# for running Robot Framework tests.
+.review_run_test:
+  extends: .aap_run_test
+  variables:
+    REVIEW_TYPE: "-test"
+
+    #
+    # Required Variables
+    #
+    EXTRA_VAR_TEST_S3_ACCESS: "${TEST_AUTOMATION_S3_ACCESS_KEY}"
+    EXTRA_VAR_TEST_S3_SECRET: "${TEST_AUTOMATION_S3_SECRET_KEY}"
+
+    #
+    # Optional Variables
+    #
+    # Override the test results filename to include the review job's parallel:matrix parameters.
+    EXTRA_VAR_TEST_FILENAME: "test-results-${GL_ENV_HOST}-${GL_ENV_CARD}.${CI_JOB_ID}.tar.gz"
+
+#----------------------------------------------------------------------------------------------------
+# Set <GL_ENV_HOST>/<GL_ENV_CARD><GL_ENV_EXTRA>
+#   e.g. ftap-ht1/1/foo
+#   where GL_ENV_HOST=ftap-ht1
+#         GL_ENV_CARD=1
+#         GL_ENV_EXTRA=/foo
+# Keep it short since it shows up in the UI
+#
+# The following template defines the expected structure of each entry in an ftap matrix table. This
+# template MUST match the entries.  The names of the keys and their ordering are important (changing
+# either requires updating all entries and the template).
+#
+# References:
+# - parallel:matrix rules: https://docs.gitlab.com/ci/yaml/#parallelmatrix
+# - matrix expressions:    https://docs.gitlab.com/ci/yaml/matrix_expressions
+#
+.ftap_matrix_template: &ftap_matrix_template
+  - GL_ENV_HOST: "$[[ matrix.GL_ENV_HOST ]]"
+    GL_ENV_CARD: "$[[ matrix.GL_ENV_CARD ]]"
+    #GL_ENV_EXTRA: "$[[ matrix.GL_ENV_EXTRA ]]"
+    SYSTEM_HW_BOARD: "$[[ matrix.SYSTEM_HW_BOARD ]]"
+    AAP_LIMIT: "$[[ matrix.AAP_LIMIT ]]"
+    #EXTRA_VAR_STACK_UNIQUE: "$[[ matrix.EXTRA_VAR_STACK_UNIQUE ]]"
+    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: "$[[ matrix.EXTRA_VAR_STACK_HW_TARGET_SERIAL ]]"
+    #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "$[[ matrix.EXTRA_VAR_STACK_FPGA_PCIE_DEV ]]"
+
+.ftap_matrix: &ftap_matrix
+  - GL_ENV_HOST: ftap-ht1
+    GL_ENV_CARD: 1
+    #GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: ftap-ht1.es.net
+    #EXTRA_VAR_STACK_UNIQUE: 0
+    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
+    #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
+
+  - GL_ENV_HOST: ftap-ht2
+    GL_ENV_CARD: 1
+    #GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au55c
+    AAP_LIMIT: ftap-ht2.es.net
+    #EXTRA_VAR_STACK_UNIQUE: 0
+    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
+    #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
+
+  - GL_ENV_HOST: ftap-ht3
+    GL_ENV_CARD: 1
+    #GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: ftap-ht3.es.net
+    #EXTRA_VAR_STACK_UNIQUE: 0
+    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
+    #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
+
+  - GL_ENV_HOST: ftap-ht4
+    GL_ENV_CARD: 1
+    #GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: ftap-ht4.es.net
+    #EXTRA_VAR_STACK_UNIQUE: 0
+    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
+    #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
+#----------------------------------------------------------------------------------------------------
+
+.ftap:
   environment:
-    name: review/${GL_ENV_NAME}
+    name: review${REVIEW_TYPE}/${GL_ENV_HOST}/${GL_ENV_CARD}${GL_ENV_EXTRA}
     url: ssh://${AAP_LIMIT}
     action: start
   parallel:
-    matrix:
-      # Set GL_ENV_NAME to <hostname>/<card_number>/<extra>
-      #   e.g. ftap-ht1/1/foo
-      # Keep it short since it shows up in the UI
+    matrix: *ftap_matrix
+  rules:
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
+      when: never
+    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD)
+      when: manual
+      allow_failure: true
 
-      - GL_ENV_NAME: ftap-ht1/1
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: ftap-ht1.es.net
-        #EXTRA_VAR_STACK_UNIQUE: 0
-        #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
-        #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
-
-      - GL_ENV_NAME: ftap-ht2/1
-        SYSTEM_HW_BOARD: au55c
-        AAP_LIMIT: ftap-ht2.es.net
-        #EXTRA_VAR_STACK_UNIQUE: 0
-        #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
-        #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
-
-      - GL_ENV_NAME: ftap-ht3/1
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: ftap-ht3.es.net
-        #EXTRA_VAR_STACK_UNIQUE: 0
-        #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
-        #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
-
-      - GL_ENV_NAME: ftap-ht4/1
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: ftap-ht4.es.net
-        #EXTRA_VAR_STACK_UNIQUE: 0
-        #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
-        #EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
-
+ftap:
+  extends:
+    - .ftap
+    - .aap_run
+  stage: review
   variables:
     AAP_JOB_TEMPLATE: 641
     #
@@ -276,28 +338,241 @@ ftap:
 
     # Run on port 443 on single card systems in the ftap environment so prometheus can scrape them
     EXTRA_VAR_STACK_SN_INGRESS_PORT: 443
-  rules:
-    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
-      when: never
-    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD)
-      when: manual
-      allow_failure: true
   needs:
     - package
+
+ftap-test:
+  extends:
+    - .ftap
+    - .aap_run
+    - .review_run_test
+  stage: review_test
+  variables:
+    AAP_JOB_TEMPLATE: 786
+    #
+    # AAP Job Template Overrides
+    #   See here for more overrides: https://gitlab.es.net/ht/cicd-common/-/blob/main/README.md?ref_type=heads#aap-run
+    #
+    #AAP_SCM_BRANCH: testing
+    #AAP_VERBOSITY: 3
+
+    #
+    # Extra variables provided to the playbook
+    #   EXTRA_VAR_name/EXTRA_VAR_NAME is a string which will be merged into the extra_vars dictionary as
+    #       "name": "value"
+    #     and will *override* matching keys found in the EXTRA_VARS dictionary
+    #     NOTE: keys like "NAME" or "NaMe" will be converted to lower case before merging
+    #
+    # EXTRA_VAR_FOO: "baz"
+
+    EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
+  needs:
+    - package
+    - job: ftap
+      artifacts: false
+      parallel:
+        matrix: *ftap_matrix_template
+
+#----------------------------------------------------------------------------------------------------
+# Set <GL_ENV_HOST>/<GL_ENV_CARD><GL_ENV_EXTRA>
+#   e.g. node3/1/alpha
+#   where GL_ENV_HOST=node3
+#         GL_ENV_CARD=1
+#         GL_ENV_EXTRA=/alpha
+# Keep it short since it shows up in the UI
+#
+# The following template defines the expected structure of each entry in an ejfat matrix table. This
+# template MUST match the entries.  The names of the keys and their ordering are important (changing
+# either requires updating all entries and the template).
+#
+# References:
+# - parallel:matrix rules: https://docs.gitlab.com/ci/yaml/#parallelmatrix
+# - matrix expressions:    https://docs.gitlab.com/ci/yaml/matrix_expressions
+#
+.ejfat_matrix_template: &ejfat_matrix_template
+  - GL_ENV_HOST: "$[[ matrix.GL_ENV_HOST ]]"
+    GL_ENV_CARD: "$[[ matrix.GL_ENV_CARD ]]"
+    GL_ENV_EXTRA: "$[[ matrix.GL_ENV_EXTRA ]]"
+    SYSTEM_HW_BOARD: "$[[ matrix.SYSTEM_HW_BOARD ]]"
+    AAP_LIMIT: "$[[ matrix.AAP_LIMIT ]]"
+    EXTRA_VAR_STACK_UNIQUE: "$[[ matrix.EXTRA_VAR_STACK_UNIQUE ]]"
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "$[[ matrix.EXTRA_VAR_STACK_HW_TARGET_SERIAL ]]"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "$[[ matrix.EXTRA_VAR_STACK_FPGA_PCIE_DEV ]]"
+
+.ejfat_ci_test_matrix: &ejfat_ci_test_matrix
+  # node4.fpga.es.net
+  - GL_ENV_HOST: node4
+    GL_ENV_CARD: 0
+    GL_ENV_EXTRA: /ci-test
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node4.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 0
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S00KA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
+
+.ejfat_staging_matrix: &ejfat_staging_matrix
+  # ejfat-staging-dp1.es.net
+
+  # USB port 2 -- temporarily plugged into upper built-in USB port
+  # USB hub logical port 1-1.1 (temporary)
+  # Top-Left FPGA card (Chassis Slot #1)
+  - GL_ENV_HOST: dp1
+    GL_ENV_CARD: 1
+    GL_ENV_EXTRA: /staging
+    SYSTEM_HW_BOARD: au55c
+    AAP_LIMIT: ejfat-staging-dp1.es.net
+    EXTRA_VAR_STACK_UNIQUE: 1
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1KMC3RH2VA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:21:00"
+
+  # USB physical port 1 (left-most) -- temporarily plugged into lower built-in USB port
+  # USB hub logical port 3-2 (temporary)
+  # Bottom-Left FPGA card (Chassis Slot #2)
+  - GL_ENV_HOST: dp1
+    GL_ENV_CARD: 2
+    GL_ENV_EXTRA: /staging
+    SYSTEM_HW_BOARD: au55c
+    AAP_LIMIT: ejfat-staging-dp1.es.net
+    EXTRA_VAR_STACK_UNIQUE: 2
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1VOLH0D0UA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:22:00"
+
+  # USB port 4
+  # USB hub logical port 5-2
+  # Top-Middle FPGA card (Chassis Slot #4)
+  - GL_ENV_HOST: dp1
+    GL_ENV_CARD: 4
+    GL_ENV_EXTRA: /staging
+    SYSTEM_HW_BOARD: au55c
+    AAP_LIMIT: ejfat-staging-dp1.es.net
+    EXTRA_VAR_STACK_UNIQUE: 4
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL14O0W1MTCA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:82:00"
+
+  # USB port 3
+  # USB hub logical port 5-1
+  # Bottom-Middle FPGA card (Chassis Slot #5)
+  - GL_ENV_HOST: dp1
+    GL_ENV_CARD: 5
+    GL_ENV_EXTRA: /staging
+    SYSTEM_HW_BOARD: au55c
+    AAP_LIMIT: ejfat-staging-dp1.es.net
+    EXTRA_VAR_STACK_UNIQUE: 5
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1UE5CEXZ0A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
+
+.ejfat_dev_multi_matrix: &ejfat_dev_multi_matrix
+  # node2.fpga.es.net
+  - GL_ENV_HOST: node2
+    GL_ENV_CARD: 0
+    GL_ENV_EXTRA: /dev
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node2.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 0
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R001A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:c1:00"
+
+  - GL_ENV_HOST: node2
+    GL_ENV_CARD: 1
+    GL_ENV_EXTRA: /dev
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node2.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 1
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S003A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
+
+  - GL_ENV_HOST: node2
+    GL_ENV_CARD: 2
+    GL_ENV_EXTRA: /dev
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node2.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 2
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R008A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:a1:00"
+
+  - GL_ENV_HOST: node2
+    GL_ENV_CARD: 3
+    GL_ENV_EXTRA: /dev
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node2.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 3
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R009A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:41:00"
+
+.ejfat_dev_single_matrix: &ejfat_dev_single_matrix
+#  - GL_ENV_HOST: node2
+#    GL_ENV_CARD: 4
+#    GL_ENV_EXTRA: /dev
+#    SYSTEM_HW_BOARD: au55c
+#    AAP_LIMIT: node2.fpga.es.net
+#    EXTRA_VAR_STACK_UNIQUE: 4
+#    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL14O0W1MTCA"
+#    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
+
+  - GL_ENV_HOST: node3
+    GL_ENV_CARD: 4
+    GL_ENV_EXTRA: /dev
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node3.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 4
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S02DA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:c1:00"
+
+  - GL_ENV_HOST: node3
+    GL_ENV_CARD: 5
+    GL_ENV_EXTRA: /dev
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node3.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 5
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R00HA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
+
+  - GL_ENV_HOST: node3
+    GL_ENV_CARD: 6
+    GL_ENV_EXTRA: /dev
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node3.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 6
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204R026A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:41:00"
+
+.ejfat_prod_matrix: &ejfat_prod_matrix
+  # node3.fpga.es.net
+  - GL_ENV_HOST: node3
+    GL_ENV_CARD: 1
+    GL_ENV_EXTRA: /alpha
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node3.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 1
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S019A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:a1:00"
+
+  - GL_ENV_HOST: node3
+    GL_ENV_CARD: 2
+    GL_ENV_EXTRA: /beta
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node3.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 2
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R014A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
+
+  - GL_ENV_HOST: node3
+    GL_ENV_CARD: 3
+    GL_ENV_EXTRA: /stable
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node3.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 3
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S00JA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:e1:00"
+#----------------------------------------------------------------------------------------------------
 
 .ejfat:
   extends: .aap_run
   stage: review
   environment:
-    name: review/${GL_ENV_NAME}
+    name: review${REVIEW_TYPE}/${GL_ENV_HOST}/${GL_ENV_CARD}${GL_ENV_EXTRA}
     url: ssh://${AAP_LIMIT}
     action: start
-  parallel:
-    matrix:
-      # Set GL_ENV_NAME to <hostname>/<card_number>/<extra>
-      #   e.g. node3/1/alpha
-      # Keep it short since it shows up in the UI
-
   variables:
     AAP_JOB_TEMPLATE: 635
     #
@@ -340,151 +615,27 @@ ftap:
 ejfat-ci-test:
   extends: .ejfat
   parallel:
-    matrix:
-      # node4.fpga.es.net
-      - GL_ENV_NAME: node4/0/ci-test
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node4.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 0
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S00KA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
+    matrix: *ejfat_ci_test_matrix
 
 ejfat-staging:
   extends: .ejfat
   parallel:
-    matrix:
-      # ejfat-staging-dp1.es.net
-
-      # USB port 2 -- temporarily plugged into upper built-in USB port
-      # USB hub logical port 1-1.1 (temporary)
-      # Top-Left FPGA card (Chassis Slot #1)
-      - GL_ENV_NAME: dp1/1/staging
-        SYSTEM_HW_BOARD: au55c
-        AAP_LIMIT: ejfat-staging-dp1.es.net
-        EXTRA_VAR_STACK_UNIQUE: 1
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1KMC3RH2VA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:21:00"
-
-      # USB physical port 1 (left-most) -- temporarily plugged into lower built-in USB port
-      # USB hub logical port 3-2 (temporary)
-      # Bottom-Left FPGA card (Chassis Slot #2)
-      - GL_ENV_NAME: dp1/2/staging
-        SYSTEM_HW_BOARD: au55c
-        AAP_LIMIT: ejfat-staging-dp1.es.net
-        EXTRA_VAR_STACK_UNIQUE: 2
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1VOLH0D0UA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:22:00"
-
-      # USB port 4
-      # USB hub logical port 5-2
-      # Top-Middle FPGA card (Chassis Slot #4)
-      - GL_ENV_NAME: dp1/4/staging
-        SYSTEM_HW_BOARD: au55c
-        AAP_LIMIT: ejfat-staging-dp1.es.net
-        EXTRA_VAR_STACK_UNIQUE: 4
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL14O0W1MTCA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:82:00"
-
-      # USB port 3
-      # USB hub logical port 5-1
-      # Bottom-Middle FPGA card (Chassis Slot #5)
-      - GL_ENV_NAME: dp1/5/staging
-        SYSTEM_HW_BOARD: au55c
-        AAP_LIMIT: ejfat-staging-dp1.es.net
-        EXTRA_VAR_STACK_UNIQUE: 5
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1UE5CEXZ0A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
+    matrix: *ejfat_staging_matrix
 
 ejfat-dev-multi:
   extends: .ejfat
   parallel:
-    matrix:
-      # node2.fpga.es.net
-      - GL_ENV_NAME: node2/0/dev
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node2.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 0
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R001A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:c1:00"
-
-      - GL_ENV_NAME: node2/1/dev
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node2.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 1
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S003A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
-
-      - GL_ENV_NAME: node2/2/dev
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node2.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 2
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R008A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:a1:00"
-
-      - GL_ENV_NAME: node2/3/dev
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node2.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 3
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R009A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:41:00"
+    matrix: *ejfat_dev_multi_matrix
 
 ejfat-dev-single:
   extends: .ejfat
   parallel:
-    matrix:
-#      - GL_ENV_NAME: node2/4/dev
-#        SYSTEM_HW_BOARD: au55c
-#        AAP_LIMIT: node2.fpga.es.net
-#        EXTRA_VAR_STACK_UNIQUE: 4
-#        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL14O0W1MTCA"
-#        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
-
-      - GL_ENV_NAME: node3/4/dev
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node3.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 4
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S02DA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:c1:00"
-
-      - GL_ENV_NAME: node3/5/dev
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node3.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 5
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R00HA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
-
-      - GL_ENV_NAME: node3/6/dev
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node3.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 6
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204R026A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:41:00"
+    matrix: *ejfat_dev_single_matrix
 
 ejfat-prod:
   extends: .ejfat
   parallel:
-    matrix:
-      # node3.fpga.es.net
-      - GL_ENV_NAME: node3/1/alpha
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node3.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 1
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S019A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:a1:00"
-
-      - GL_ENV_NAME: node3/2/beta
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node3.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 2
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R014A"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
-
-      - GL_ENV_NAME: node3/3/stable
-        SYSTEM_HW_BOARD: au280
-        AAP_LIMIT: node3.fpga.es.net
-        EXTRA_VAR_STACK_UNIQUE: 3
-        EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760204S00JA"
-        EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:e1:00"
+    matrix: *ejfat_prod_matrix
 
 .trigger_sw:
   stage: trigger_downstream

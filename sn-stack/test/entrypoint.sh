@@ -9,13 +9,19 @@ cmd=( 'robot' )
 # Redirect report and log files.
 cmd+=( '--outputdir=/scratch' )
 
+# Generate a report in the XUnit format along with the defaults.
+cmd+=( '--xunit=xunit.xml' )
+
 # Give the aggregated test suite a sane name.
 cmd+=( "--name=${SN_TEST_SUITE_NAME}" )
 
 # Setup the Python module search paths.
 cmd+=( $(find /test -type d -name library | sed -e 's:^:--pythonpath=:') )
 
-# Extra options passed through the docker command line.
+# Extra options passed through the docker environment and command line.
+if [[ "${TEST_OPTIONS}" != "" ]]; then
+    cmd+=( ${TEST_OPTIONS} )
+fi
 cmd+=( "$@" )
 
 # Insert the global suite setup/teardown.
@@ -43,4 +49,10 @@ fi
 export PYTHONDONTWRITEBYTECODE=1
 
 # Run the tests.
-exec "${cmd[@]}"
+${cmd[@]} | tee /scratch/robot.log
+
+# Publish the test results to the S3 store.
+if [[ -e "/scratch/output.xml" ]]; then
+    results="/scratch/${TEST_FILENAME:-test-results.tar.gz}"
+    tar czf "${results}" -C /scratch output.xml log.html report.html xunit.xml robot.log
+fi
