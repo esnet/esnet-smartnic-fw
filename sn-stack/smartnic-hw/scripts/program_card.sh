@@ -104,6 +104,44 @@ fi
 /scripts/check_fpga_version.sh "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
 FPGA_VERSION_OK=$?
 
+PCI_DEVICES='/sys/bus/pci/devices'
+
+remove_pcie_devices() {
+    local dev_id="$1"; shift
+    local devices=( $(find "${PCI_DEVICES}" -mindepth 1 -maxdepth 1 \
+                          -name "${dev_id}.*" -printf '%P\n' | sort -n) )
+
+    # Disconnect any devices from the kernel
+    for dev in "${devices[@]}"; do
+        local dev_path="${PCI_DEVICES}/${dev}"
+
+        echo "Removing PCIe device ${dev}"
+        echo 1 >"${dev_path}/remove"
+
+        echo "Waiting for uevent processing to settle"
+        udevadm settle
+        echo "Done settling uevents"
+
+        echo "Waiting for removal of PCIe device ${dev}"
+        local remove_done=0
+        for ((i=0; i<10; i++)); do
+            if ! udevadm info "${dev_path}" &>/dev/null; then
+                echo "==> Done removal of PCIe device ${dev}"
+                remove_done=1
+                break
+            fi
+            sleep 1s
+        done
+
+        if ((remove_done != 1)); then
+            echo "==> Timed out waiting for removal of PCIe device ${dev}"
+            exit 1
+        fi
+    done
+
+    return 0
+}
+
 if [[ $FORCE -eq 0 && $FPGA_VERSION_OK -eq 0 ]] ; then
     echo "Running and Target FPGA versions match"
 else
@@ -113,10 +151,7 @@ else
 	echo "Running version does not match Target version, reprogramming"
     fi
 
-    # Disconnect any devices from the kernel
-    for i in $(lspci -Dmm -s $FPGA_PCIE_DEV | cut -d' ' -f 1) ; do
-	echo 1 > /sys/bus/pci/devices/$i/remove
-    done
+    remove_pcie_devices $FPGA_PCIE_DEV
 
     # Program the bitfile into the FPGA
     vivado_lab \
@@ -150,10 +185,7 @@ else
 fi
 
 if [ -e $PROBES_PATH ]; then
-    # Disconnect any devices from the kernel
-    for i in $(lspci -Dmm -s $FPGA_PCIE_DEV | cut -d' ' -f 1) ; do
-	echo 1 > /sys/bus/pci/devices/$i/remove
-    done
+    remove_pcie_devices $FPGA_PCIE_DEV
 
     # Perform the reset of the PCIe endpoint via VIOs.
     vivado_lab \
