@@ -6,6 +6,10 @@ set -e -o pipefail
 # Build up the command line to invoke the Robot Framework engine.
 cmd=( 'robot' )
 
+# Force exit code to 0 regardless of errors in tests.  This ensures that report
+# files will always be produced.
+cmd+=( '--nostatusrc' )
+
 # Redirect report and log files.
 cmd+=( '--outputdir=/scratch' )
 
