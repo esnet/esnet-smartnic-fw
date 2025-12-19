@@ -223,6 +223,8 @@ container_scanning:
     EXTRA_VAR_TEST_S3_ACCESS: "${TEST_AUTOMATION_S3_ACCESS_KEY}"
     EXTRA_VAR_TEST_S3_SECRET: "${TEST_AUTOMATION_S3_SECRET_KEY}"
 
+    EXTRA_VAR_GITLAB_JOB_URL: "${CI_PROJECT_URL}/-/jobs/${SN_FW_API_JOB_NUMBER}"
+
     #
     # Optional Variables
     #
@@ -364,8 +366,6 @@ ftap-test:
     #     NOTE: keys like "NAME" or "NaMe" will be converted to lower case before merging
     #
     # EXTRA_VAR_FOO: "baz"
-
-    EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
   needs:
     - package
     - job: ftap
