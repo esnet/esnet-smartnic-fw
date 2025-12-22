@@ -106,6 +106,28 @@ FPGA_VERSION_OK=$?
 
 PCI_DEVICES='/sys/bus/pci/devices'
 
+find_root_port() {
+    local dev="$1"; shift
+    local pci_id=($(echo "${dev}" | tr ':' ' '))
+    local pci_bus=$(printf '%d' "0x${pci_id[1]}")
+
+    for path in $(find -L "${PCI_DEVICES}" -mindepth 2 -maxdepth 2 \
+                      -path "*/${pci_id[0]}:*/subordinate_bus_number" \
+                      -printf '%h\n' | sort); do
+        local root_port=$(basename "${path}")
+        local sec=$(<"${path}/secondary_bus_number")
+        local sub=$(<"${path}/subordinate_bus_number")
+
+        # PCIe root port with a single endpoint
+        if (( ${sec} == ${pci_bus} && ${sub} == ${pci_bus} )); then
+            echo "${root_port}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 remove_pcie_devices() {
     local dev_id="$1"; shift
     local devices=( $(find "${PCI_DEVICES}" -mindepth 1 -maxdepth 1 \
@@ -141,6 +163,21 @@ remove_pcie_devices() {
 
     return 0
 }
+
+ROOT_PORT=$(find_root_port "${FPGA_PCIE_DEV}")
+if [[ $? -eq 0 ]]; then
+    # Removing all devices from a PCIe root port that supports automatic power management will
+    # force the root port to transition from the D0 power state to D3hot.  When attempting a
+    # rescan, the wakeup proceedure on the root port is triggered rather than actually searching
+    # for devices as expected.  This results in no devices appearing and the need for a second
+    # rescan to actually find them.  By disabling automatic power control on the root port, it
+    # stays in the D0 state when it's devices are removed and does not require multiple rescans.
+    echo "Disabling automatic power control on PCIe root port ${ROOT_PORT} for device ${FPGA_PCIE_DEV}"
+    echo 'on' >"${PCI_DEVICES}/${ROOT_PORT}/power/control"
+else
+    echo "ERROR: Failed to find root port for PCIe device ${FPGA_PCIE_DEV}"
+    exit 1
+fi
 
 if [[ $FORCE -eq 0 && $FPGA_VERSION_OK -eq 0 ]] ; then
     echo "Running and Target FPGA versions match"
