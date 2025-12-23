@@ -272,7 +272,8 @@ RUN <<EOF
       python3-pip \
       screen \
       socat \
-      tree
+      tree \
+      udev
 
     apt autoclean
     apt autoremove
