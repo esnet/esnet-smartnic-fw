@@ -131,6 +131,134 @@ Bring down the running stack after flash writing has completed.
 docker compose down -v --remove-orphans
 ```
 
+(OPTIONAL) Updating the FPGA card Satellite Controller (SC) firmware image
+--------------------------------------------------------------------------
+
+**WARNING** This process has some risk of bricking (ie. rendering it unrecoverable / unusable) the Xilinx FPGA card.  If it is bricked, it will have to be returned/repaired via an RMA process with the vendor.  We have never had this happen to a U280 card (>200 individual SC FW upgrades over 80+ cards).  We have had one U55C FPGA card become bricked during an SC FW upgrade (at the time, this card was attached to QSFP optics that seemed to be causing communication problems but the root cause of the bricked card is still unknown as of January 2026).
+
+The Satellite Controller (SC) is a microcontroller that is on the Xilinx FPGA card, adjacent to the FPGA IC itself.  The SC manages card initialization and monitoring.  The version of firmware running on the SC when the card comes from the factory is often quite old and is missing features and bug fixes.  Some of the bugs that we've seen in older SC firmware include spurious resets of the FPGA card, and an inability to read QSFP module information.  Other bugs are mentioned in various places in the Xilinx knowledge base.  If any of these bugs or missing features affects you, then upgrading the SC firmware may fix them.
+
+**WARNING** If you are unsure of what you are doing, please consult your Xilinx support team for advice and assistance rather than following these instructions on your own.  Please include a pointer to this project's git repo in your Xilinx support request so that they have context for your request.
+
+For general information about the Satellite Controller, refer to: https://xilinx.github.io/Alveo-Cards/master/management-specification/oob-intro.html
+For general information about the Card Management Controller blocks, refer to: https://docs.amd.com/r/en-US/pg348-cms-subsystem/Introduction
+For the latest Satellite Controller Firmware versions, refer to: https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
+For details about the Xilinx Alveo FPGA card RMA process, refer to: https://adaptivesupport.amd.com/s/article/72533
+
+If you have read the warning above, and would still like to upgrade the SC firmware on your Xilinx FPGA card, proceed with the following steps:
+
+**PREREQUISITE** The SC firmware files referenced below are only available if you followed the optional step (https://github.com/esnet/xilinx-labtools-docker/blob/main/README.md#download-the-latest-satellite-controller-firmware-releases-optional) to download them during your build of the `xilinx-labtools-docker` image.  If you skipped that optional step, you will need to rebuild that container with the latest satellite controller firmware images before proceeding.
+
+First, ensure that the currently running docker stack has been stopped to avoid having any uncontrolled competition for the mailbox registers in the CMC block within the FPGA.  In particular, the `smartnic-cfg` daemon is constantly accessing this block as a background task.
+``` bash
+docker compose down -v --remove-orphans
+```
+
+Bring up just enough of the smartnic stack to allow us to access the SC via the CMC mailbox registers.
+``` bash
+docker compose --profile smartnic-mgr-vfio-unlock up -d smartnic-vfio-unlock
+```
+
+Dump out the current SC FW version
+``` bash
+docker compose exec smartnic-hw bash -c '/sc-fw/loadsc -d ${FPGA_PCIE_DEV}.0 -b 2 -a 0x40000 -r'
+```
+
+Example output from a run showing a U280 card (pre-update).  Note the initial SC FW version here is 4.0 -- a *very* old factory image.  The versions shown in the output below are examples only and may not represent the latest recommended versions.  Please consult the Xilinx webpage shown above to find the latest recommended version.  If you're not sure which version to install, please consult with your Xilinx support representative.
+``` bash
+------------------------------------------------------------------------------------
+CMS Satellite Controller Firmware Download Tool v2.3
+------------------------------------------------------------------------------------
+
+>> Aquiring BAR address of target card
+
+   > PCIe DBDF                        0000:d8:00.0 
+   > PCIe BAR/Region                  2 
+   > PCIe Vendor ID                   0x10EE
+
+<< Aquiring BAR address of target card (success)
+
+   < PCIe Device ID                   0x903F
+   < PCIe BAR Address                 0xF0000000
+
+>> Bring CMS Microblaze out of reset and establish comms with satellite controller
+
+   > CMS Subsystem Base Address       0x00040000
+
+<< Bring CMS Microblaze out of reset and establish comms with satellite controller (success)
+
+   < CMS Firmware Version             1.3.5 (0x0C010305)
+   < CMS Hardware Version             Vivado 2023.2.2
+   < SC  Firmware Version             4.0
+
+------------------------------------------------------------------------------------
+The current Satellite Controller firmware version is 4.0
+------------------------------------------------------------------------------------
+```
+
+Upgrade the SC FW
+
+**WARNING** Make sure you are installing the SC FW that matches your exact card type (ie. SC_U280 for U280 card, SC_U55C for U55C card).  Installing the wrong firmware may brick the FPGA card.
+
+``` bash
+# U280 card
+# docker compose exec smartnic-hw bash -c '/sc-fw/loadsc -d ${FPGA_PCIE_DEV}.0 -b 2 -a 0x40000 -f /sc-fw/SC_U280_4_3_31.txt'
+
+# U55 card
+# docker compose exec smartnic-hw bash -c '/sc-fw/loadsc -d ${FPGA_PCIE_DEV}.0 -b 2 -a 0x40000 -f /sc-fw/SC_U55C_7_1_24.txt'
+```
+
+Example output from a run showing a U280 card being upgraded from SC FW version 4.0 (factory) -> 4.3.31 (latest).  The output for a U55C is similar, with version numbers in a different range.
+``` bash
+------------------------------------------------------------------------------------
+CMS Satellite Controller Firmware Download Tool v2.3
+------------------------------------------------------------------------------------
+
+>> Aquiring BAR address of target card
+
+   > PCIe DBDF                        0000:d8:00.0 
+   > PCIe BAR/Region                  2 
+   > PCIe Vendor ID                   0x10EE
+
+<< Aquiring BAR address of target card (success)
+
+   < PCIe Device ID                   0x903F
+   < PCIe BAR Address                 0xF0000000
+
+>> Bring CMS Microblaze out of reset and establish comms with satellite controller
+
+   > CMS Subsystem Base Address       0x00040000
+
+>> Reading SC image file "/sc-fw/SC_U280_4_3_31.txt"
+<< Reading SC image file "/sc-fw/SC_U280_4_3_31.txt" (success)
+
+<< Bring CMS Microblaze out of reset and establish comms with satellite controller (success)
+
+   < CMS Firmware Version             1.3.5 (0x0C010305)
+   < CMS Hardware Version             Vivado 2023.2.2
+   < SC  Firmware Version             4.0
+
+>> DownloadSequence_Initial (start)
+<< DownloadSequence_Initial (success)
+>> DownloadSequence_EraseFirmware (start)
+<< DownloadSequence_EraseFirmware (success)
+>> DownloadSequence_SendImage (start)
+>> Image downloading: ..... 
+<< DownloadSequence_SendImage (success)
+>> DownloadSequence_JumpToResetVector (start)
+<< DownloadSequence_JumpToResetVector (success)
+------------------------------------------------------------------------------------
+Satellite Controller firmware has been succesfully updated from 4.0 to 4.3.31
+------------------------------------------------------------------------------------
+```
+
+This takes approximately 1 minute.  **DO NOT** interrupt this procedure.  It is unknown whether the SC will recover from an interrupted firmware download or whether it will become "bricked".
+
+Bring down the smartnic stack
+``` bash
+docker compose --profile smartnic-mgr-vfio-unlock down -v --remove-orphans
+```
+
 (OPTIONAL) Remove the ESnet Smartnic flash image from the FPGA card to revert to factory image
 ----------------------------------------------------------------------------------------------
 
