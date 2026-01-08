@@ -21,6 +21,12 @@ if [ "$#" -lt 5 ] ; then
     exit 1
 fi
 
+# Note: This is intended as a temporary measure until the xilinx-labtools-docker container is updated.
+if ! which udevadm &>dev/null; then
+    apt update
+    apt install -y udev
+fi
+
 # Grab URL pointing to the xilinx hw_server
 echo "Using Xilinx hw_server URL: $1"
 HW_SERVER_URL=$1
