@@ -21,6 +21,11 @@ if [ "$#" -lt 5 ] ; then
     exit 1
 fi
 
+if ! which udevadm &>dev/null; then
+    echo "ERROR: Missing required udev userspace tools.  Please ensure that the xilinx-labtools-docker base container has been built with the latest changes"
+    exit 1
+fi
+
 # Grab URL pointing to the xilinx hw_server
 echo "Using Xilinx hw_server URL: $1"
 HW_SERVER_URL=$1
@@ -98,6 +103,81 @@ fi
 /scripts/check_fpga_version.sh "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
 FPGA_VERSION_OK=$?
 
+PCI_DEVICES='/sys/bus/pci/devices'
+
+find_root_port() {
+    local dev="$1"; shift
+    local pci_id=($(echo "${dev}" | tr ':' ' '))
+    local pci_bus=$(printf '%d' "0x${pci_id[1]}")
+
+    for path in $(find -L "${PCI_DEVICES}" -mindepth 2 -maxdepth 2 \
+                      -path "*/${pci_id[0]}:*/subordinate_bus_number" \
+                      -printf '%h\n' | sort); do
+        local root_port=$(basename "${path}")
+        local sec=$(<"${path}/secondary_bus_number")
+        local sub=$(<"${path}/subordinate_bus_number")
+
+        # PCIe root port with a single endpoint
+        if (( ${sec} == ${pci_bus} && ${sub} == ${pci_bus} )); then
+            echo "${root_port}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+remove_pcie_devices() {
+    local dev_id="$1"; shift
+    local devices=( $(find "${PCI_DEVICES}" -mindepth 1 -maxdepth 1 \
+                          -name "${dev_id}.*" -printf '%P\n' | sort -n) )
+
+    # Disconnect any devices from the kernel
+    for dev in "${devices[@]}"; do
+        local dev_path="${PCI_DEVICES}/${dev}"
+
+        echo "Removing PCIe device ${dev}"
+        echo 1 >"${dev_path}/remove"
+
+        echo "Waiting for uevent processing to settle"
+        udevadm settle
+        echo "Done settling uevents"
+
+        echo "Waiting for removal of PCIe device ${dev}"
+        local remove_done=0
+        for ((i=0; i<10; i++)); do
+            if ! udevadm info "${dev_path}" &>/dev/null; then
+                echo "==> Done removal of PCIe device ${dev}"
+                remove_done=1
+                break
+            fi
+            sleep 1s
+        done
+
+        if ((remove_done != 1)); then
+            echo "==> Timed out waiting for removal of PCIe device ${dev}"
+            exit 1
+        fi
+    done
+
+    return 0
+}
+
+ROOT_PORT=$(find_root_port "${FPGA_PCIE_DEV}")
+if [[ $? -eq 0 ]]; then
+    # Removing all devices from a PCIe root port that supports automatic power management will
+    # force the root port to transition from the D0 power state to D3hot.  When attempting a
+    # rescan, the wakeup proceedure on the root port is triggered rather than actually searching
+    # for devices as expected.  This results in no devices appearing and the need for a second
+    # rescan to actually find them.  By disabling automatic power control on the root port, it
+    # stays in the D0 state when it's devices are removed and does not require multiple rescans.
+    echo "Disabling automatic power control on PCIe root port ${ROOT_PORT} for device ${FPGA_PCIE_DEV}"
+    echo 'on' >"${PCI_DEVICES}/${ROOT_PORT}/power/control"
+else
+    echo "ERROR: Failed to find root port for PCIe device ${FPGA_PCIE_DEV}"
+    exit 1
+fi
+
 if [[ $FORCE -eq 0 && $FPGA_VERSION_OK -eq 0 ]] ; then
     echo "Running and Target FPGA versions match"
 else
@@ -107,10 +187,7 @@ else
 	echo "Running version does not match Target version, reprogramming"
     fi
 
-    # Disconnect any devices from the kernel
-    for i in $(lspci -Dmm -s $FPGA_PCIE_DEV | cut -d' ' -f 1) ; do
-	echo 1 > /sys/bus/pci/devices/$i/remove
-    done
+    remove_pcie_devices $FPGA_PCIE_DEV
 
     # Program the bitfile into the FPGA
     vivado_lab \
@@ -144,10 +221,7 @@ else
 fi
 
 if [ -e $PROBES_PATH ]; then
-    # Disconnect any devices from the kernel
-    for i in $(lspci -Dmm -s $FPGA_PCIE_DEV | cut -d' ' -f 1) ; do
-	echo 1 > /sys/bus/pci/devices/$i/remove
-    done
+    remove_pcie_devices $FPGA_PCIE_DEV
 
     # Perform the reset of the PCIe endpoint via VIOs.
     vivado_lab \

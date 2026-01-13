@@ -325,6 +325,7 @@ services:
       - |
         # Unbind the kernel driver (if any) from each FPGA PF
         dpdk-devbind.py -u $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
+        udevadm settle
         dpdk-devbind.py --status
         # Manually enable device memory since there is no device driver in this mode
         setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2
@@ -370,6 +371,7 @@ services:
         modinfo vfio-pci | egrep -q '^filename:\s+\(builtin\)$' || modprobe vfio-pci
         # Bind the vfio-pci driver to each FPGA PF
         dpdk-devbind.py -b vfio-pci $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
+        udevadm settle
         dpdk-devbind.py --status
         # Confirm that the driver is properly bound to each FPGA PF
         # Note the <TAB> before vfio-pci in the grep command

@@ -30,7 +30,7 @@ variables:
   # These variables may be overridden by manual pipeline runs or from triggered
   # pipelines from other repos.
   LABTOOLS_IMAGE_URI:
-    value: wharf.es.net/ht/xilinx-labtools-docker:75195-gc43e5fb5
+    value: wharf.es.net/ht/xilinx-labtools-docker:92312-g9726f682
     description: xilinx-labtools-docker image to use when deploying the sn-stack HW services
   SN_HW_GROUP:
     value: ht
@@ -619,6 +619,14 @@ ejfat-ci-test:
 
 ejfat-staging:
   extends: .ejfat
+  variables:
+    # The u55c cards in ejfat-staging-dp1 can't interop with the power class 1 QSFP-100G-AO03 AOC
+    # cables and results in locking up communication between the CMS block and the SC.  To prevent
+    # this, make sure that sn-cfg doesn't automatically poll the QSFP modules for statistics.
+    # Notes:
+    #   - u55c requires SFF-8636 revision 2.5 or later
+    #   - power class 1 QSFP-100G-AO03 only supports SFF-8636 revision 1.3 or earlier
+    EXTRA_VAR_SN_CFG_SERVER_STATS_FLAGS_DISABLE: domain-modules
   parallel:
     matrix: *ejfat_staging_matrix
 
