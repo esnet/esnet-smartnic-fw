@@ -21,10 +21,9 @@ if [ "$#" -lt 5 ] ; then
     exit 1
 fi
 
-# Note: This is intended as a temporary measure until the xilinx-labtools-docker container is updated.
 if ! which udevadm &>dev/null; then
-    apt update
-    apt install -y udev
+    echo "ERROR: Missing required udev userspace tools.  Please ensure that the xilinx-labtools-docker base container has been built with the latest changes"
+    exit 1
 fi
 
 # Grab URL pointing to the xilinx hw_server
