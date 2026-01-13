@@ -22,5 +22,13 @@ puts "Selected Hardware Target: [current_hw_target]"
 open_hw_target -verbose
 puts "Selected Hardware Device: [current_hw_device]"
 
+# Note: FPGA configuration works at the high speed but VIO/ILAs may not
+puts "Increasing JTAG clock frequency to 30MHz (max)"
+set_property PARAM.FREQUENCY 30000000 [current_hw_target]
+
 set_property PROGRAM.FILE $bitfile_path [current_hw_device]
 program_hw_device [current_hw_device]
+
+# TODO this also seems to work at 15MHz so maybe worth bumping this up in the future after retesting
+puts "Decreasing JTAG clock frequency back down to 10MHz so that VIO/ILA access works reliably"
+set_property PARAM.FREQUENCY 10000000 [current_hw_target]
