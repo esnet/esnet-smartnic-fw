@@ -627,6 +627,10 @@ ejfat-staging:
     #   - u55c requires SFF-8636 revision 2.5 or later
     #   - power class 1 QSFP-100G-AO03 only supports SFF-8636 revision 1.3 or earlier
     EXTRA_VAR_SN_CFG_SERVER_STATS_FLAGS_DISABLE: domain-modules
+    # ejfat-staging-dp1 is the first system that is using the new common path for smartnic stacks
+    # temporarily override the path here until all other ejfat systems are using the same path,
+    # at which time we can bubble the common path up to the .ejfat template.
+    EXTRA_VAR_STACK_ROOT_PATH: /usr/local/smartnic/${EXTRA_VAR_STACK_UNIQUE}
   parallel:
     matrix: *ejfat_staging_matrix
 
