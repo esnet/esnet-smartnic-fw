@@ -567,12 +567,27 @@ ftap-test:
 #----------------------------------------------------------------------------------------------------
 
 .ejfat:
-  extends: .aap_run
-  stage: review
   environment:
     name: review${REVIEW_TYPE}/${GL_ENV_HOST}/${GL_ENV_CARD}${GL_ENV_EXTRA}
     url: ssh://${AAP_LIMIT}
     action: start
+  rules:
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
+      when: never
+    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'ejfat')
+      when: manual
+      allow_failure: true
+    # Deprecated HW app name.  The 'udplb' rule below can be removed any time after 2025 Nov 01
+    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
+      when: manual
+      allow_failure: true
+  resource_group: ${AAP_LIMIT}/${EXTRA_VAR_STACK_UNIQUE}
+
+.ejfat_review:
+  extends:
+    - .aap_run
+    - .ejfat
+  stage: review
   variables:
     AAP_JOB_TEMPLATE: 635
     #
@@ -598,27 +613,16 @@ ftap-test:
     EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
     EXTRA_VAR_STACK_ROOT_PATH: /usr/local/ejfat/${EXTRA_VAR_STACK_UNIQUE}
     EXTRA_VAR_STACK_COMPOSE_PROFILES: "smartnic-mgr-dpdk-portlink,smartnic-ingress,smartnic-metrics"
-  rules:
-    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
-      when: never
-    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'ejfat')
-      when: manual
-      allow_failure: true
-    # Deprecated HW app name.  The 'udplb' rule below can be removed any time after 2025 Nov 01
-    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
-      when: manual
-      allow_failure: true
   needs:
     - package
-  resource_group: ${AAP_LIMIT}/${EXTRA_VAR_STACK_UNIQUE}
 
 ejfat-ci-test:
-  extends: .ejfat
+  extends: .ejfat_review
   parallel:
     matrix: *ejfat_ci_test_matrix
 
 ejfat-staging:
-  extends: .ejfat
+  extends: .ejfat_review
   variables:
     # The u55c cards in ejfat-staging-dp1 can't interop with the power class 1 QSFP-100G-AO03 AOC
     # cables and results in locking up communication between the CMS block and the SC.  To prevent
@@ -635,17 +639,17 @@ ejfat-staging:
     matrix: *ejfat_staging_matrix
 
 ejfat-dev-multi:
-  extends: .ejfat
+  extends: .ejfat_review
   parallel:
     matrix: *ejfat_dev_multi_matrix
 
 ejfat-dev-single:
-  extends: .ejfat
+  extends: .ejfat_review
   parallel:
     matrix: *ejfat_dev_single_matrix
 
 ejfat-prod:
-  extends: .ejfat
+  extends: .ejfat_review
   parallel:
     matrix: *ejfat_prod_matrix
 
