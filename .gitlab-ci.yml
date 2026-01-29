@@ -399,11 +399,11 @@ ftap-test:
     EXTRA_VAR_STACK_HW_TARGET_SERIAL: "$[[ matrix.EXTRA_VAR_STACK_HW_TARGET_SERIAL ]]"
     EXTRA_VAR_STACK_FPGA_PCIE_DEV: "$[[ matrix.EXTRA_VAR_STACK_FPGA_PCIE_DEV ]]"
 
-.ejfat_ci_test_matrix: &ejfat_ci_test_matrix
+.ejfat_ci_trial_matrix: &ejfat_ci_trial_matrix
   # node4.fpga.es.net
   - GL_ENV_HOST: node4
     GL_ENV_CARD: 0
-    GL_ENV_EXTRA: /ci-test
+    GL_ENV_EXTRA: /ci-trial
     SYSTEM_HW_BOARD: au280
     AAP_LIMIT: node4.fpga.es.net
     EXTRA_VAR_STACK_UNIQUE: 0
@@ -616,10 +616,10 @@ ftap-test:
   needs:
     - package
 
-ejfat-ci-test:
+ejfat-ci-trial:
   extends: .ejfat_review
   parallel:
-    matrix: *ejfat_ci_test_matrix
+    matrix: *ejfat_ci_trial_matrix
 
 ejfat-staging:
   extends: .ejfat_review
