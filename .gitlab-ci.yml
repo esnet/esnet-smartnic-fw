@@ -571,6 +571,8 @@ ftap-test:
     name: review${REVIEW_TYPE}/${GL_ENV_HOST}/${GL_ENV_CARD}${GL_ENV_EXTRA}
     url: ssh://${AAP_LIMIT}
     action: start
+  variables:
+    EXTRA_VAR_STACK_ROOT_PATH: /usr/local/ejfat/${EXTRA_VAR_STACK_UNIQUE}
   rules:
     - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
       when: never
@@ -611,15 +613,49 @@ ftap-test:
     # EXTRA_VAR_FOO: "baz"
 
     EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
-    EXTRA_VAR_STACK_ROOT_PATH: /usr/local/ejfat/${EXTRA_VAR_STACK_UNIQUE}
     EXTRA_VAR_STACK_COMPOSE_PROFILES: "smartnic-mgr-dpdk-portlink,smartnic-ingress,smartnic-metrics"
   needs:
     - package
+
+.ejfat_review_test:
+  extends:
+    - .aap_run
+    - .review_run_test
+    - .ejfat
+  stage: review_test
+  variables:
+    AAP_JOB_TEMPLATE: 803
+    #
+    # AAP Job Template Overrides
+    #   See here for more overrides: https://gitlab.es.net/ht/cicd-common/-/blob/main/README.md?ref_type=heads#aap-run
+    #
+    #AAP_SCM_BRANCH: testing
+    #AAP_VERBOSITY: 3
+
+    #
+    # Extra variables provided to the playbook
+    #   EXTRA_VAR_name/EXTRA_VAR_NAME is a string which will be merged into the extra_vars dictionary as
+    #       "name": "value"
+    #     and will *override* matching keys found in the EXTRA_VARS dictionary
+    #     NOTE: keys like "NAME" or "NaMe" will be converted to lower case before merging
+    #
+    # EXTRA_VAR_FOO: "baz"
 
 ejfat-ci-trial:
   extends: .ejfat_review
   parallel:
     matrix: *ejfat_ci_trial_matrix
+
+ejfat-ci-trial-test:
+  extends: .ejfat_review_test
+  parallel:
+    matrix: *ejfat_ci_trial_matrix
+  needs:
+    - package
+    - job: ejfat-ci-trial
+      artifacts: false
+      parallel:
+        matrix: *ejfat_matrix_template
 
 ejfat-staging:
   extends: .ejfat_review
@@ -631,6 +667,7 @@ ejfat-staging:
     #   - u55c requires SFF-8636 revision 2.5 or later
     #   - power class 1 QSFP-100G-AO03 only supports SFF-8636 revision 1.3 or earlier
     EXTRA_VAR_SN_CFG_SERVER_STATS_FLAGS_DISABLE: domain-modules
+
     # ejfat-staging-dp1 is the first system that is using the new common path for smartnic stacks
     # temporarily override the path here until all other ejfat systems are using the same path,
     # at which time we can bubble the common path up to the .ejfat template.
@@ -638,20 +675,66 @@ ejfat-staging:
   parallel:
     matrix: *ejfat_staging_matrix
 
+ejfat-staging-test:
+  extends: .ejfat_review_test
+  variables:
+    EXTRA_VAR_STACK_ROOT_PATH: /usr/local/smartnic/${EXTRA_VAR_STACK_UNIQUE}
+  parallel:
+    matrix: *ejfat_staging_matrix
+  needs:
+    - package
+    - job: ejfat-staging
+      artifacts: false
+      parallel:
+        matrix: *ejfat_matrix_template
+
 ejfat-dev-multi:
   extends: .ejfat_review
   parallel:
     matrix: *ejfat_dev_multi_matrix
+
+ejfat-dev-multi-test:
+  extends: .ejfat_review_test
+  parallel:
+    matrix: *ejfat_dev_multi_matrix
+  needs:
+    - package
+    - job: ejfat-dev-multi
+      artifacts: false
+      parallel:
+        matrix: *ejfat_matrix_template
 
 ejfat-dev-single:
   extends: .ejfat_review
   parallel:
     matrix: *ejfat_dev_single_matrix
 
+ejfat-dev-single-test:
+  extends: .ejfat_review_test
+  parallel:
+    matrix: *ejfat_dev_single_matrix
+  needs:
+    - package
+    - job: ejfat-dev-single
+      artifacts: false
+      parallel:
+        matrix: *ejfat_matrix_template
+
 ejfat-prod:
   extends: .ejfat_review
   parallel:
     matrix: *ejfat_prod_matrix
+
+ejfat-prod-test:
+  extends: .ejfat_review_test
+  parallel:
+    matrix: *ejfat_prod_matrix
+  needs:
+    - package
+    - job: ejfat-prod
+      artifacts: false
+      parallel:
+        matrix: *ejfat_matrix_template
 
 .trigger_sw:
   stage: trigger_downstream
