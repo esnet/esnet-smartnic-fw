@@ -1,0 +1,7 @@
+Package: smartnic-system-setup
+Description: ESnet SmartNIC System Setup
+ Provides udev rules, systemd unit files and supporting scripts
+ to support the runtime environment for ESnet SmartNIC FPGA cards.
+Maintainer: ESnet SmartNIC Team <smartnic@es.net>
+Version: 0.1.0
+Architecture: all
