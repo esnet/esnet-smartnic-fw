@@ -1,0 +1,5 @@
+#! /usr/bin/bash
+
+# Given a PCIe device path in $DEVPATH, extract the device ID of the parent port
+echo "PCIE_PARENT_SLOT_NAME=$(basename $(dirname $DEVPATH))"
+

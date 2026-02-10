@@ -1,0 +1,119 @@
+#
+# Matches many variants of Xilinx FPGA cards in the Alveo and Versal families
+# as well as cards running variants of the OpenNIC Shell including all cards
+# running designs based on the ESnet SmartNIC Platform.
+#
+
+SUBSYSTEM=="pci", ATTR{vendor}=="0x10ee", GOTO="xilinx-device"
+GOTO="skip"
+
+LABEL="xilinx-device"
+
+#
+# Xilinx device IDs for Alveo golden images and non-smartnic images taken from:
+#   https://xilinx.github.io/Alveo-Cards/master/management-specification/appendix-a.html
+#
+
+# U200
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xD000|0x5000|0x5001|0x5002|0x5003|0x5010|0x5011|0x5012|0x5013", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# U250
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xD004|0x5004|0x5005|0x5006|0x5007|0x5014|0x5015|0x5016|0x5017", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# U280
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xD00C|0x500C|0x500D|0x500E|0x500F", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# U50
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xD020|0x5020|0x5021|0x5022|0x5023|0x5060|0x5061|0x5062|0x5063|0x506C|0x506D|0x506E|0x506F", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# U30
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xD03C|0x513C|0x513D|0x513E|0x513F", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# U55N
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x5058|0x5059|0x505A|0x505B", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# U55C
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x505C|0x505D|0x505E|0x505F", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# VCK5000
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x5044|0x5045|0x5046|0x5047|0x5048|0x5049|0x504A|0x504B", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# V70
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x5094|0x5095|0x5096|0x5097|0x50B0|0x50B1|0x50B2|0x50B3", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# UL3xxx
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x50C0|0x50C1|0x50C2|0x50C3", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+# MA35D
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x5070|0x5071|0x5072|0x5073", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+#
+# Xilinx device IDs for Versal golden images and non-smartnic images taken from:
+#   https://xilinx.github.io/AVED/amd_v80_gen5x8_exdes_2_20240408/AVED%2BV80%2B-%2BCIPS%2BConfiguration.html#pf-ids
+#
+
+# V80
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x50B4|0x50B5|0x50B6|0x50B7", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  TAG+="systemd"
+
+
+#
+# ESnet Smartnic Platform (and OpenNIC shell) device IDs
+#
+
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x903f|0x913f|0x923f|0x933f", \
+  IMPORT{program}+="smartnic-pcie-parent", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
+  IMPORT{program}+="smartnic-vpd-decoder $devpath", \
+  TAG+="systemd"
+
+LABEL="skip"
+
