@@ -1,0 +1,6 @@
+# Ignore this entire directory tree
+
+*
+!.gitignore
+!.dockerignore
+
