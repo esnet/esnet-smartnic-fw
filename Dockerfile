@@ -332,12 +332,6 @@ RUN <<EOF
     done
 EOF
 
-# Install the MinIO client command line tool.
-ADD \
-    --chmod=755 \
-    https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2025-08-13T08-35-41Z \
-    /usr/local/bin/mc
-
 # Install the gRPC health-check command line tool.
 ADD \
     --chmod=755 \
