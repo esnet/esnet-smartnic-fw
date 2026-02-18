@@ -359,6 +359,7 @@ RUN <<EOF
       pciutils \
       python3 \
       python3-pip \
+      rclone \
       tcpreplay \
       tshark \
       unzip \
