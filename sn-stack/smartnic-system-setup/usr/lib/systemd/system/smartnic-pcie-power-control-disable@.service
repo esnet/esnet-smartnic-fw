@@ -1,0 +1,24 @@
+# This service disables automatic power control for a PCIe root port.
+#
+# This is required to prevent the root port above an ESnet SmartNIC
+# FPGA card from turning power off to the device when all downstream
+# devices have been removed.  This removal happens as a normal part of
+# reprogramming the FPGA devices, and the automatic power control gets
+# in the way of rescanning after a reload, forcing a double rescan of
+# the SmartNIC's parent port.
+#
+# This service will run once per boot and will remain active to prevent
+# running again.
+
+[Unit]
+Description=Disable PCIe Automatic Power Control on %i
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'echo on > /sys/bus/pci/devices/%i/power/control'
+
+[Install]
+WantedBy=default.target
+

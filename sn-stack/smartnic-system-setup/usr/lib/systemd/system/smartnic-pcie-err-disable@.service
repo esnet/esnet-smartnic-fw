@@ -1,0 +1,26 @@
+# This service disables fatal error reporting on the PCIe root ports
+# that are connected to an ESnet SmartNIC FPGA card.
+#
+# This is required to prevent bus errors (and often reboots) during
+# initialization when the SmartNIC docker stacks are restarting and
+# reprogramming the FPGA via JTAG.
+#
+# This service will be automatically "wanted" when udev matches a smartnic
+# FPGA device on the PCIe bus.
+#   See: /usr/lib/udev/rules.d/90-smartnic-pci.rules
+#
+# This service will run once per boot and will stay active to prevent
+# being run again.
+
+[Unit]
+Description=Disable PCIe Severe and Fatal Error Reporting on %i
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/smartnic-pcie-err-disable %i
+
+[Install]
+WantedBy=default.target
+

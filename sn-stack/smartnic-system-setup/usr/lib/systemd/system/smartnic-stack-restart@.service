@@ -1,0 +1,20 @@
+# This service forces a full restart of a docker compose stack
+# associated with an ESnet SmartNIC FPGA card in a particular "slot".
+#
+# This is required to ensure that all components in the stack are properly
+# reloaded in the correct sequence on system boot or at any other time when
+# this service is manually triggered.
+
+[Unit]
+Description=Restart ESnet SmartNIC stack %i
+After=network.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=smartnic
+ExecStart=/usr/bin/smartnic-stack-restart %i
+
+[Install]
+WantedBy=default.target
+

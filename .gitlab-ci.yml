@@ -129,6 +129,8 @@ package:
   before_script:
     # Install bash and GNU find (with full regex support).
     - apk add bash findutils
+    # Install dpkg (incl. dpkg-deb) for building a deb package
+    - apk add dpkg
   script:
     # Set up the build environment
     - |
@@ -163,6 +165,10 @@ package:
 
     # Push to external registry
     - docker push $PUBLISH_URI$TAG_SUFFIX
+
+    # Build the deb package after fixing up file and directory permissions
+    - find ./sn-stack/smartnic-system-setup -print0 | xargs -0 chmod go-w
+    - dpkg-deb --build --root-owner-group sn-stack/smartnic-system-setup sn-stack/debs
 
     # Capture this job's ID for downstream triggered pipelines
     - |

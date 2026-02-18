@@ -1,0 +1,85 @@
+#!/bin/bash
+
+set -eo pipefail
+
+function usage() {
+    echo ""
+    echo "Usage: $(basename $0) <pcie_device_addr>"
+    echo "  pcie_device_addr: pcie domain:bus:device (e.g. 0000:00:01)"
+    echo "    * This should be the address of the PCIe parent port above a SmartNIC FPGA card"
+    echo ""
+}
+
+function enable_severe_error_reporting() {
+	local root_port=$1
+	echo "  Enabling Severe Error Reporting on Root Port: $root_port"
+
+	# Set SERR (0x0100) bit in COMMAND register
+	cmd=$(setpci -s $root_port COMMAND)
+	echo "    Read:   COMMAND=0x$cmd"
+	cmd=$(printf "%04x" $(("0x$cmd" | 0x0100)))
+	echo "    Modify: COMMAND=0x$cmd"
+	setpci -s $root_port COMMAND=$cmd
+	cmd=$(setpci -s $root_port COMMAND)
+	echo "    Verify: COMMAND=0x$cmd"
+}
+
+function disable_severe_error_reporting() {
+	local root_port=$1
+	echo "  Disabling Severe Error Reporting on Root Port: $root_port"
+
+	# Clear SERR (0x0100) bit in COMMAND register
+	cmd=$(setpci -s $root_port COMMAND)
+	echo "    Read:   COMMAND=0x$cmd"
+	cmd=$(printf "%04x" $(("0x$cmd" & ~0x0100)))
+	echo "    Modify: COMMAND=0x$cmd"
+	setpci -s $root_port COMMAND=$cmd
+	cmd=$(setpci -s $root_port COMMAND)
+	echo "    Verify: COMMAND=0x$cmd"
+}
+
+function enable_fatal_error_reporting() {
+	local root_port=$1
+	echo "  Enabling Fatal Error Reporting on Root Port: $root_port"
+
+	# Set Fatal Error Reporting Enable (0x0004) bit in CONTROL register
+	ctrl=$(setpci -s $root_port CAP_EXP+8.w)
+	echo "    Read:   CONTROL=0x$ctrl"
+	ctrl=$(printf "%04x" $(("0x$ctrl" | 0x0004)))
+	echo "    Modify: CONTROL=0x$ctrl"
+	setpci -s $root_port CAP_EXP+8.w=$ctrl
+	ctrl=$(setpci -s $root_port CAP_EXP+8.w)
+	echo "    Verify: CONTROL=0x$ctrl"
+}
+
+function disable_fatal_error_reporting() {
+	local root_port=$1
+	echo "  Disabling Fatal Error Reporting on Root Port: $root_port"
+
+	# Clear Fatal Error Reporting Enable (0x0004) bit in CONTROL register
+	ctrl=$(setpci -s $root_port CAP_EXP+8.w)
+	echo "    Read:   CONTROL=0x$ctrl"
+	ctrl=$(printf "%04x" $(("0x$ctrl" & ~0x0004)))
+	echo "    Modify: CONTROL=0x$ctrl"
+	setpci -s $root_port CAP_EXP+8.w=$ctrl
+	ctrl=$(setpci -s $root_port CAP_EXP+8.w)
+	echo "    Verify: CONTROL=0x$ctrl"
+}
+
+if [ "$#" -lt 1 ] ; then
+	echo "Error: Missing parameter"
+	usage
+	exit 1
+fi
+
+# The PCIe root port device address is provided as the first argument
+root_port=$1
+
+echo "Configuring Root Port ${root_port}"
+disable_severe_error_reporting $root_port
+disable_fatal_error_reporting $root_port
+#enable_severe_error_reporting $root_port
+#enable_fatal_error_reporting $root_port
+
+exit 0
+

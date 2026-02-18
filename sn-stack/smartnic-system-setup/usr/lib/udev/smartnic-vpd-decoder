@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+
+def decode_ascii_vpd(kw, kw_data):
+    kw_string = kw_data.decode('utf8')
+    print(f'VPD_{kw}="{kw_string}"')
+
+def decode_vpd_r(vpd):
+    vpd_len = len(vpd)
+    pos = 0
+    while pos < vpd_len:
+        if pos + 3 <= vpd_len:
+            kw = vpd[pos:pos+2].decode('utf8')
+            kw_len = vpd[pos+2]
+            pos += 3
+        else:
+            raise(Exception(f'VPD header truncated at vpd pos {pos}'))
+
+        if pos + kw_len <= vpd_len:
+            kw_data = vpd[pos:pos+kw_len]
+            pos += kw_len
+        else:
+            raise(Exception(f'VPD kw {kw} of length {kw_len} truncated'))
+
+        if kw in ['PN', 'EC', 'MN', 'PG', 'SN', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9']:
+            decode_ascii_vpd(kw, kw_data)
+        elif kw == 'RV':
+            cksum = kw_data[0]
+            rsvd_len = kw_len - 1
+            #print(f'  {kw}:  checksum: 0x{cksum:02x}  {rsvd_len:d} reserved bytes')
+        else:
+            #print(f'  {kw}:  Raw bytes: {kw_data}')
+            pass
+
+def decode_vpd_w(lrdt_data):
+    for i, b in enumerate(lrdt_data):
+        print(f'  {i:02d}  {b:02x}')
+
+def vpd_parse_tags(vpd_raw):
+    vpd_len = len(vpd_raw)
+    vpd_tags = []
+
+    pos = 0
+    while pos < vpd_len:
+        tag = vpd_raw[pos]
+        pos += 1
+
+        rd_type = (tag >> 7)
+
+        if rd_type == 0:
+            # Small Resource Data Type Tag
+            srdt_name = (tag >> 3) & 0xF
+            srdt_len  = tag & 0x7
+
+            if pos + srdt_len <= vpd_len:
+                srdt_data = vpd_raw[pos:pos+srdt_len]
+                pos += srdt_len
+            else:
+                raise(Exception(f'SRDT len {srdt_len} at pos {pos} would exceed total len {vpd_len}'))
+
+            vpd_tags.append((rd_type, srdt_name, srdt_data))
+        else:
+            # Large Resource Data Type Tag
+            lrdt_name = tag & 0x7F
+            if pos + 2 <= vpd_len:
+                lrdt_len = vpd_raw[pos+1] << 8 | vpd_raw[pos]
+                pos += 2
+            else:
+                raise(f'LRDT header truncated at pos {pos}')
+
+            if pos + lrdt_len <= vpd_len:
+                lrdt_data = vpd_raw[pos:pos+lrdt_len]
+                pos += lrdt_len
+            else:
+                raise(Exception(f'LRDT len {lrdt_len} at pos {pos} would exceed total len {vpd_len}'))
+
+            vpd_tags.append((rd_type, lrdt_name, lrdt_data))
+
+    return vpd_tags
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(1)
+
+    devpath = os.path.join('/sys', sys.argv[1].lstrip('/'))
+
+    if not os.path.exists(devpath):
+        # Not a valid path for a device
+        sys.exit(2)
+
+    vpdpath = os.path.join(devpath, 'vpd')
+
+    if not os.path.isfile(vpdpath):
+        # This device has no VPD add an env var showing this and exit with success
+        print(f'VPD_STATUS="missing"')
+        sys.exit(0)
+
+    if not os.access(vpdpath, os.R_OK):
+        # The VPD data is present, but we can't read it, add an env var showing this and exit with success
+        print(f'VPD_STATUS="unreadable"')
+        sys.exit(0)
+
+    with open(vpdpath, 'rb') as vpd_file:
+        vpd_raw = vpd_file.read()
+
+    vpd_tags = vpd_parse_tags(vpd_raw)
+
+    if len(vpd_tags) < 1:
+        raise(Exception(f'VPD data has no tags'))
+
+    print(f'VPD_STATUS="OK"')
+
+    for rd_type, rdt_name, rdt_data in vpd_tags:
+        if rd_type == 0:
+            # Small Resource Data Type
+            if rdt_name == 0xF:
+                # End Tag
+                #print(f'End Tag')
+                pass
+            else:
+                raise(Exception(f'Unknown SRDT: {srdt_name:1x} Raw bytes: {rdt_data}'))
+        else:
+            # Large Resource Data Type
+            if rdt_name == 0x02:
+                # Identifier String
+                rdt_string = rdt_data.decode('utf8')
+                print(f'VPD_IDENT="{rdt_string}"')
+            elif rdt_name == 0x10:
+                # VPD-R (read-only) section
+                #print(f'VPD-R')
+                decode_vpd_r(rdt_data)
+            elif rdt_name == 0x11:
+                # VPD-W (read-write) section
+                #print(f'VPD-W')
+                #decode_vpd_w(rdt_data)
+                pass
+            else:
+                raise(Exception(f'Unknown LRDT: {rdt_name:1x} Raw bytes: {rdt_data}'))
+
+if __name__ == "__main__":
+    main()
+
