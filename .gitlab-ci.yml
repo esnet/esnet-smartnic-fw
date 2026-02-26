@@ -3,7 +3,7 @@ include:
   - template: 'Workflows/Branch-Pipelines.gitlab-ci.yml'
   - project: 'security/container-scanning'
     file: '.ESnet-container-scan.yml'
-  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.3.3
+  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.3.4
     inputs:
       aap_host:  $AAP_HOST
       aap_token: $AAP_TOKEN
