@@ -93,6 +93,52 @@ pull_sn_hw:
         hwapi.env
   needs: []
 
+
+bootstrap:
+  stage: build
+  image: wharf.es.net/dockerhub-proxy/library/alpine:3
+  variables:
+    DISPENSE_BASE_URL: https://dispense.es.net/Linux/xilinx
+  before_script:
+    # Install bash and GNU find (with full regex support).
+    - apk add bash findutils
+    # Install dpkg (incl. dpkg-deb) for building a deb package
+    - apk add dpkg
+    # Tools for managing compressed archives
+    - apk add zstd
+    - apk add unzip
+    # Fix up the permissions on the deb package dir since CI sets perms to group/other writable
+    - find ./smartnic-system-setup -print0 | xargs -0 chmod go-w
+  script:
+    # Set up the build environment
+    - |
+      cat <<_EOF > .env
+      SN_HW_BOARD=${SN_HW_BOARD}
+      SN_HW_APP_NAME=${SN_HW_APP_NAME}
+      SN_HW_VER=${SN_HW_VER}
+      _EOF
+    - cat .env
+
+    - ./build-bootstrap.sh
+
+    # Download SC FW assets from dispense which match the files that external users would download manually
+    - wget -q -P sn-bootstrap ${DISPENSE_BASE_URL}/SC_U280_4_3_31.zip
+    - wget -q -P sn-bootstrap ${DISPENSE_BASE_URL}/SC_U55C_7_1_24.zip
+
+    # Download loadsc tool assets from dispense which are not directly available on xilinx.com
+    - wget -q ${DISPENSE_BASE_URL}/loadsc_v2.3.zip
+    - unzip -j -d sn-bootstrap loadsc_v2.3.zip bin/loadsc
+    - chmod 755 sn-bootstrap/loadsc
+
+    - tree sn-bootstrap
+  artifacts:
+    name: "artifacts.$CI_PROJECT_NAME.$SN_HW_BOARD.$SN_HW_APP_NAME.$CI_JOB_NAME.$CI_PIPELINE_ID"
+    paths:
+      - sn-bootstrap
+    expire_in: 3 month
+  needs:
+    - pull_sn_hw
+
 package:
   stage: build
   image: wharf.es.net/dockerhub-proxy/library/docker:26.1
@@ -129,8 +175,6 @@ package:
   before_script:
     # Install bash and GNU find (with full regex support).
     - apk add bash findutils
-    # Install dpkg (incl. dpkg-deb) for building a deb package
-    - apk add dpkg
   script:
     # Set up the build environment
     - |
@@ -165,10 +209,6 @@ package:
 
     # Push to external registry
     - docker push $PUBLISH_URI$TAG_SUFFIX
-
-    # Build the deb package after fixing up file and directory permissions
-    - find ./sn-stack/smartnic-system-setup -print0 | xargs -0 chmod go-w
-    - dpkg-deb --build --root-owner-group sn-stack/smartnic-system-setup sn-stack/debs
 
     # Capture this job's ID for downstream triggered pipelines
     - |
