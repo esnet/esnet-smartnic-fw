@@ -404,7 +404,57 @@ Initially, there will not be any application installed under `/usr/local/smartni
 
 # Check all the things before handing off to the smartnic application service owners
 
-TODO: SOME SCRIPT GOES HERE TO CHECK ALL THE THINGS
+```
+ ┌─────────────┬──────────────────────────────────────────┬───────────────────────────────────────────────────┐
+ │  Category   │              Checklist Item              │               Verification Command                │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ OS          │ Ubuntu Server 22.04/24.04 installed      │ lsb_release -a                                    │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Kernel      │ Kernel command line configured correctly │ cat /proc/cmdline                                 │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Kernel      │ Hugepages enabled (32 x 1GB)             │ grep -i hugepages /proc/meminfo                   │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Kernel      │ IOMMU enabled                            │ dmesg | grep -i -E "(DMAR|IOMMU)"                 │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Kernel      │ Grub config updated                      │ grep GRUB_CMDLINE_LINUX_DEFAULT /etc/default/grub │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Docker      │ Docker installed                         │ docker version                                    │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Docker      │ Docker Compose installed                 │ docker compose version                            │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Docker      │ Docker functional                        │ docker run --rm hello-world                       │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ User        │ smartnic user exists                     │ id smartnic                                       │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ User        │ smartnic user in docker group            │ groups smartnic | grep docker                     │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ User        │ smartnic can run docker                  │ sudo -u smartnic docker ps                        │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Directories │ /usr/local/smartnic exists               │ test -d /usr/local/smartnic && echo OK            │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Directories │ Slot directories exist (0-9)             │ ls -la /usr/local/smartnic/                       │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Directories │ Ownership correct                        │ stat -c '%U:%G' /usr/local/smartnic/{0..9}        │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Packages    │ libboost-program-options installed       │ dpkg -l libboost-program-options1.74.0            │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Packages    │ xbflash2 installed                       │ which xbflash2                                    │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ Packages    │ smartnic-system-setup installed          │ dpkg -l smartnic-system-setup                     │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ udev        │ SmartNIC udev rules installed            │ ls /etc/udev/rules.d/*smartnic*                   │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ systemd     │ PCIe error disable service exists        │ systemctl cat smartnic-pcie-err-disable@.service  │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ systemd     │ Stack restart service enabled (per slot) │ systemctl is-enabled smartnic-stack-restart@<N>   │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ PCIe        │ Xilinx FPGA cards detected               │ lspci -Dd 10ee:                                   │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ PCIe        │ Cards show as SmartNIC (post-flash)      │ lspci -Dd 10ee:903f -Dd 10ee:913f                 │
+ ├─────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ USB         │ JTAG adapters detected                   │ lsusb | grep -i xilinx                            │
+ └─────────────┴──────────────────────────────────────────┴───────────────────────────────────────────────────┘
+ ```
 
 # Conclusion
 
