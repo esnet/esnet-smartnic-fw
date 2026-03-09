@@ -18,6 +18,7 @@ mkdir -p ${OUT}
 
 # Copy the system setup readme
 cp sn-stack/README.SYSTEM.SETUP.md ${OUT}
+cp sn-stack/README.SYSTEM.DECOM.md ${OUT}
 
 # Build the smartnic-system-setup deb package after fixing up file and directory permissions
 dpkg-deb --build --root-owner-group smartnic-system-setup ${OUT}

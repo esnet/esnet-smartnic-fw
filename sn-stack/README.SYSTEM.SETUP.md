@@ -229,6 +229,7 @@ This zip file contains the following files
 $ tree sn-bootstrap/
 sn-bootstrap/
 ├── README.SYSTEM.SETUP.md    <------------ copy of this document
+├── README.SYSTEM.DECOM.md    <------------ instructions to decommission an ESnet SmartNIC system
 ├── SC_U280_4_3_31.zip        <------------ (optional) Satellite Controller Firmware Image (au280)
 ├── SC_U55C_7_1_24.zip        <------------ (optional) Satellite Controller Firmware Image (au55c)
 ├── esnet-smartnic.au280.mcs  <------------ FPGA card flash image for au280 FPGA card
