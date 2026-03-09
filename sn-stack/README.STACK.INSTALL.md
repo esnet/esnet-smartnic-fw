@@ -1,7 +1,11 @@
-One-time Setup of the Runtime Environment
-=========================================
+One-time Setup of the Host Server
+=================================
 
-The smartnic runtime environment also requires `docker` and `docker compose` as described in README.md at the top of this repo.
+Server setup
+------------
+All of the steps for setting up a server to host one or more ESnet SmartNIC application stacks is contained in the `README.SERVER.SETUP.md` file found next to this file in the `esnet-smartnic-fw` repository.
+
+The steps itemized in that document are typically performed by system adminstrators prior to handing off the system to the users operating the SmartNIC application stack.  Please ensure that all steps from that document are completed before proceeding.
 
 Set up Xilinx Labtools
 ----------------------
