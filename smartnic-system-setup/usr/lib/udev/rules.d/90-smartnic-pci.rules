@@ -108,12 +108,22 @@ ATTR{vendor}=="0x10ee", ATTR{device}=="0x50B4|0x50B5|0x50B6|0x50B7", \
 # ESnet Smartnic Platform (and OpenNIC shell) device IDs
 #
 
+# First rule works for all SmartNICs with or without valid VPD and handles PCIe parent port bindings
 ATTR{vendor}=="0x10ee", ATTR{device}=="0x903f|0x913f|0x923f|0x933f", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
-  IMPORT{program}+="smartnic-vpd-decoder $devpath", \
   TAG+="systemd"
+
+# Second rule adds VPD attributes for any devices that have a valid, parseable VPD extension
+# This rule will fail to match and be entirely ignored if there are any errors parsing the VPD data.
+#
+# **WARNING** DO NOT MERGE THIS WITH THE PREVIOUS GENERIC RULE
+#             or a failure to parse VPD will result in NOT configuring
+#             the rules / systemd bindings for managing the parent port
+#
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x903f|0x913f|0x923f|0x933f", \
+  IMPORT{program}+="smartnic-vpd-decoder $devpath"
 
 LABEL="skip"
 
