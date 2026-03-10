@@ -144,7 +144,54 @@ The build script also automatically customizes the `sn-stack/.env` file to refer
 
 The entire `sn-stack` directory will need to be transferred to the runtime system.
 
-```
+``` bash
 cd $(git rev-parse --show-toplevel)
 zip -r artifacts.esnet-smartnic-fw.package.0.zip sn-stack
+```
+
+Download Xilinx Alveo Satellite Controller Update Tool (optional)
+-----------------------------------------------------------------
+
+The Satellite Controller is a small microcontroller that is adjacent to the FPGA chip on the Alveo au280/au55c FPGA cards.  This chip controlls the card initialization and monitoring.  The factory installed firmware is often old and missing bug fixes.
+
+These optional downloads from Xilinx will allow you to update the firmware on the Satellite Controller to the latest version.
+
+Download the Alveo Smartnic Satellite Controller Update Tool
+* Open a web browser to this page: https://adaptivesupport.amd.com/s/article/73654
+* At the bottom of the page under the `Files` section
+  * Download `loadsc_v2.3.zip`
+  * Save the file as exactly `loadsc_v2.3.zip`
+
+Download the latest Satellite Controller Firmware Releases
+* Open a web browser to this page: https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
+* At the bottom of the page under the `Files` section
+  * Download `SC_U280_4_3_31.zip`
+    * Save the file as exactly `SC_U280_4_3_31.zip`
+  * Download `SC_U55C_7_1_24.zip`
+    * Save the file as exactly `SC_U55C_7_1_24.zip`
+
+Build the smartnic-bootstrap package for Ubuntu Servers (optional)
+------------------------------------------------------------------
+
+The smartnic-bootstrap package can be used to commission a new server to be used as a host for ESnet SmartNIC applications.  It is a sequence of steps that only need to be done once when bringing up new FPGA cards or a brand new server.
+
+``` bash
+cd $(git rev-parse --show-toplevel)
+./build-bootstrap.sh
+```
+
+If you downloaded the (optional) `loadsc` zip file in the previous section, unzip the tool and place it into the `sn-bootstrap` directory so it will be available during server bootstrapping.
+``` bash
+cd $(git rev-parse --show-toplevel)
+unzip -j -d sn-bootstrap loadsc_v2.3.zip bin/loadsc
+chmod 755 sn-bootstrap/loadsc
+```
+
+If you downloaded the (optional) latest Satellite Controller firmware releases in the previous section, copy the `SC_*.zip` files into the `sn-bootstrap` directory so they will be available during server bootstrapping.
+
+The entire `sn-bootstrap` directory will need to be transferred to the runtime system.  Zip it up and make it available to the sysadmin who will be bootstrapping the server containing your FPGA cards.
+
+``` bash
+cd $(git rev-parse --show-toplevel)
+zip -r artifacts.esnet-smartnic-fw.bootstrap.0.zip sn-bootstrap
 ```
