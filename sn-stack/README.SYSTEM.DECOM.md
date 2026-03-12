@@ -55,7 +55,7 @@ sudo systemctl disable smartnic-stack-restart@
 
 List all remaining application stacks started by `docker compose`
 ``` bash
-docker compose ls
+sudo docker compose ls
 ```
 
 This should print one line for each application stack that is running on this host.  These will typically be in the form
@@ -75,7 +75,7 @@ sudo -i -u userid docker compose --project-directory /home/userid/some/path down
 
 List all remaining application stacks started by `docker compose`
 ``` bash
-docker compose ls
+sudo docker compose ls
 ```
 
 **NOTE** Do NOT proceed until all running application stacks have been stopped.
