@@ -55,7 +55,7 @@ sudo systemctl disable smartnic-stack-restart@
 
 List all remaining application stacks started by `docker compose`
 ``` bash
-docker compose ls
+sudo docker compose ls
 ```
 
 This should print one line for each application stack that is running on this host.  These will typically be in the form
@@ -75,7 +75,7 @@ sudo -i -u userid docker compose --project-directory /home/userid/some/path down
 
 List all remaining application stacks started by `docker compose`
 ``` bash
-docker compose ls
+sudo docker compose ls
 ```
 
 **NOTE** Do NOT proceed until all running application stacks have been stopped.
@@ -88,9 +88,15 @@ for i in $(lspci -Dd 10ee: | awk -F' ' '{ print $1 }' | grep '0$') ; do echo "$i
 ```
 
 Wipe the user image from all FPGA cards using `xbflash2`
+
+This step requires that you obtain the `xbflash2` program.  This is typically provided as part of the bootstrap zip file that was used during initial server commissioning.  Refer to the "Obtain SmartNIC Bootstrap Zip file" section of `README.SYSTEM.SETUP.md`.
 ``` bash
+#unzip artifacts.esnet-smartnic-fw.bootstrap.0.zip
+#unzip artifacts.esnet-smartnic-fw.[au280|au55c].ejfat.bootstrap.<build#>.zip
 cd sn-bootstrap
-for i in $(lspci -Dd 10ee: | awk -F' ' '{ print $1 }' | grep '0$') ; do printf "\n" | sudo ./xbflash2 program --spi --revert-to-golden -d $i -b 2 -s 0x20000 ; done
+for card_addr in $(lspci -Dd 10ee: | awk -F' ' '{ print $1 }' | grep '0$') ; do
+  printf "\n" | sudo ./xbflash2 program --spi --revert-to-golden --bar 2 --bar-offset 0x20000 --device $card_addr
+done
 ```
 
 # Purge the `smartnic-system-setup` deb package

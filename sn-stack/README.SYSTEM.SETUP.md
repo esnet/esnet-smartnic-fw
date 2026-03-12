@@ -235,7 +235,7 @@ sn-bootstrap/
 ├── esnet-smartnic.au280.mcs  <------------ FPGA card flash image for au280 FPGA card
 ├── esnet-smartnic.au55c.mcs  <------------ FPGA card flash image for au55c FPGA card
 ├── loadsc                    <------------ (optional) Xilinx tool for upgrading Satellite Controller
-├── smartnic-system-setup_0.2.0_all.deb <-- Debian package providing udev and systemd units for card management
+├── smartnic-system-setup_0.3.0_all.deb <-- Debian package providing udev and systemd units for card management
 └── xbflash2                  <------------ Xilinx tool for programming FPGA card flash images
 ```
 (version numbers above are latest as of March 2026)
@@ -263,7 +263,7 @@ The `smartnic-system-setup` package contains `udev` and `systemd` services and s
 
 ``` bash
 cd sn-bootstrap
-sudo dpkg -i smartnic-system-setup_0.2.0_all.deb
+sudo dpkg -i smartnic-system-setup_0.3.0_all.deb
 ```
 
 # Convert FPGA cards from factory images to ESnet SmartNIC images
@@ -279,9 +279,15 @@ This tool requires one or more packages on the host system as dependencies, inst
 sudo apt install --no-install-recommends libboost-program-options1.74.0
 ```
 
-## Write the SmartNIC image onto the flash storage of each FPGA card
+## Install `parallel` to allow faster execution of updates in parallel
 
-**NOTE** This step will take approx. 10 min per card if run using the loops below.  Running multiple xbflash2 processes on different cards in parallel is safe and can speed this up when you have multiple cards.
+Later long-running steps can be run in parallel.  This can save 30+ minutes when operating on multi-card systems.  Install a helper package to make this more ergonomic.
+
+``` bash
+sudo apt install parallel
+```
+
+## Write the SmartNIC image onto the flash storage of each FPGA card
 
 Find out what type of FPGA cards you have
 ``` bash
@@ -293,20 +299,24 @@ $ lspci -Dd 10ee:
 ```
 (example from a system with four Alveo au55c FPGA cards)
 
+**NOTE** The following commands will program all factory cards in parallel with delayed, interleaved console output.  Line-buffered IO here means that the progress updates don't come out very often.  Be patient even if it looks like it's not doing anything for multiple minutes.  This process takes ~10 minutes total to program all of your cards.  Doing this sequentially would take 10 minutes *per card*.
+
 If your FPGA cards are au55C cards, they will have reported as `Xilinx Corporation Device 505c`.  Use these commands to program their flash.
 ``` bash
 cd sn-bootstrap
-for card_addr in $(lspci -Dd 10ee:505c | awk -F' ' '{ print $1 }') ; do
-  printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au55c.mcs --bar-offset 0x1f06000 -d $card_addr
-done
+lspci -Dd 10ee:505c | awk -F' ' '{ print $1 }' | \
+  time \
+  parallel --verbose --line-buffer --tag --no-run-if-empty \
+    'printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au55c.mcs --bar-offset 0x1f06000 --device {}'
 ```
 
 If your FPGA cards are au280 cards, they will have reported as `Xilinx Corporation Device 500c`.  Use these commands to program their flash.
 ``` bash
 cd sn-bootstrap
-for card_addr in $(lspci -Dd 10ee:500c | awk -F' ' '{ print $1 }') ; do
-  printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au280.mcs --bar-offset 0x40000 -d $card_addr
-done
+lspci -Dd 10ee:500c | awk -F' ' '{ print $1 }' | \
+  time \
+  parallel --verbose --line-buffer --tag --no-run-if-empty \
+    'printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au280.mcs --bar-offset 0x40000 --device {}'
 ```
 
 ## Cold boot the system
@@ -371,6 +381,16 @@ $ sudo lspci -vvv -Dd 10ee:903f | awk '/^0000/ { print } /Vital Prod/,/Advanced 
 			[SN] Serial number: XFL1......TC
 			[RV] Reserved: checksum good, 0 byte(s) reserved
 		End
+```
+(example from a system with four Alveo au55c FPGA cards -- your bus addresses may differ)
+
+Another view of the same information can be seen with this command but from the perspective of the devices detected by udev + systemd
+``` bash
+$ lspci -Dd 10ee:903f | awk -F' ' '{ print $1 }' sudo xargs -I{} systemctl list-units --full --quiet --legend=no --no-pager 'sys-devices-pci*-{}.device'
+  sys-devices-pci0000:20-0000:20:01.1-0000:21:00.0.device loaded active plugged ESnet SmartNIC XFL1......2V
+  sys-devices-pci0000:20-0000:20:01.2-0000:22:00.0.device loaded active plugged ESnet SmartNIC XFL1......0U
+  sys-devices-pci0000:80-0000:80:01.1-0000:81:00.0.device loaded active plugged ESnet SmartNIC XFL1......Z0
+  sys-devices-pci0000:80-0000:80:01.2-0000:82:00.0.device loaded active plugged ESnet SmartNIC XFL1......TC
 ```
 (example from a system with four Alveo au55c FPGA cards -- your bus addresses may differ)
 
