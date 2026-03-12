@@ -83,9 +83,9 @@ def batch_table(op, **kargs):
 # Restrict parsing to formatting of mpz_set_str (https://gmplib.org/manual/Assigning-Integers)
 # with base 0 (0x/0X for hexadecimal, 0b/0B for binary, 0 for octal, or decimal otherwise).
 MPZ_RE = r'(0[xX][0-9a-fA-F]+|0[bB][01]+|0[0-7]+|\d+)'
-MATCH_KEY_ONLY_RE = re.compile(r'^(?P<key>' + MPZ_RE + ')$')
-MATCH_KEY_MASK_RE = re.compile(r'^(?P<key>' + MPZ_RE + ')&&&(?P<mask>' + MPZ_RE + ')$')
-MATCH_KEY_PREFIX_RE = re.compile(r'^(?P<key>' + MPZ_RE + ')/(?P<prefix_length>\d+)$')
+MATCH_KEY_ONLY_RE = re.compile(r'^(?P<key>' + MPZ_RE + r')$')
+MATCH_KEY_MASK_RE = re.compile(r'^(?P<key>' + MPZ_RE + r')&&&(?P<mask>' + MPZ_RE + r')$')
+MATCH_KEY_PREFIX_RE = re.compile(r'^(?P<key>' + MPZ_RE + r')/(?P<prefix_length>\d+)$')
 MATCH_RANGE_RE = re.compile(r'^(?P<lower>\d+)->(?P<upper>\d+)$')
 ACTION_PARAM_RE = re.compile(r'^' + MPZ_RE + r'$')
 

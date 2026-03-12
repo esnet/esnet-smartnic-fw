@@ -6,7 +6,9 @@
 #
 
 ARG DOCKERHUB_PROXY
-FROM ${DOCKERHUB_PROXY:-}library/ubuntu:jammy AS base
+FROM ${DOCKERHUB_PROXY:-}library/ubuntu:noble AS base
+
+SHELL ["bash", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LC_ALL=C.UTF-8
@@ -22,12 +24,45 @@ RUN <<EOF
     apt update -y
 
     apt install -y --no-install-recommends \
-      locales \
+      locales
 
     locale-gen en_US.UTF-8
     update-locale LANG=en_US.UTF-8
     rm -rf /var/lib/apt/lists/*
 EOF
+
+# Setup a Python virtualenv for managing Python-based build tools/libraries
+# separately from system packages.
+ADD \
+    --unpack=true \
+    --chown=root:root \
+    --checksum=sha256:5a360b0de092ddf4131f5313d0411b48c4e95e8107e40c3f8f2e9fcb636b3583 \
+    https://releases.astral.sh/github/uv/releases/download/0.10.11/uv-x86_64-unknown-linux-gnu.tar.gz \
+    /root
+
+RUN <<EOF
+    set -ex
+
+    # Install a Python virtualenv manager.
+    chown root:root /root/uv-x86_64-unknown-linux-gnu/*
+    mv /root/uv-x86_64-unknown-linux-gnu/uv{,x} /usr/local/bin/.
+    rm -r /root/uv-x86_64-unknown-linux-gnu
+
+    # Create a new virtualenv for the root user.
+    uv venv --directory / --no-project --no-config --clear
+EOF
+
+RUN cat <<EOF >/root/.bash_root_venv_activate
+VIRTUAL_ENV_DISABLE_PROMPT=1
+source /.venv/bin/activate
+EOF
+
+RUN cat <<EOF >/root/.bash_env
+source /root/.bash_root_venv_activate
+EOF
+
+# For "bash -c"/"sh -c" invocations to activate the Python virtualenv.
+ENV BASH_ENV="/root/.bash_env"
 
 #
 # Create a stage that provides a full build environment
@@ -42,15 +77,12 @@ RUN <<EOF
 
     apt install -y --no-install-recommends \
       build-essential \
+      ca-certificates \
       pkg-config \
-      python3 \
-      python3-pip \
-      python3-setuptools \
-      python3-wheel \
-      wget
+      python3
 EOF
 
-RUN pip3 install --no-cache-dir \
+RUN uv pip install --no-cache \
     meson \
     ninja
 
@@ -73,9 +105,11 @@ RUN <<EOF
       libnuma-dev \
       libpcap-dev \
       libssl-dev \
-      python3-pyelftools \
       zlib1g-dev
 EOF
+
+RUN uv pip install --no-cache \
+    pyelftools
 
 COPY xilinx-qdma-for-opennic/QDMA/DPDK /QDMA/DPDK
 COPY dpdk-patches /dpdk-patches
@@ -83,16 +117,19 @@ COPY dpdk-patches /dpdk-patches
 # Download build and install DPDK
 ARG DPDK_BASE_URL="https://fast.dpdk.org/rel"
 ARG DPDK_VER="22.11.2"
-#ARG DPDK_TOPDIR="dpdk-${DPDK_VER}"
-ARG DPDK_TOPDIR="dpdk-stable-${DPDK_VER}"
+ARG DPDK_TOPDIR="/root/dpdk-stable-${DPDK_VER}"
 ARG DPDK_PLATFORM
 ARG DPDK_CPU_INSTRUCTION_SET
 
+ADD \
+    --unpack=true \
+    --chown=root:root \
+    --checksum=sha256:af64bdda15087ff8d429894b9ea6cbbbb6ee7a932bdb344f82b0dc366379a2d4 \
+    $DPDK_BASE_URL/dpdk-$DPDK_VER.tar.xz \
+    /root
+
 RUN <<EOF
     set -ex
-    wget -q $DPDK_BASE_URL/dpdk-$DPDK_VER.tar.xz
-    tar xf dpdk-$DPDK_VER.tar.xz
-    rm dpdk-$DPDK_VER.tar.xz
     cd $DPDK_TOPDIR
     ln -s /QDMA/DPDK/drivers/net/qdma ./drivers/net
     patch -p 1 < /dpdk-patches/0000-dpdk-include-xilinx-qdma-driver.patch
@@ -118,6 +155,7 @@ FROM builder AS pktgen
 
 # Import build artifacts from dpdk stage
 COPY --from=dpdk /dpdk-install-root/ /
+COPY pktgen-patches /pktgen-patches
 RUN ldconfig
 
 # Install the build dependencies for libdpdk
@@ -145,12 +183,19 @@ EOF
 # Build and install pktgen-dpdk
 ARG PKTGEN_BASE_URL="https://github.com/pktgen/Pktgen-DPDK/archive/refs/tags"
 ARG PKTGEN_VER=23.03.0
-ARG PKTGEN_TOPDIR="Pktgen-DPDK-pktgen-${PKTGEN_VER}"
+ARG PKTGEN_TOPDIR="/root/Pktgen-DPDK-pktgen-${PKTGEN_VER}"
+
+ADD \
+    --unpack=true \
+    --chown=root:root \
+    --checksum=sha256:bc26afd81d25d4ba4f8307edaf59e29f23525af6bc10de77472cb41390412df9 \
+    $PKTGEN_BASE_URL/pktgen-$PKTGEN_VER.tar.gz \
+    /root
+
 RUN <<EOF
-    wget -q $PKTGEN_BASE_URL/pktgen-$PKTGEN_VER.tar.gz
-    tar xaf pktgen-$PKTGEN_VER.tar.gz
-    rm pktgen-$PKTGEN_VER.tar.gz
+    set -ex
     cd $PKTGEN_TOPDIR
+    patch -p 1 < /pktgen-patches/0000-pktgen-compile-errors.patch
     export PKTGEN_DESTDIR=/pktgen-install-root
     make buildlua
     make install
@@ -180,7 +225,7 @@ RUN <<EOF
       zstd
 EOF
 
-RUN pip3 install --no-cache-dir \
+RUN uv pip install --no-cache \
     grpcio-tools \
     poetry
 
@@ -190,9 +235,8 @@ WORKDIR /sn-fw/source
 # Build and install the Python regmap library.
 WORKDIR regio
 RUN poetry build
-RUN pip3 install --no-cache-dir \
-    --find-links \
-    ./dist \
+RUN uv pip install --no-cache \
+    --find-links ./dist \
     regio[shells]
 
 # Set up env vars that point us to the hardware artifact
@@ -266,10 +310,10 @@ RUN <<EOF
       less \
       lsof \
       net-tools \
-      libgrpc++1 \
+      openssl \
+      libgrpc++1.51t64 \
       libmicrohttpd12 \
       python3 \
-      python3-pip \
       screen \
       socat \
       tree \
@@ -280,7 +324,7 @@ RUN <<EOF
     rm -rf /var/lib/apt/lists/*
 EOF
 
-RUN pip3 install --no-cache-dir \
+RUN uv pip install --no-cache \
     grpcio-tools
 
 # Import the build artifacts from the firmware
@@ -290,7 +334,7 @@ COPY --from=firmware /sn-fw/source/regio/dist/ /usr/local/share/esnet-smartnic/p
 RUN ldconfig
 
 # Install the generated Python regmap and configuration client.
-RUN pip3 install --no-cache-dir \
+RUN uv pip install --no-cache \
     --find-links /usr/local/share/esnet-smartnic/python \
     regio[shells] \
     regmap_esnet_smartnic \
@@ -298,37 +342,32 @@ RUN pip3 install --no-cache-dir \
     sn_p4
 
 # Install bash completions.
-RUN regio-esnet-smartnic -t zero -p none completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
-RUN sn-cfg completions bash >/usr/share/bash-completion/completions/sn-cfg
-RUN sn-p4 completions bash >/usr/share/bash-completion/completions/sn-p4
+RUN uv run \
+    regio-esnet-smartnic -t zero -p none completions bash >/usr/share/bash-completion/completions/regio-esnet-smartnic
+RUN uv run \
+    sn-cfg completions bash >/usr/share/bash-completion/completions/sn-cfg
+RUN uv run \
+    sn-p4 completions bash >/usr/share/bash-completion/completions/sn-p4
 
-RUN cat <<EOF >> /root/.bashrc
+RUN cat <<"EOF" >>/root/.bashrc
+
+# Enable the Python virtualenv containing runtime tools.
+. /root/.bash_root_venv_activate
 
 # Enable bash completion for non-login interactive shells.
 if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
     . /etc/bash_completion
 fi
+
 EOF
-
-# RUN <<EOF
-#     set -ex
-#     cat <<'_EOF' >>/root/.bashrc
-
-# # Enable bash completion for non-login interactive shells.
-# if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
-#     . /etc/bash_completion
-# fi
-# _EOF
-# EOF
 
 # Setup the test automation framework.
 # Install Python dependencies for the test automation libraries.
 COPY ./sn-stack/test/ /test
-WORKDIR /test
 RUN <<EOF
     set -ex
-    for req in $(find . -type f -name pip-requirements.txt); do
-        pip3 install --no-cache-dir --no-deps --requirement="${req}"
+    for req in $(find /test -type f -name pip-requirements.txt); do
+        uv pip install --no-cache --no-deps --requirement="${req}"
     done
 EOF
 
@@ -339,13 +378,21 @@ ADD \
     /usr/local/bin/grpc_health_probe
 
 # Install gRPC debug tool (uncomment for inclusion).
-# RUN <<EOF
-#     set -ex
-#     cd /tmp
-#     wget -Ogrpcurl.deb https://github.com/fullstorydev/grpcurl/releases/download/v1.9.2/grpcurl_1.9.2_linux_amd64.deb
-#     apt install ./grpcurl.deb
-#     rm -f grpcurl.deb
-# EOF
+
+#ARG GRPCURL_VERSION="1.9.2"
+#ARG GRPCURL_DEB="grpcurl_${GRPCURL_VERSION}_linux_amd64.deb"
+#ADD \
+#    --chown=root:root \
+#    --checksum=sha256:be1a79d01b1dd7c42f06a76eb497964be731ca76f4f3ff2b2c471fdc01dfac60 \
+#    https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}/${GRPCURL_DEB} \
+#    /root
+#
+#RUN <<EOF
+#    set -ex
+#    cd /root
+#    apt install ./${GRPCURL_DEB}
+#    rm -f ${GRPCURL_DEB}
+#EOF
 
 # Install some useful tools to have inside of this container
 RUN <<EOF
@@ -358,12 +405,12 @@ RUN <<EOF
       lsb-release \
       pciutils \
       python3 \
-      python3-pip \
       rclone \
       tcpreplay \
       tshark \
       unzip \
       vim-tiny \
+      wget \
       zstd
 
     apt autoclean
@@ -371,7 +418,7 @@ RUN <<EOF
     rm -rf /var/lib/apt/lists/*
 EOF
 
-RUN pip3 install --no-cache-dir \
+RUN uv pip install --no-cache \
     scapy \
     yq
 
