@@ -279,9 +279,15 @@ This tool requires one or more packages on the host system as dependencies, inst
 sudo apt install --no-install-recommends libboost-program-options1.74.0
 ```
 
-## Write the SmartNIC image onto the flash storage of each FPGA card
+## Install `parallel` to allow faster execution of updates in parallel
 
-**NOTE** This step will take approx. 10 min per card if run using the loops below.  Running multiple xbflash2 processes on different cards in parallel is safe and can speed this up when you have multiple cards.
+Later long-running steps can be run in parallel.  This can save 30+ minutes when operating on multi-card systems.  Install a helper package to make this more ergonomic.
+
+``` bash
+sudo apt install parallel
+```
+
+## Write the SmartNIC image onto the flash storage of each FPGA card
 
 Find out what type of FPGA cards you have
 ``` bash
@@ -293,20 +299,24 @@ $ lspci -Dd 10ee:
 ```
 (example from a system with four Alveo au55c FPGA cards)
 
+**NOTE** The following commands will program all factory cards in parallel with delayed, interleaved console output.  Line-buffered IO here means that the progress updates don't come out very often.  Be patient even if it looks like it's not doing anything for multiple minutes.  This process takes ~10 minutes total to program all of your cards.  Doing this sequentially would take 10 minutes *per card*.
+
 If your FPGA cards are au55C cards, they will have reported as `Xilinx Corporation Device 505c`.  Use these commands to program their flash.
 ``` bash
 cd sn-bootstrap
-for card_addr in $(lspci -Dd 10ee:505c | awk -F' ' '{ print $1 }') ; do
-  printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au55c.mcs --bar-offset 0x1f06000 -d $card_addr
-done
+lspci -Dd 10ee:505c | awk -F' ' '{ print $1 }' | \
+  time \
+  parallel --verbose --line-buffer --tag --no-run-if-empty \
+    'printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au55c.mcs --bar-offset 0x1f06000 --device {}'
 ```
 
 If your FPGA cards are au280 cards, they will have reported as `Xilinx Corporation Device 500c`.  Use these commands to program their flash.
 ``` bash
 cd sn-bootstrap
-for card_addr in $(lspci -Dd 10ee:500c | awk -F' ' '{ print $1 }') ; do
-  printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au280.mcs --bar-offset 0x40000 -d $card_addr
-done
+lspci -Dd 10ee:500c | awk -F' ' '{ print $1 }' | \
+  time \
+  parallel --verbose --line-buffer --tag --no-run-if-empty \
+    'printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au280.mcs --bar-offset 0x40000 --device {}'
 ```
 
 ## Cold boot the system
