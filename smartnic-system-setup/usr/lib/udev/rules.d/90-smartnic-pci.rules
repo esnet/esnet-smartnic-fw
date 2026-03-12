@@ -123,7 +123,8 @@ ATTR{vendor}=="0x10ee", ATTR{device}=="0x903f|0x913f|0x923f|0x933f", \
 #             the rules / systemd bindings for managing the parent port
 #
 ATTR{vendor}=="0x10ee", ATTR{device}=="0x903f|0x913f|0x923f|0x933f", \
-  IMPORT{program}+="smartnic-vpd-decoder $devpath"
+  IMPORT{program}+="smartnic-vpd-decoder $devpath", \
+  ENV{ID_MODEL}="$env{VPD_IDENT} $env{VPD_SN}"
 
 LABEL="skip"
 
