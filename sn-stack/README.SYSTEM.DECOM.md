@@ -94,7 +94,9 @@ This step requires that you obtain the `xbflash2` program.  This is typically pr
 #unzip artifacts.esnet-smartnic-fw.bootstrap.0.zip
 #unzip artifacts.esnet-smartnic-fw.[au280|au55c].ejfat.bootstrap.<build#>.zip
 cd sn-bootstrap
-for i in $(lspci -Dd 10ee: | awk -F' ' '{ print $1 }' | grep '0$') ; do printf "\n" | sudo ./xbflash2 program --spi --revert-to-golden -d $i -b 2 -s 0x20000 ; done
+for card_addr in $(lspci -Dd 10ee: | awk -F' ' '{ print $1 }' | grep '0$') ; do
+  printf "\n" | sudo ./xbflash2 program --spi --revert-to-golden --bar 2 --bar-offset 0x20000 --device $card_addr
+done
 ```
 
 # Purge the `smartnic-system-setup` deb package
