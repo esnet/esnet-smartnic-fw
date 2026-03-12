@@ -15,70 +15,70 @@ LABEL="xilinx-device"
 #
 
 # U200
-ATTR{vendor}=="0x10ee", ATTR{device}=="0xD000|0x5000|0x5001|0x5002|0x5003|0x5010|0x5011|0x5012|0x5013", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xd000|0x5000|0x5001|0x5002|0x5003|0x5010|0x5011|0x5012|0x5013", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # U250
-ATTR{vendor}=="0x10ee", ATTR{device}=="0xD004|0x5004|0x5005|0x5006|0x5007|0x5014|0x5015|0x5016|0x5017", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xd004|0x5004|0x5005|0x5006|0x5007|0x5014|0x5015|0x5016|0x5017", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # U280
-ATTR{vendor}=="0x10ee", ATTR{device}=="0xD00C|0x500C|0x500D|0x500E|0x500F", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xd00c|0x500c|0x500d|0x500e|0x500f", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # U50
-ATTR{vendor}=="0x10ee", ATTR{device}=="0xD020|0x5020|0x5021|0x5022|0x5023|0x5060|0x5061|0x5062|0x5063|0x506C|0x506D|0x506E|0x506F", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xd020|0x5020|0x5021|0x5022|0x5023|0x5060|0x5061|0x5062|0x5063|0x506c|0x506d|0x506e|0x506f", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # U30
-ATTR{vendor}=="0x10ee", ATTR{device}=="0xD03C|0x513C|0x513D|0x513E|0x513F", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0xd03c|0x513c|0x513d|0x513e|0x513f", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # U55N
-ATTR{vendor}=="0x10ee", ATTR{device}=="0x5058|0x5059|0x505A|0x505B", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x5058|0x5059|0x505a|0x505b", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # U55C
-ATTR{vendor}=="0x10ee", ATTR{device}=="0x505C|0x505D|0x505E|0x505F", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x505c|0x505d|0x505e|0x505f", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # VCK5000
-ATTR{vendor}=="0x10ee", ATTR{device}=="0x5044|0x5045|0x5046|0x5047|0x5048|0x5049|0x504A|0x504B", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x5044|0x5045|0x5046|0x5047|0x5048|0x5049|0x504a|0x504b", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # V70
-ATTR{vendor}=="0x10ee", ATTR{device}=="0x5094|0x5095|0x5096|0x5097|0x50B0|0x50B1|0x50B2|0x50B3", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x5094|0x5095|0x5096|0x5097|0x50b0|0x50b1|0x50b2|0x50b3", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   TAG+="systemd"
 
 # UL3xxx
-ATTR{vendor}=="0x10ee", ATTR{device}=="0x50C0|0x50C1|0x50C2|0x50C3", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x50c0|0x50c1|0x50c2|0x50c3", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
@@ -97,7 +97,7 @@ ATTR{vendor}=="0x10ee", ATTR{device}=="0x5070|0x5071|0x5072|0x5073", \
 #
 
 # V80
-ATTR{vendor}=="0x10ee", ATTR{device}=="0x50B4|0x50B5|0x50B6|0x50B7", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x50b4|0x50b5|0x50b6|0x50b7", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
