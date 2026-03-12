@@ -384,6 +384,16 @@ $ sudo lspci -vvv -Dd 10ee:903f | awk '/^0000/ { print } /Vital Prod/,/Advanced 
 ```
 (example from a system with four Alveo au55c FPGA cards -- your bus addresses may differ)
 
+Another view of the same information can be seen with this command but from the perspective of the devices detected by udev + systemd
+``` bash
+$ lspci -Dd 10ee:903f | awk -F' ' '{ print $1 }' sudo xargs -I{} systemctl list-units --full --quiet --legend=no --no-pager 'sys-devices-pci*-{}.device'
+  sys-devices-pci0000:20-0000:20:01.1-0000:21:00.0.device loaded active plugged ESnet SmartNIC XFL1......2V
+  sys-devices-pci0000:20-0000:20:01.2-0000:22:00.0.device loaded active plugged ESnet SmartNIC XFL1......0U
+  sys-devices-pci0000:80-0000:80:01.1-0000:81:00.0.device loaded active plugged ESnet SmartNIC XFL1......Z0
+  sys-devices-pci0000:80-0000:80:01.2-0000:82:00.0.device loaded active plugged ESnet SmartNIC XFL1......TC
+```
+(example from a system with four Alveo au55c FPGA cards -- your bus addresses may differ)
+
 **NOTE** Record the relationship between the PCIe Bus Address and the VPD [SN] Serial number field.  This information will be needed by the SmartNIC Application Operators.
 
 ## Verify that the udev glue and systemd units are starting without error for all SmartNIC FPGA cards
