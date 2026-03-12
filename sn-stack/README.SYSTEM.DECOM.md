@@ -88,7 +88,11 @@ for i in $(lspci -Dd 10ee: | awk -F' ' '{ print $1 }' | grep '0$') ; do echo "$i
 ```
 
 Wipe the user image from all FPGA cards using `xbflash2`
+
+This step requires that you obtain the `xbflash2` program.  This is typically provided as part of the bootstrap zip file that was used during initial server commissioning.  Refer to the "Obtain SmartNIC Bootstrap Zip file" section of `README.SYSTEM.SETUP.md`.
 ``` bash
+#unzip artifacts.esnet-smartnic-fw.bootstrap.0.zip
+#unzip artifacts.esnet-smartnic-fw.[au280|au55c].ejfat.bootstrap.<build#>.zip
 cd sn-bootstrap
 for i in $(lspci -Dd 10ee: | awk -F' ' '{ print $1 }' | grep '0$') ; do printf "\n" | sudo ./xbflash2 program --spi --revert-to-golden -d $i -b 2 -s 0x20000 ; done
 ```
