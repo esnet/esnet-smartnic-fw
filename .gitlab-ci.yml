@@ -99,6 +99,13 @@ bootstrap:
   image: wharf.es.net/dockerhub-proxy/library/alpine:3
   variables:
     DISPENSE_BASE_URL: https://dispense.es.net/Linux/xilinx
+    SN_FW_GROUP: ${CI_PROJECT_NAMESPACE}
+    SN_FW_REPO: ${CI_PROJECT_NAME}
+    SN_FW_BRANCH: ${CI_COMMIT_BRANCH}
+    # Copy HW_APP_NAME into FW_APP_NAME
+    SN_FW_APP_NAME: ${SN_HW_APP_NAME}
+    SN_FW_VER: ${CI_PIPELINE_ID}
+    SN_FW_COMMIT: ${CI_COMMIT_SHORT_SHA}
   before_script:
     # Install bash and GNU find (with full regex support).
     - apk add bash findutils
@@ -113,9 +120,19 @@ bootstrap:
     # Set up the build environment
     - |
       cat <<_EOF > .env
+      SN_HW_GROUP=${SN_HW_GROUP}
+      SN_HW_REPO=${SN_HW_REPO}
+      SN_HW_BRANCH=${SN_HW_BRANCH}
       SN_HW_BOARD=${SN_HW_BOARD}
       SN_HW_APP_NAME=${SN_HW_APP_NAME}
       SN_HW_VER=${SN_HW_VER}
+      SN_HW_COMMIT=${SN_HW_COMMIT}
+      SN_FW_GROUP=${SN_FW_GROUP}
+      SN_FW_REPO=${SN_FW_REPO}
+      SN_FW_BRANCH=${SN_FW_BRANCH}
+      SN_FW_APP_NAME=${SN_FW_APP_NAME}
+      SN_FW_VER=${SN_FW_VER}
+      SN_FW_COMMIT=${SN_FW_COMMIT}
       _EOF
     - cat .env
 
