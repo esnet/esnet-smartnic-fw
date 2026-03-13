@@ -386,7 +386,7 @@ $ sudo lspci -vvv -Dd 10ee:903f | awk '/^0000/ { print } /Vital Prod/,/Advanced 
 
 Another view of the same information can be seen with this command but from the perspective of the devices detected by udev + systemd
 ``` bash
-$ lspci -Dd 10ee:903f | awk -F' ' '{ print $1 }' sudo xargs -I{} systemctl list-units --full --quiet --legend=no --no-pager 'sys-devices-pci*-{}.device'
+$ lspci -Dd 10ee:903f | awk -F' ' '{ print $1 }' | sudo xargs -I{} systemctl list-units --full --quiet --legend=no --no-pager 'sys-devices-pci*-{}.device'
   sys-devices-pci0000:20-0000:20:01.1-0000:21:00.0.device loaded active plugged ESnet SmartNIC XFL1......2V
   sys-devices-pci0000:20-0000:20:01.2-0000:22:00.0.device loaded active plugged ESnet SmartNIC XFL1......0U
   sys-devices-pci0000:80-0000:80:01.1-0000:81:00.0.device loaded active plugged ESnet SmartNIC XFL1......Z0
