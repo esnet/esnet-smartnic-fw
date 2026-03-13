@@ -6,15 +6,70 @@
 set -e
 
 # Make sure these variables are **only** taken from the .env file
+unset SN_HW_GROUP
+unset SN_HW_REPO
+unset SN_HW_BRANCH
 unset SN_HW_BOARD
 unset SN_HW_APP_NAME
 unset SN_HW_VER
+unset SN_HW_COMMIT
+unset SN_FW_GROUP
+unset SN_FW_REPO
+unset SN_FW_BRANCH
+unset SN_FW_APP_NAME
+unset SN_FW_VER
+unset SN_FW_COMMIT
 
 # Read build-time arguments from .env
 source .env
 
+# Check for missing mandatory build-arguments and fill in default values for optional arguments
+SN_HW_GROUP="${SN_HW_GROUP:-unset}"
+SN_HW_REPO="${SN_HW_REPO:-unset}"
+SN_HW_BRANCH="${SN_HW_BRANCH:-unset}"
+if [ ! -v SN_HW_BOARD ] ; then
+	echo "ERROR: Missing environment variable 'SN_HW_BOARD' which is required"
+	exit 1
+fi
+
+if [ ! -v SN_HW_APP_NAME ] ; then
+	echo "ERROR: Missing environment variable 'SN_HW_APP_NAME' which is required"
+	exit 1
+fi
+
+if [ ! -v SN_HW_VER ] ; then
+	echo "ERROR: Missing environment variable 'SN_HW_VER' which is required"
+	exit 1
+fi
+SN_HW_COMMIT="${SN_HW_COMMIT:-unset}"
+
+SN_FW_GROUP="${SN_FW_GROUP:-unset}"
+SN_FW_REPO="${SN_FW_REPO:-unset}"
+SN_FW_BRANCH="${SN_FW_BRANCH:-unset}"
+SN_FW_APP_NAME="${SN_FW_APP_NAME:-unset}"
+SN_FW_VER="${SN_FW_VER:-unset}"
+SN_FW_COMMIT="${SN_FW_COMMIT:-unset}"
+
 OUT=sn-bootstrap
 mkdir -p ${OUT}
+
+# Rewrite a cleaned-up, simplified version of the input .env file used to build this image
+#
+cat <<_EOF > ${OUT}/buildinfo.env
+SN_FW_GROUP=${SN_FW_GROUP}
+SN_FW_REPO=${SN_FW_REPO}
+SN_FW_BRANCH=${SN_FW_BRANCH}
+SN_FW_APP_NAME=${SN_FW_APP_NAME}
+SN_FW_VER=${SN_FW_VER}
+SN_FW_COMMIT=${SN_FW_COMMIT}
+SN_HW_GROUP=${SN_HW_GROUP}
+SN_HW_REPO=${SN_HW_REPO}
+SN_HW_BRANCH=${SN_HW_BRANCH}
+SN_HW_BOARD=${SN_HW_BOARD}
+SN_HW_APP_NAME=${SN_HW_APP_NAME}
+SN_HW_VER=${SN_HW_VER}
+SN_HW_COMMIT=${SN_HW_COMMIT}
+_EOF
 
 # Copy the system setup readme
 cp sn-stack/README.SYSTEM.SETUP.md ${OUT}
