@@ -1,6 +1,7 @@
 #include "agent.hpp"
 #include "device.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <sstream>
 #include <stdint.h>
@@ -839,7 +840,7 @@ void SmartnicConfigImpl::get_module_mem(
             cms_id.cage = (uint8_t)mod_id;
             if (count > 1) {
                 uint8_t page_offset = offset & (CMS_MODULE_PAGE_SIZE - 1);
-                uint8_t data_count = MIN(count, CMS_MODULE_PAGE_SIZE - page_offset);
+                uint8_t data_count = min(count, CMS_MODULE_PAGE_SIZE - (unsigned int)page_offset);
                 uint8_t data_offset = 0;
                 uint8_t data[count];
 
@@ -863,7 +864,7 @@ void SmartnicConfigImpl::get_module_mem(
                 mem->set_offset(offset);
                 mem->set_page(page);
                 mem->set_count(count);
-                mem->set_data(data, count);
+                mem->set_data(&data[0], count);
             } else {
                 // Perform a single byte read.
                 uint8_t data;

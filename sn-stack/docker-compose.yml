@@ -509,6 +509,12 @@ services:
       - /etc/protocols:/etc/protocols
       - /etc/services:/etc/services
     entrypoint:
+      - /bin/bash
+      - -c
+      - -e
+      - -o
+      - pipefail
+      - -x
       - /scripts/sn_lldp.py
     profiles:
       - smartnic-mgr-dpdk-portlink

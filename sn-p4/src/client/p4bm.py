@@ -55,7 +55,7 @@ class P4bmTableAdd(P4bmOp):
     RPC = rpc_insert_table_rule
 
     ARGS_RE = re.compile(
-        '^(?P<table>\w+)\s+(?P<action>\w+)\s+(?P<matches>.+)\s+=>\s+(?P<params>.*)$')
+        r'^(?P<table>\w+)\s+(?P<action>\w+)\s+(?P<matches>.+)\s+=>\s+(?P<params>.*)$')
 
     def parse_init(self, args):
         rm = self.ARGS_RE.match(args)
