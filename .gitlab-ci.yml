@@ -30,7 +30,7 @@ variables:
   # These variables may be overridden by manual pipeline runs or from triggered
   # pipelines from other repos.
   LABTOOLS_IMAGE_URI:
-    value: wharf.es.net/ht/xilinx-labtools-docker:97709-gcdc0c46c
+    value: wharf.es.net/ht/xilinx-labtools-docker:98023-g3ce9296c
     description: xilinx-labtools-docker image to use when deploying the sn-stack HW services
   SN_HW_GROUP:
     value: ht

@@ -16,12 +16,13 @@ ENV LANG=C.UTF-8
 
 # Configure local ubuntu mirror as package source
 RUN \
-    sed -i -re 's|(http://)([^/]+.*)/|\1linux.mirrors.es.net/ubuntu|g' /etc/apt/sources.list
+    sed -i -re 's|(http://)([^/]+.*)/|\1linux.mirrors.es.net/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
 
 RUN <<EOF
     set -ex
     ln -fs /usr/share/zoneinfo/UTC /etc/localtime
     apt update -y
+    apt upgrade -y
 
     apt install -y --no-install-recommends \
       locales
