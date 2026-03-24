@@ -53,17 +53,9 @@ RUN <<EOF
     uv venv --directory / --no-project --no-config --clear
 EOF
 
-RUN cat <<EOF >/root/.bash_root_venv_activate
-VIRTUAL_ENV_DISABLE_PROMPT=1
-source /.venv/bin/activate
-EOF
-
-RUN cat <<EOF >/root/.bash_env
-source /root/.bash_root_venv_activate
-EOF
-
-# For "bash -c"/"sh -c" invocations to activate the Python virtualenv.
-ENV BASH_ENV="/root/.bash_env"
+# Make sure the Python virtualenv is always active.
+ENV VIRTUAL_ENV="/.venv"
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 #
 # Create a stage that provides a full build environment
@@ -351,9 +343,6 @@ RUN uv run \
     sn-p4 completions bash >/usr/share/bash-completion/completions/sn-p4
 
 RUN cat <<"EOF" >>/root/.bashrc
-
-# Enable the Python virtualenv containing runtime tools.
-. /root/.bash_root_venv_activate
 
 # Enable bash completion for non-login interactive shells.
 if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
