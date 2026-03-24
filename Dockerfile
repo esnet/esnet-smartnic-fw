@@ -22,6 +22,7 @@ RUN <<EOF
     set -ex
     ln -fs /usr/share/zoneinfo/UTC /etc/localtime
     apt update -y
+    apt upgrade -y
 
     apt install -y --no-install-recommends \
       locales
