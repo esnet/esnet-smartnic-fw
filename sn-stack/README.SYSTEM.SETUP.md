@@ -408,6 +408,160 @@ Display the full time-interleaved logs of all `smartnic-*` systemd units since b
 sudo journalctl --output=short-iso-precise -u 'smartnic-*' --boot
 ```
 
+# Upgrade the Alveo FPGA card's Satellite Controller (SC) firmware
+
+**WARNING** This process has some risk of "bricking" (ie. rendering it unrecoverable / unusable) the Xilinx FPGA card.  If it is bricked, it will have to be returned/repaired via an RMA process with the vendor.  We have never had this happen to a U280 card (>200 individual SC FW upgrades over 80+ cards).  We have had one U55C FPGA card become bricked during an SC FW upgrade (at the time, this card was attached to QSFP optics that seemed to be causing communication problems but the root cause of the bricked card is still unknown as of March 2026).
+
+The Satellite Controller (SC) is a microcontroller that is on the Xilinx FPGA card, adjacent to the FPGA ASIC itself.  The SC manages card initialization and monitoring.  The version of firmware running on the SC when the card comes from the factory is often quite old and is missing features and bug fixes.  Some of the bugs that we've seen in older SC firmware include spurious resets of the FPGA card, and an inability to read QSFP module information.  Other bugs are mentioned in various places in the Xilinx knowledge base.  If any of these bugs or missing features affects you, then upgrading the SC firmware may fix them.  If you have a fresh card, delivered from the factory, you will probably want to perform this upgrade at least once.
+
+The implementation of the SC firmware update process is entirely within the closed-source firmware provided by Xilinx which runs on the Satellite controller.  Unfortunately, this means that we are unable to improve the robustness of the implementation.
+
+**WARNING** If you are unsure of what you are doing, please consult your Xilinx support team for advice and assistance rather than following these instructions on your own.  Please include a pointer to this project's git repo in your Xilinx support request so that they have context for your request.
+
+For general information about the Satellite Controller, refer to: https://xilinx.github.io/Alveo-Cards/master/management-specification/oob-intro.html
+For general information about the Card Management Controller blocks, refer to: https://docs.amd.com/r/en-US/pg348-cms-subsystem/Introduction
+For the latest Satellite Controller Firmware versions, refer to: https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
+For details about the Xilinx Alveo FPGA card RMA process, refer to: https://adaptivesupport.amd.com/s/article/72533
+
+**WARNING** Do NOT automate this sequence and run it repeatedly expecting it to be idempotent.  It will erase and re-write the SC firmware even if it's already running the desired version.  The `loadsc` tool does not detect/skip this scenario and automating this update step may repeatedly risk bricking your card for no benefit.
+
+If you have read the warnings above, and would still like to upgrade the SC firmware on your Xilinx FPGA card, proceed with the steps in the following sections.
+
+## Ensure that there are NO active application stacks running
+
+**Do NOT skip this step**.  Any running application stacks which are active during the SC firmware update process will interfere with the communication path between the FPGA and the adjacent SC.  This interference may result in corruption of the SC firmware update messages, potentially resulting in a "bricked" FPGA card.
+
+Follow the steps in the [Stop all running SmartNIC Application Stacks section of the README.SYSTEM.DECOM.md file](./README.SYSTEM.DECOM.md#stop-all-running-smartnic-application-stacks).
+
+Verify that no remaining docker containers are running which may be interacting with the FPGA cards
+```
+sudo docker ps
+```
+**NOTE** For maximum safety, that command should return an empty list.  If that command *does* list any running containers, ensure that none of them are related to SmartNIC application stacks.  If you are unsure, **DO NOT PROCEED**.
+
+## Identify the correct SC firmware file for your FPGA card
+
+You will need to determine which FPGA card type (eg. U55C or U280) that you have in your system.  Note that your system may contain more than one type of FPGA card.  In that case, you will additionally need a clear view of the mapping between PCIe bus address and FPGA card type.  **DO NOT GUESS**.
+
+Once you've identified the PCIe bus address and card type that you would like to inspect and possibly update, you will need to ensure that you have the matching SC firmware file for your card.  Depending on where you obtained your bootstrap zip file, it may or may not contain the relevant, matching SC firmware file for your card.
+
+Look for a file called `SC_<U55C|U280>_<major>_<minor>_<patch>.[txt|zip]` in your `sn-bootstrap` directory that matches your FPGA card type.
+
+If you do not have a matching SC firmware file already, or if you would like to check for the latest release from Xilinx, follow these steps:
+* Navigate to https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
+* Check the latest release version for your card
+* If required, download the zip file for the matching SC firmware file
+  * **NOTE** You may need to log in to be permitted to download files from this page
+
+If you have a `.zip` file, you will need to unzip the file so that the `.txt` file within is extracted
+```
+$ cd sn-bootstrap
+$ unzip SC_U55C_7_1_24.zip 
+Archive:  SC_U55C_7_1_24.zip
+   creating: SC_U55C_7_1_24/
+  inflating: SC_U55C_7_1_24/SC_U55C_7_1_24.txt
+```
+(example for extracting the SC firmware for a U55C file from its zip file)
+
+**NOTE** the `.txt` file may be extracted into a new directory.  Adjust the paths below to match the location of the `.txt` file as necessary.
+
+## Read out the current SC firmware status
+
+This step also confirms that we have working comms path through PCIe -> FPGA -> SC.
+```
+$ cd sn-bootstrap
+$ sudo ./loadsc -d 0000:21:00.0 -b 2 -a 0x40000 -r
+
+------------------------------------------------------------------------------------
+CMS Satellite Controller Firmware Download Tool v2.3
+------------------------------------------------------------------------------------
+
+>> Aquiring BAR address of target card
+
+   > PCIe DBDF                        0000:21:00.0 
+   > PCIe BAR/Region                  2 
+   > PCIe Vendor ID                   0x10EE
+
+<< Aquiring BAR address of target card (success)
+
+   < PCIe Device ID                   0x903F
+   < PCIe BAR Address                 0xC4000000
+
+>> Bring CMS Microblaze out of reset and establish comms with satellite controller
+
+   > CMS Subsystem Base Address       0x00040000
+
+<< Bring CMS Microblaze out of reset and establish comms with satellite controller (success)
+
+   < CMS Firmware Version             1.5.26 (0x0C01051A)
+   < CMS Hardware Version             Vivado 2023.2.2
+   < SC  Firmware Version             7.1.23
+
+------------------------------------------------------------------------------------
+The current Satellite Controller firmware version is 7.1.23
+------------------------------------------------------------------------------------
+
+```
+(example output from a U55C FPGA card)
+
+**NOTE** Do NOT proceed to the next step if you get an error message from this read-out step.
+
+## Program a newer version of the SC firmware to the card
+
+**NOTE** Only perform this step if you've determined that your card requires an updated SC firmware version.  Upgrading may or may not be required, depending the details of the application you would like to run on your FPGA card.
+
+**WARNING** Before running these commands, be absolutely sure that you are using the `.txt` file that matches your card type.  Installing the wrong SC firmware file onto your card may result in your card being "bricked" and requiring an RMA to replace/repair the card.  If you are unsure of what card type you have, **DO NOT PROCEED**.
+
+```
+$ cd sn-bootstrap
+$ sudo ./loadsc -d 0000:21:00.0 -b 2 -a 0x40000 -f SC_U55C_7_1_24.txt
+
+------------------------------------------------------------------------------------
+CMS Satellite Controller Firmware Download Tool v2.3
+------------------------------------------------------------------------------------
+
+>> Aquiring BAR address of target card
+
+   > PCIe DBDF                        0000:21:00.0 
+   > PCIe BAR/Region                  2 
+   > PCIe Vendor ID                   0x10EE
+
+<< Aquiring BAR address of target card (success)
+
+   < PCIe Device ID                   0x903F
+   < PCIe BAR Address                 0xC4000000
+
+>> Bring CMS Microblaze out of reset and establish comms with satellite controller
+
+   > CMS Subsystem Base Address       0x00040000
+
+>> Reading SC image file "SC_U55C_7_1_24.txt"
+<< Reading SC image file "SC_U55C_7_1_24.txt" (success)
+
+<< Bring CMS Microblaze out of reset and establish comms with satellite controller (success)
+
+   < CMS Firmware Version             1.5.26 (0x0C01051A)
+   < CMS Hardware Version             Vivado 2023.2.2
+   < SC  Firmware Version             7.1.23
+
+>> DownloadSequence_Initial (start)
+<< DownloadSequence_Initial (success)
+>> DownloadSequence_EraseFirmware (start)
+<< DownloadSequence_EraseFirmware (success)
+>> DownloadSequence_SendImage (start)
+>> Image downloading: ..... 
+<< DownloadSequence_SendImage (success)
+>> DownloadSequence_JumpToResetVector (start)
+<< DownloadSequence_JumpToResetVector (success)
+------------------------------------------------------------------------------------
+Satellite Controller firmware has been succesfully updated from 7.1.23 to 7.1.24
+------------------------------------------------------------------------------------
+
+```
+(example output from a U55C FPGA card -- note the `SC_U55C_*` filename matches the U55C card type)
+
+**NOTE** This process takes around 1 minute to run, and includes a somewhat stressful pause of at least 10s between `JumpToResetVector (start)` and `JumpToResetVector (success)` logs.  Be patient and **DO NOT INTERRUPT** this process.  It is unknown whether the SC will recover from an interrupted firmware download or whether it will become "bricked".
+
 # Enable automatic SmartNIC application restart at boot
 
 Now we need the list of physical slots containing a Xilinx FPGA card from the info captured during card install.  For each slot number, activate a systemd unit to automatically restart the SmartNIC at system boot.
