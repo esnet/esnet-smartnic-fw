@@ -524,8 +524,7 @@ ftap-test:
     EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL1UE5CEXZ0A"
     EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
 
-.ejfat_dev_multi_matrix: &ejfat_dev_multi_matrix
-  # node2.fpga.es.net
+.ejfat_dev_single_matrix: &ejfat_dev_single_matrix
   - GL_ENV_HOST: node2
     GL_ENV_CARD: 0
     GL_ENV_EXTRA: /dev
@@ -562,7 +561,6 @@ ftap-test:
     EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R009A"
     EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:41:00"
 
-.ejfat_dev_single_matrix: &ejfat_dev_single_matrix
 #  - GL_ENV_HOST: node2
 #    GL_ENV_CARD: 4
 #    GL_ENV_EXTRA: /dev
@@ -747,22 +745,6 @@ ejfat-staging-test:
   needs:
     - package
     - job: ejfat-staging
-      artifacts: false
-      parallel:
-        matrix: *ejfat_matrix_template
-
-ejfat-dev-multi:
-  extends: .ejfat_review
-  parallel:
-    matrix: *ejfat_dev_multi_matrix
-
-ejfat-dev-multi-test:
-  extends: .ejfat_review_test
-  parallel:
-    matrix: *ejfat_dev_multi_matrix
-  needs:
-    - package
-    - job: ejfat-dev-multi
       artifacts: false
       parallel:
         matrix: *ejfat_matrix_template
