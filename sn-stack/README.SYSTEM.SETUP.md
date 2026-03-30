@@ -287,7 +287,7 @@ Later long-running steps can be run in parallel.  This can save 30+ minutes when
 sudo apt install parallel
 ```
 
-## Write the SmartNIC image onto the flash storage of each FPGA card
+## Write the SmartNIC image onto the flash storage of each FPGA card (if Factory/Golden Image)
 
 Find out what type of FPGA cards you have
 ``` bash
@@ -319,6 +319,39 @@ lspci -Dd 10ee:500c | awk -F' ' '{ print $1 }' | \
     'printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au280.mcs --bar-offset 0x40000 --device {}'
 ```
 
+If your FPGA cards report as `Xilinx Corporation Device 903f` or `Xilinx Corporation Device 913f` then your cards are already ESnet SmartNIC cards.  Refer to the next section for how to update the flash on these cards.
+
+## Updating the flash of an existing SmartNIC FPGA card (if already an ESnet SmartNIC Image)
+
+If your FPGA cards reported as `Xilinx Corporation Device 903f` or `Xilinx Corporation Device 913f` in the previous section, then your cards are already ESnet SmartNIC cards.  You can still update them to the flash image provided in this bootstrap zip file.  This situation will occur if you are updating to a newer release of the ESnet SmartNIC flash image which modifies the PCIe BAR configuration or the set of PCIe features being advertised by the ESnet SmartNIC.
+
+Example output for cards already running an ESnet SmartNIC image:
+```
+$ lspci -Dd 10ee:
+0000:21:00.0 Network controller: Xilinx Corporation Device 903f
+0000:21:00.1 Network controller: Xilinx Corporation Device 913f
+0000:22:00.0 Network controller: Xilinx Corporation Device 903f
+0000:22:00.1 Network controller: Xilinx Corporation Device 913f
+0000:81:00.0 Network controller: Xilinx Corporation Device 903f
+0000:81:00.1 Network controller: Xilinx Corporation Device 913f
+0000:82:00.0 Network controller: Xilinx Corporation Device 903f
+0000:82:00.1 Network controller: Xilinx Corporation Device 913f
+```
+
+Before you run the next command, you will need to edit the name of the `.mcs` file given in the command, to match the type of FPGA card you are updating. It will be one of these two filenames:
+* au280 card: `esnet-smartnic.au280.mcs`
+* au55c card: `esnet-smartnic.au55c.mcs`
+
+``` bash
+cd sn-bootstrap
+lspci -Dd 10ee:903f | awk -F' ' '{ print $1 }' | \
+  time \
+  parallel --verbose --line-buffer --tag --no-run-if-empty \
+    'printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au280_or_au55c.mcs --bar 2 --bar-offset 0x20000 --device {}'
+```
+
+**NOTE** If you have an older ESnet SmartNIC version which lacks the Vital Product Data section in `lspci -vv` output, you may need to use `--bar-offset 0x340000` as the older versions positioned the Flash QSPI registers at a different offset.
+
 ## Cold boot the system
 
 After flash programming is completed, cold boot the system to allow the FPGAs to load their configuration from flash.  This must be a proper cold boot (eg. `ipmitool chassis power cycle`) and **not** an ordinarly warm boot (eg. `shutdown -r now`) or the FPGAs will not reconfigure from flash.
@@ -328,6 +361,8 @@ sudo ipmitool chassis power cycle
 ```
 
 **DO NOT SKIP THIS STEP**
+
+**NOTE** Although rare, some servers fail to properly perform a cold boot (ie. removing all power to the PCIe slots) using this sequence.  They may require different steps, or even physically removing the power cables from *all* power supply units (PSUs) on the chassis in order to force the FPGA cards to load from their flash.  In particular, this has been observed on at least one Supermicro server model.
 
 ## Verify that all FPGA cards are now reporting as ESnet SmartNIC cards
 
