@@ -577,6 +577,14 @@ done
 
 Initially, there will not be any application installed under `/usr/local/smartnic/*` so these jobs won't be doing anything useful and might show up as failing.  These jobs should still be enabled during commissioning since they require root privs and will be required by the SmartNIC Application Operators.
 
+# Install a trusted TLS certificate
+
+The SmartNIC application stack provides secure configuration channels, encrypted with TLS.  Many applications will require an external controller to manage the SmartNIC application.  For maximum security and compatibility with TLS clients, it is recommended that you install a TLS certificate signed by a globally trusted CA.
+
+The SmartNIC application stack includes example settings to allow it to easily refer to a TLS certificate and private key installed under `/etc/letsencrypt/<FQDN>` where it might be placed by popular ACME tooling.  If you install the TLS certificate to a custom path, or with custom naming, the SmartNIC application can be configured to find it in your preferred location.
+
+As a fallback, in the absence of a provided TLS certificate, the SmartNIC stack will auto-generate a new self-signed TLS certificate on every restart.  Note that some TLS clients will refuse to connect to endpoints which provide a self-signed TLS certificate so operating in this fallback mode is *NOT* recommended for a production environment.
+
 # Check all the things before handing off to the smartnic application service owners
 
 ```
@@ -630,5 +638,6 @@ The users who are installing and managing the SmartNIC application will need a f
   * PCIe Bus Address (from lspci VPD output)
   * Card Type
   * Card Serial Number
+* Path to TLS certificate and private key
 * Instructions to either log in as the `smartnic` user directly or to be able to become that user via `sudo su - smartnic`
 
