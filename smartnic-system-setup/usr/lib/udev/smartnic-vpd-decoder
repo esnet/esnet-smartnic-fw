@@ -24,7 +24,15 @@ def decode_vpd_r(vpd):
         else:
             raise(Exception(f'VPD kw {kw} of length {kw_len} truncated'))
 
-        if kw in ['PN', 'EC', 'MN', 'PG', 'SN', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9']:
+        if kw in ['EC', 'MN', 'PN', 'SN', 'YA', 'PG']:
+            decode_ascii_vpd(kw, kw_data)
+        elif kw[0] == 'V':
+            decode_ascii_vpd(kw, kw_data)
+        elif kw[0] == 'Y':
+            decode_ascii_vpd(kw, kw_data)
+        elif kw in ['CC', 'FC', 'NA', 'RM']:
+            decode_ascii_vpd(kw, kw_data)
+        elif kw[0] == 'Z':
             decode_ascii_vpd(kw, kw_data)
         elif kw == 'RV':
             cksum = kw_data[0]

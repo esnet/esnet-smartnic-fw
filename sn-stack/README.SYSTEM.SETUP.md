@@ -235,7 +235,7 @@ sn-bootstrap/
 ├── esnet-smartnic.au280.mcs  <------------ FPGA card flash image for au280 FPGA card
 ├── esnet-smartnic.au55c.mcs  <------------ FPGA card flash image for au55c FPGA card
 ├── loadsc                    <------------ (optional) Xilinx tool for upgrading Satellite Controller
-├── smartnic-system-setup_0.3.0_all.deb <-- Debian package providing udev and systemd units for card management
+├── smartnic-system-setup_0.4.0_all.deb <-- Debian package providing udev and systemd units for card management
 └── xbflash2                  <------------ Xilinx tool for programming FPGA card flash images
 ```
 (version numbers above are latest as of March 2026)
@@ -263,7 +263,7 @@ The `smartnic-system-setup` package contains `udev` and `systemd` services and s
 
 ``` bash
 cd sn-bootstrap
-sudo dpkg -i smartnic-system-setup_0.3.0_all.deb
+sudo dpkg -i smartnic-system-setup_0.4.0_all.deb
 ```
 
 # Convert FPGA cards from factory images to ESnet SmartNIC images
