@@ -401,32 +401,52 @@ $ sudo lspci -vvv -Dd 10ee:903f | awk '/^0000/ { print } /Vital Prod/,/Advanced 
 	Capabilities: [b0] Vital Product Data
 		Product Name: ESnet SmartNIC
 		Read-only fields:
+			[VA] Vendor specific: Application   : ejfat
+			[VB] Vendor specific: Build ID      : 98635
+			[VR] Vendor specific: Build git repo: udplb
+			[VH] Vendor specific: Build git hash: e023ec49
+			[VT] Vendor specific: Build time    : 2026-04-01T05:07:27Z
+			[VF] Vendor specific: Flash offset  : 0x20000
+			[VC] Vendor specific: CMS offset    : 0x40000
+			[PN] Part number: ALVEO U55C PQ
 			[SN] Serial number: XFL1......2V
-			[RV] Reserved: checksum good, 0 byte(s) reserved
+			[RM] Firmware version: 7.1.24
+			[RV] Reserved: checksum good, 80 byte(s) reserved
 		End
 0000:22:00.0 Network controller: Xilinx Corporation Device 903f
 	Capabilities: [b0] Vital Product Data
 		Product Name: ESnet SmartNIC
 		Read-only fields:
+			[...]
+			[PN] Part number: ALVEO U55C PQ
 			[SN] Serial number: XFL1......0U
-			[RV] Reserved: checksum good, 0 byte(s) reserved
+			[RM] Firmware version: 7.1.24
+			[RV] Reserved: checksum good, 80 byte(s) reserved
 		End
 0000:81:00.0 Network controller: Xilinx Corporation Device 903f
 	Capabilities: [b0] Vital Product Data
 		Product Name: ESnet SmartNIC
 		Read-only fields:
+			[...]
+			[PN] Part number: ALVEO U55C PQ
 			[SN] Serial number: XFL1......Z0
-			[RV] Reserved: checksum good, 0 byte(s) reserved
+			[RM] Firmware version: 7.1.24
+			[RV] Reserved: checksum good, 80 byte(s) reserved
 		End
 0000:82:00.0 Network controller: Xilinx Corporation Device 903f
 	Capabilities: [b0] Vital Product Data
 		Product Name: ESnet SmartNIC
 		Read-only fields:
+			[...]
+			[PN] Part number: ALVEO U55C PQ
 			[SN] Serial number: XFL1......TC
-			[RV] Reserved: checksum good, 0 byte(s) reserved
+			[RM] Firmware version: 7.1.24
+			[RV] Reserved: checksum good, 80 byte(s) reserved
 		End
 ```
-(example from a system with four Alveo au55c FPGA cards -- your bus addresses may differ)
+(example from a system with four Alveo au55c FPGA cards -- your build info and bus addresses may differ)
+
+**NOTE** Older versions of the ESnet SmartNIC bootstrap flash images did not export Vital Product Data.  If you do not see the Vital Product Data information or if your VPD or your VPD section has fewer fields in it, it may indicate that you have an older version active.  Double check that your system has properly **cold booted** (ie. full removal of PCIe card power), pulling power cables if necessary for your system.  It is recommended that you have update to a version of the `.mcs` flash image that supports VPD before proceeding with the rest of these instructions.  If you are certain that the older, non-VPD version is the one you want to be running, proceed with caution as some of the subsequent steps may not be possible or safe without accurate information about your FPGA cards.
 
 Another view of the same information can be seen with this command but from the perspective of the devices detected by udev + systemd
 ``` bash
