@@ -39,14 +39,14 @@ In multi-socket, multi-card installations, it is recommended to spread the FPGA 
 
 Record your physical cards in a table similar to this one for future reference
 ```
- -------------------------------------------
-| Card Type | Card Serial # | Physical Slot |
-|-----------|---------------|---------------|
-| U55C      | XFL1......2V  | Slot 1        |
-| U55C      | XFL1......0U  | Slot 2        |
-| U55C      | XFL1......Z0  | Slot 4        |
-| U55C      | XFL1......TC  | Slot 5        |
- -------------------------------------------
+ --------------- ----------- ---------------
+| Physical Slot | Card Type | Card Serial # |
+|---------------|-----------|---------------|
+| Slot 1        | U55C      | XFL1......2V  |
+| Slot 2        | U55C      | XFL1......0U  |
+| Slot 4        | U55C      | XFL1......TC  |
+| Slot 5        | U55C      | XFL1......Z0  |
+ --------------- ----------- ---------------
 ```
 
 ## USB / JTAG connection
@@ -460,6 +460,84 @@ $ lspci -Dd 10ee:903f | awk -F' ' '{ print $1 }' | sudo xargs -I{} systemctl lis
 
 **NOTE** Record the relationship between the PCIe Bus Address and the VPD [SN] Serial number field.  This information will be needed by the SmartNIC Application Operators.
 
+## Validate the Card Serial Number to Physical Slot Map that was captured during installation
+
+If the VPD output in the previous section included the `[SN]` field, you can combine this information with the ACPI data provided by your BIOS/UEFI system firmware to confirm that the card mapping that you captured during installation matches the view from the running system.
+
+Most (but not all) servers expose Slot records in their ACPI (aka DMI) data.  Slot records provide a mapping for:
+* Physical Slot <-> PCIe Bus Address
+
+VPD data (when available) provides a mapping for:
+* PCIe Bus Address <-> Card Type, Serial Number and SC Firmware Version
+
+We can combine these two mappings to create:
+* Physical Slot <-> PCIe Bus Address <-> FPGA Card Type, Serial Number and SC FW Version
+
+Query the ACPI/DMI Slot records
+``` bash
+$ sudo dmidecode -t 9 | awk '/(^System|Designation|Current Usage|ID:|Bus Address|^$)/ { print }'
+
+System Slot Information
+	Designation: PCIe Slot 3
+	Current Usage: In Use
+	ID: 3
+	Bus Address: 0000:64:00.0
+
+System Slot Information
+	Designation: PCIe Slot 1
+	Current Usage: In Use
+	ID: 1
+	Bus Address: 0000:21:00.0
+
+System Slot Information
+	Designation: PCIe Slot 2
+	Current Usage: In Use
+	ID: 2
+	Bus Address: 0000:22:00.0
+
+System Slot Information
+	Designation: PCIe Slot 7
+	Current Usage: Available
+	ID: 7
+
+System Slot Information
+	Designation: PCIe Slot 8
+	Current Usage: Available
+	ID: 8
+
+System Slot Information
+	Designation: PCIe Slot 6
+	Current Usage: In Use
+	ID: 6
+	Bus Address: 0000:a1:00.0
+
+System Slot Information
+	Designation: PCIe Slot 5
+	Current Usage: In Use
+	ID: 5
+	Bus Address: 0000:81:00.0
+
+System Slot Information
+	Designation: PCIe Slot 4
+	Current Usage: In Use
+	ID: 4
+	Bus Address: 0000:82:00.0
+```
+(example output for a system with 8 physical slots reported in the ACPI/DMI tables -- your output will likely look different)
+
+Use the VPD data and ACPI/DMI Slot records to validate the records from the installation step and to build up the full view for:
+```
+ --------------- ----------- --------------- ------------------ -----------
+| Physical Slot | Card Type | Card Serial # | PCIe Bus Address | SC FW Ver |
+|---------------|-----------|---------------|------------------|-----------|
+| Slot 1        | U55C      | XFL1......2V  | 0000:21:00.0     | 7.1.24    |
+| Slot 2        | U55C      | XFL1......0U  | 0000:22:00.0     | 7.1.24    |
+| Slot 4        | U55C      | XFL1......TC  | 0000:82:00.0     | 7.1.24    |
+| Slot 5        | U55C      | XFL1......Z0  | 0000:81:00.0     | 7.1.24    |
+ --------------- ----------- --------------- ------------------ -----------
+```
+(example from a system with 4 Alveo au55c FPGA cards -- your table will differ)
+
 ## Verify that the udev glue and systemd units are starting without error for all SmartNIC FPGA cards
 
 Display the current status of all `smartnic-*` systemd units since boot.
@@ -698,10 +776,11 @@ Congratulations, you're all done commissioning this server to run ESnet SmartNIC
 
 The users who are installing and managing the SmartNIC application will need a few facts that were collected during these steps:
 * A list of FPGA cards
-  * Physical Slot Number
-  * PCIe Bus Address (from lspci VPD output)
+  * Physical Slot Number (from installation notes and ACPI/DMI Slot records)
   * Card Type
   * Card Serial Number
+  * PCIe Bus Address (from lspci VPD output)
+  * SC Firmware Version (from lspci VPD output)
 * Path to TLS certificate and private key
 * Instructions to either log in as the `smartnic` user directly or to be able to become that user via `sudo su - smartnic`
 
