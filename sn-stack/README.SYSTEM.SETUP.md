@@ -310,10 +310,10 @@ lspci -Dd 10ee:505c | awk -F' ' '{ print $1 }' | \
     'printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au55c.mcs --bar-offset 0x1f06000 --device {}'
 ```
 
-If your FPGA cards are au280 cards, they will have reported as `Xilinx Corporation Device 500c`.  Use these commands to program their flash.
+If your FPGA cards are au280 cards, they will have reported as `Xilinx Corporation Device d00c`.  Use these commands to program their flash.
 ``` bash
 cd sn-bootstrap
-lspci -Dd 10ee:500c | awk -F' ' '{ print $1 }' | \
+lspci -Dd 10ee:d00c | awk -F' ' '{ print $1 }' | \
   time \
   parallel --verbose --line-buffer --tag --no-run-if-empty \
     'printf "\n" | sudo ./xbflash2 program --spi --image esnet-smartnic.au280.mcs --bar-offset 0x40000 --device {}'
