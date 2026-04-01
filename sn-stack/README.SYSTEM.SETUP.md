@@ -164,6 +164,15 @@ Bus 005 Device 003: ID 0403:6011 Future Technology Devices International, Ltd FT
 ```
 (example from a system with four Alveo au55c FPGA cards -- your bus/device numbers may differ)
 
+``` bash
+$ sudo lsusb -d 0403:6011 -vv 2>/dev/null | grep -Ei '(iManufacturer|iProduct|iSerial|^Bus)'
+Bus 001 Device 002: ID 0403:6011 Future Technology Devices International, Ltd FT4232H Quad HS USB-UART/FIFO IC
+  iManufacturer           1 Xilinx
+  iProduct                2 A-U280-P32G
+  iSerial                 3 2177......4N
+```
+(example from a system with one Alveo au280 FPGA card -- your bus/device numbers may differ)
+
 **NOTE** If any of the expected cards are missing from the output of either of these commands, double check the micro-USB connection on the FPGA card.  The micro-USB port on the back plate of the au55c card can sometimes be partially obstructed by the case metalwork, preventing proper seating of the USB plug.
 
 # Docker Installation
