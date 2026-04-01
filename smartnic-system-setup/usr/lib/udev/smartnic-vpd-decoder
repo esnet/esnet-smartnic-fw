@@ -4,7 +4,7 @@ import sys
 import os
 
 def decode_ascii_vpd(kw, kw_data):
-    kw_string = kw_data.decode('utf8')
+    kw_string = kw_data.decode('utf8').split('\x00',1)[0]
     print(f'VPD_{kw}="{kw_string}"')
 
 def decode_vpd_r(vpd):
@@ -133,7 +133,7 @@ def main():
             # Large Resource Data Type
             if rdt_name == 0x02:
                 # Identifier String
-                rdt_string = rdt_data.decode('utf8')
+                rdt_string = rdt_data.decode('utf8').split('\x00', 1)[0]
                 print(f'VPD_IDENT="{rdt_string}"')
             elif rdt_name == 0x10:
                 # VPD-R (read-only) section
