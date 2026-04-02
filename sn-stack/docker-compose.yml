@@ -140,7 +140,12 @@ services:
         condition: service_started
     volumes:
       - bitfiles:/bitfiles:ro
-      - ${SN_STACK_ROOT-${PWD}}/smartnic-hw/scripts:/scripts:ro
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/smartnic-hw/scripts
+        target: /scripts
+        read_only: true
+        bind:
+          create_host_path: false
     network_mode: none
     command:
       - /bin/bash
@@ -255,7 +260,12 @@ services:
       - /status
     volumes:
       - bitfiles:/bitfiles:ro
-      - ${SN_STACK_ROOT-${PWD}}/smartnic-hw/scripts:/scripts:ro
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/smartnic-hw/scripts
+        target: /scripts
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
       interval: 10s
@@ -403,7 +413,12 @@ services:
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev/vfio:/dev/vfio
-      - ${SN_STACK_ROOT-${PWD}}/smartnic-vfio-unlock/scripts:/scripts:ro
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/smartnic-vfio-unlock/scripts
+        target: /scripts
+        read_only: true
+        bind:
+          create_host_path: false
     entrypoint:
       - /bin/bash
       - -c
@@ -435,7 +450,11 @@ services:
       - /dev:/dev
       - /sys/kernel/mm/hugepages:/sys/kernel/mm/hugepages
       - /lib/modules:/lib/modules
-      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/scratch
+        target: /scratch
+        bind:
+          create_host_path: false
     entrypoint:
       - /bin/bash
       - -c
@@ -466,7 +485,11 @@ services:
       - /dev:/dev
       - /sys/kernel/mm/hugepages:/sys/kernel/mm/hugepages
       - /lib/modules:/lib/modules
-      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/scratch
+        target: /scratch
+        bind:
+          create_host_path: false
     entrypoint:
       - dpdk-testpmd
       - --file-prefix=sn-$FPGA_PCIE_DEV.0
@@ -504,7 +527,12 @@ services:
       - SN_LLDP_PHYS_SLOT=${SN_PHYS_SLOT:-${UNIQUE:-}}
       - SN_LLDP_TTL=20
     volumes:
-      - ${SN_STACK_ROOT-${PWD}}/smartnic-lldp/scripts:/scripts:ro
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/smartnic-lldp/scripts
+        target: /scripts
+        read_only: true
+        bind:
+          create_host_path: false
       # scapy depends on protocols and services for part of its init
       - /etc/protocols:/etc/protocols
       - /etc/services:/etc/services
@@ -540,7 +568,11 @@ services:
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
-      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/scratch
+        target: /scratch
+        bind:
+          create_host_path: false
     entrypoint:
       - /bin/bash
       - -c
@@ -586,7 +618,11 @@ services:
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
-      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/scratch
+        target: /scratch
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-tls", "-tls-no-verify", "-addr", "[::]:50050"]
       interval: 10s
@@ -645,7 +681,11 @@ services:
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
-      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/scratch
+        target: /scratch
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-tls", "-tls-no-verify", "-addr", "[::]:50100"]
       interval: 10s
@@ -694,10 +734,29 @@ services:
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
-      - ${SN_STACK_ROOT-${PWD}}/scratch:/scratch
-      - ${SN_FW_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/fw}:/test/fw:ro
-      - ${SN_HW_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/hw}:/test/hw:ro
-      - ${SN_APP_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/app}:/test/app:ro
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/scratch
+        target: /scratch
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SN_FW_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/fw}
+        target: /test/fw
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SN_HW_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/hw}
+        target: /test/hw
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SN_APP_TEST_ROOT-${SN_STACK_ROOT-${PWD}}/test/app}
+        target: /test/app
+        read_only: true
+        bind:
+          create_host_path: false
     entrypoint:
       - /test/entrypoint.sh
     profiles:
@@ -712,7 +771,12 @@ services:
     networks:
       - default
     volumes:
-      - ${SN_STACK_ROOT-${PWD}}/traefik:/etc/traefik:ro
+      - type: bind
+        source: ${SN_STACK_ROOT-${PWD}}/traefik
+        target: /etc/traefik
+        read_only: true
+        bind:
+          create_host_path: false
       # Expose the docker socket to this container to allow for service auto-discovery
       - /var/run/docker.sock:/var/run/docker.sock
       # Import the host's TLS certificates
@@ -789,7 +853,11 @@ services:
     networks:
       - default
     volumes:
-      - ./prometheus:/etc/prometheus/
+      - type: bind
+        source: ./prometheus
+        target: /etc/prometheus/
+        bind:
+          create_host_path: false
     command:
       - '--web.listen-address=0.0.0.0:9090'
       - '--config.file=/etc/prometheus/prometheus.yml'

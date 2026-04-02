@@ -25,6 +25,7 @@ RUN <<EOF
     apt upgrade -y
 
     apt install -y --no-install-recommends \
+      ca-certificates \
       locales
 
     locale-gen en_US.UTF-8
@@ -70,7 +71,6 @@ RUN <<EOF
 
     apt install -y --no-install-recommends \
       build-essential \
-      ca-certificates \
       pkg-config \
       python3
 EOF
