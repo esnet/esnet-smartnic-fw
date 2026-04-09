@@ -210,6 +210,7 @@ sudo mkdir -p /usr/local/smartnic
 sudo chown root:smartnic /usr/local/smartnic
 sudo mkdir /usr/local/smartnic/{0..9}
 sudo chown smartnic:smartnic /usr/local/smartnic/{0..9}
+sudo chmod 775 /usr/local/smartnic/{0..9}
 ```
 
 **NOTE** By convention, the smartnic firmware stack for the card in server physical slot X should be deployed under `/usr/local/smartnic/X` to make it easy to match up the deployed firmware with the physical card it should apply to.
