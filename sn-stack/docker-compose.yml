@@ -1,10 +1,20 @@
+# https://docs.docker.com/engine/logging/drivers/journald/
+# https://docs.docker.com/engine/logging/log_tags/
+x-smartnic-logging: &smartnic-logging
+  logging:
+    driver: journald
+    options:
+      tag: "{{.Name}}({{.ID}})"
+
 x-labtools-service: &labtools-service
   image: ${LABTOOLS_IMAGE_URI-xilinx-labtools-docker:$USER-dev}
   restart: unless-stopped
+  <<: *smartnic-logging
 
 x-smartnic-fw-service: &smartnic-fw-service
   image: ${SMARTNIC_FW_IMAGE_URI-esnet-smartnic-fw:$USER-dev}
   restart: unless-stopped
+  <<: *smartnic-logging
 
 # https://github.com/traefik/traefik/releases
 # https://traefik.io/traefik/
@@ -12,11 +22,13 @@ x-smartnic-fw-service: &smartnic-fw-service
 x-traefik-service: &traefik-service
   image: '${DOCKERHUB_PROXY-}library/traefik:3.6.5'
   restart: unless-stopped
+  <<: *smartnic-logging
 
 # https://github.com/prometheus/prometheus/releases
 x-prometheus-service: &prometheus-service
   image: '${DOCKERHUB_PROXY-}prom/prometheus:v3.7.3'
   restart: unless-stopped
+  <<: *smartnic-logging
 
 services:
   xilinx-hwserver:
