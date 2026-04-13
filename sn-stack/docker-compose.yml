@@ -73,7 +73,7 @@ services:
     privileged: true
     network_mode: none
     environment:
-      - HW_TARGET_SERIAL=${HW_TARGET_SERIAL:-*}
+      HW_TARGET_SERIAL: ${HW_TARGET_SERIAL:-*}
     volumes:
       - /dev:/dev
     entrypoint:
@@ -143,7 +143,7 @@ services:
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     depends_on:
       xilinx-hwserver:
         condition: service_healthy
@@ -194,7 +194,7 @@ services:
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - bitfiles:/bitfiles:ro
     network_mode: none
@@ -230,7 +230,7 @@ services:
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     network_mode: none
     command:
       - /bin/bash
@@ -264,7 +264,7 @@ services:
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - bitfiles:/bitfiles:ro
       - type: bind
@@ -309,7 +309,7 @@ services:
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
@@ -344,7 +344,7 @@ services:
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
@@ -386,10 +386,10 @@ services:
         condition: service_completed_successfully
     environment:
       # Tell python to do unbuffered IO to stdout
-      - PYTHONUNBUFFERED=1
-      - VFIO_UNLOCK_PF=$FPGA_PCIE_DEV.0 $FPGA_PCIE_DEV.1
-      - VFIO_UNLOCK_VF=
-      - VFIO_UNLOCK_BAR=2
+      PYTHONUNBUFFERED: 1
+      VFIO_UNLOCK_PF: ${FPGA_PCIE_DEV}.0 ${FPGA_PCIE_DEV}.1
+      VFIO_UNLOCK_VF: ""
+      VFIO_UNLOCK_BAR: 2
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev/vfio:/dev/vfio
@@ -420,8 +420,8 @@ services:
       smartnic-devbind:
         condition: service_completed_successfully
     environment:
-      - SN_PCIE_DEV=$FPGA_PCIE_DEV
-      - SN_DEV_PCIEADDR=$FPGA_PCIE_DEV.0
+      SN_PCIE_DEV: ${FPGA_PCIE_DEV}
+      SN_DEV_PCIEADDR: ${FPGA_PCIE_DEV}.0
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /var/run/dpdk:/var/run/dpdk
@@ -502,10 +502,10 @@ services:
     # set the SN_PF_NETDEV_SERVICE env var to run this service in a different container context.
     network_mode: "service:${SN_PF_NETDEV_SERVICE:-smartnic-dpdk-portlink}"
     environment:
-      - SN_LLDP_SLOTADDR=$FPGA_PCIE_DEV
-      - SN_LLDP_HOST=${SN_HOST:-sn-host-unset}
-      - SN_LLDP_PHYS_SLOT=${SN_PHYS_SLOT:-${UNIQUE:-}}
-      - SN_LLDP_TTL=20
+      SN_LLDP_SLOTADDR: ${FPGA_PCIE_DEV}
+      SN_LLDP_HOST: ${SN_HOST:-sn-host-unset}
+      SN_LLDP_PHYS_SLOT: ${SN_PHYS_SLOT:-${UNIQUE:-}}
+      SN_LLDP_TTL: 20
     volumes:
       - type: bind
         source: ${SN_STACK_ROOT-${PWD}}/smartnic-lldp/scripts
@@ -537,13 +537,13 @@ services:
     user: root
     privileged: true
     environment:
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CFG_CLI_ADDRESS=smartnic-cfg
-      - SN_CFG_CLI_TLS_INSECURE=true
-      - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
-      - SN_P4_CLI_ADDRESS=smartnic-p4
-      - SN_P4_CLI_TLS_INSECURE=true
-      - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
+      REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
+      SN_CFG_CLI_ADDRESS: smartnic-cfg
+      SN_CFG_CLI_TLS_INSECURE: true
+      SN_CFG_CLI_AUTH_TOKEN: ${SN_CFG_AUTH_TOKEN?}
+      SN_P4_CLI_ADDRESS: smartnic-p4
+      SN_P4_CLI_TLS_INSECURE: true
+      SN_P4_CLI_AUTH_TOKEN: ${SN_P4_AUTH_TOKEN?}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -580,18 +580,18 @@ services:
     expose:
       - 50050
     environment:
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_SW_VER=${SN_SW_VER:-unset}
+      REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
+      SN_SW_VER: ${SN_SW_VER:-unset}
 
-      - SN_P4_SERVER_AUTH_TOKENS=${SN_P4_AUTH_TOKEN}
-      - SN_P4_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
+      SN_P4_SERVER_AUTH_TOKENS: ${SN_P4_AUTH_TOKEN}
+      SN_P4_SERVER_DEVICES: ${FPGA_PCIE_DEV}.0
       # A colon-separated list of debug flags as shown by "sn-p4 show server config".
-      #- SN_P4_SERVER_DEBUG_FLAGS=all
+      #SN_P4_SERVER_DEBUG_FLAGS: all
 
       # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
       # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
-      #- GRPC_TRACE=tsi,http #all
-      #- GRPC_VERBOSITY=DEBUG
+      #GRPC_TRACE: "tsi,http" #all
+      #GRPC_VERBOSITY: DEBUG
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -637,22 +637,22 @@ services:
     expose:
       - 50100
     environment:
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_SW_VER=${SN_SW_VER:-unset}
+      REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
+      SN_SW_VER: ${SN_SW_VER:-unset}
 
-      - SN_CFG_SERVER_AUTH_TOKENS=${SN_CFG_AUTH_TOKEN}
-      - SN_CFG_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
+      SN_CFG_SERVER_AUTH_TOKENS: ${SN_CFG_AUTH_TOKEN}
+      SN_CFG_SERVER_DEVICES: ${FPGA_PCIE_DEV}.0
 
       # A colon-separated list of debug flags as shown by "sn-cfg show server config".
-      #- SN_CFG_SERVER_DEBUG_FLAGS=all
+      #SN_CFG_SERVER_DEBUG_FLAGS: all
 
       # A colon-separated list of stats flags as show by "sn-cfg show server config".
-      #- SN_CFG_SERVER_STATS_FLAGS_DISABLE=all
+      #SN_CFG_SERVER_STATS_FLAGS_DISABLE: all
 
       # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
       # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
-      #- GRPC_TRACE=tsi,http #all
-      #- GRPC_VERBOSITY=DEBUG
+      #GRPC_TRACE: "tsi,http" #all
+      #GRPC_VERBOSITY: DEBUG
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -698,14 +698,14 @@ services:
     user: root
     privileged: true
     environment:
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CFG_CLI_ADDRESS=smartnic-cfg
-      - SN_CFG_CLI_TLS_INSECURE=true
-      - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
-      - SN_P4_CLI_ADDRESS=smartnic-p4
-      - SN_P4_CLI_TLS_INSECURE=true
-      - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
-      - SN_TEST_SUITE_NAME=${SN_TEST_SUITE_NAME:-esnet-smartnic-fw}
+      REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
+      SN_CFG_CLI_ADDRESS: smartnic-cfg
+      SN_CFG_CLI_TLS_INSECURE: true
+      SN_CFG_CLI_AUTH_TOKEN: ${SN_CFG_AUTH_TOKEN?}
+      SN_P4_CLI_ADDRESS: smartnic-p4
+      SN_P4_CLI_TLS_INSECURE: true
+      SN_P4_CLI_AUTH_TOKEN: ${SN_P4_AUTH_TOKEN?}
+      SN_TEST_SUITE_NAME: ${SN_TEST_SUITE_NAME:-esnet-smartnic-fw}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -762,8 +762,8 @@ services:
         bind:
           create_host_path: false
     environment:
-      - SN_INGRESS_TLS_FULLCHAIN=${SN_INGRESS_TLS_FULLCHAIN-}
-      - SN_INGRESS_TLS_KEY=${SN_INGRESS_TLS_KEY-}
+      SN_INGRESS_TLS_FULLCHAIN: ${SN_INGRESS_TLS_FULLCHAIN-}
+      SN_INGRESS_TLS_KEY: ${SN_INGRESS_TLS_KEY-}
     healthcheck:
       test:
         - CMD
