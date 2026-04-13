@@ -5,6 +5,14 @@ x-smartnic-logging: &smartnic-logging
     driver: journald
     options:
       tag: "{{.Name}}({{.ID}})"
+      env: "SN_UNIQUE,SN_PROJECT"
+
+x-smartnic-logging-environment: &smartnic-logging-environment
+  SN_UNIQUE: ${UNIQUE}
+  SN_PROJECT: ${COMPOSE_PROJECT_NAME}
+
+x-smartnic-environment: &smartnic-environment
+  <<: *smartnic-logging-environment
 
 x-labtools-service: &labtools-service
   image: ${LABTOOLS_IMAGE_URI-xilinx-labtools-docker:$USER-dev}
@@ -41,6 +49,8 @@ services:
     #  - "${HW_SERVER_PORT-50000}:3121"
     expose:
       - 3121
+    environment:
+      <<: *smartnic-environment
     volumes:
       - /dev:/dev
       - /sys/bus/usb:/sys/bus/usb
@@ -73,6 +83,7 @@ services:
     privileged: true
     network_mode: none
     environment:
+      <<: *smartnic-environment
       HW_TARGET_SERIAL: ${HW_TARGET_SERIAL:-*}
     volumes:
       - /dev:/dev
@@ -102,6 +113,8 @@ services:
     restart: no
     init: true
     user: root
+    environment:
+      <<: *smartnic-environment
     volumes:
       - bitfiles:/bitfiles
     network_mode: none
@@ -143,6 +156,7 @@ services:
     user: root
     privileged: true
     environment:
+      <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     depends_on:
       xilinx-hwserver:
@@ -194,6 +208,7 @@ services:
     user: root
     privileged: true
     environment:
+      <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - bitfiles:/bitfiles:ro
@@ -230,6 +245,7 @@ services:
     user: root
     privileged: true
     environment:
+      <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     network_mode: none
     command:
@@ -264,6 +280,7 @@ services:
     user: root
     privileged: true
     environment:
+      <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - bitfiles:/bitfiles:ro
@@ -309,6 +326,7 @@ services:
     user: root
     privileged: true
     environment:
+      <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
@@ -344,6 +362,7 @@ services:
     user: root
     privileged: true
     environment:
+      <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
@@ -385,6 +404,7 @@ services:
       smartnic-devbind:
         condition: service_completed_successfully
     environment:
+      <<: *smartnic-environment
       # Tell python to do unbuffered IO to stdout
       PYTHONUNBUFFERED: 1
       VFIO_UNLOCK_PF: ${FPGA_PCIE_DEV}.0 ${FPGA_PCIE_DEV}.1
@@ -420,6 +440,7 @@ services:
       smartnic-devbind:
         condition: service_completed_successfully
     environment:
+      <<: *smartnic-environment
       SN_PCIE_DEV: ${FPGA_PCIE_DEV}
       SN_DEV_PCIEADDR: ${FPGA_PCIE_DEV}.0
     volumes:
@@ -457,6 +478,8 @@ services:
       smartnic-devbind:
         condition: service_completed_successfully
     stop_grace_period: 1m
+    environment:
+      <<: *smartnic-environment
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /var/run/dpdk:/var/run/dpdk
@@ -502,6 +525,7 @@ services:
     # set the SN_PF_NETDEV_SERVICE env var to run this service in a different container context.
     network_mode: "service:${SN_PF_NETDEV_SERVICE:-smartnic-dpdk-portlink}"
     environment:
+      <<: *smartnic-environment
       SN_LLDP_SLOTADDR: ${FPGA_PCIE_DEV}
       SN_LLDP_HOST: ${SN_HOST:-sn-host-unset}
       SN_LLDP_PHYS_SLOT: ${SN_PHYS_SLOT:-${UNIQUE:-}}
@@ -537,6 +561,7 @@ services:
     user: root
     privileged: true
     environment:
+      <<: *smartnic-environment
       REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
       SN_CFG_CLI_ADDRESS: smartnic-cfg
       SN_CFG_CLI_TLS_INSECURE: true
@@ -580,6 +605,7 @@ services:
     expose:
       - 50050
     environment:
+      <<: *smartnic-environment
       REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
       SN_SW_VER: ${SN_SW_VER:-unset}
 
@@ -637,6 +663,7 @@ services:
     expose:
       - 50100
     environment:
+      <<: *smartnic-environment
       REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
       SN_SW_VER: ${SN_SW_VER:-unset}
 
@@ -698,6 +725,7 @@ services:
     user: root
     privileged: true
     environment:
+      <<: *smartnic-environment
       REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
       SN_CFG_CLI_ADDRESS: smartnic-cfg
       SN_CFG_CLI_TLS_INSECURE: true
@@ -762,6 +790,7 @@ services:
         bind:
           create_host_path: false
     environment:
+      <<: *smartnic-environment
       SN_INGRESS_TLS_FULLCHAIN: ${SN_INGRESS_TLS_FULLCHAIN-}
       SN_INGRESS_TLS_KEY: ${SN_INGRESS_TLS_KEY-}
     healthcheck:
@@ -827,6 +856,8 @@ services:
       - 9090
     networks:
       - default
+    environment:
+      <<: *smartnic-environment
     volumes:
       - type: bind
         source: ./prometheus
