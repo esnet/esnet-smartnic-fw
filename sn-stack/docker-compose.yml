@@ -8,7 +8,7 @@ x-smartnic-logging: &smartnic-logging
 
 x-labtools-service: &labtools-service
   image: ${LABTOOLS_IMAGE_URI-xilinx-labtools-docker:$USER-dev}
-  restart: unless-stopped
+  restart: no
   <<: *smartnic-logging
 
 x-smartnic-fw-service: &smartnic-fw-service
@@ -67,6 +67,7 @@ services:
 
   xilinx-sc-console:
     <<: *smartnic-fw-service
+    restart: no
     init: true
     user: root
     privileged: true
@@ -98,6 +99,7 @@ services:
   smartnic-unpack:
     <<: *smartnic-fw-service
     hostname: smartnic-unpack
+    restart: no
     init: true
     user: root
     volumes:
@@ -133,12 +135,10 @@ services:
         fi
 
         touch /bitfiles/ok
-        sleep infinity
 
   smartnic-flash-rescue:
     <<: *labtools-service
     hostname: smartnic-flash-rescue
-    restart: no
     init: true
     user: root
     privileged: true
@@ -148,7 +148,7 @@ services:
       xilinx-hwserver:
         condition: service_healthy
       smartnic-unpack:
-        condition: service_started
+        condition: service_completed_successfully
     volumes:
       - bitfiles:/bitfiles:ro
       - type: bind
@@ -189,7 +189,6 @@ services:
 
   smartnic-flash-update:
     <<: *labtools-service
-    restart: no
     hostname: smartnic-flash-update
     init: true
     user: root
@@ -226,7 +225,6 @@ services:
 
   smartnic-flash-remove:
     <<: *labtools-service
-    restart: no
     hostname: smartnic-flash-remove
     init: true
     user: root
@@ -261,14 +259,12 @@ services:
       xilinx-hwserver:
         condition: service_healthy
       smartnic-unpack:
-        condition: service_started
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
     environment:
       - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
-    tmpfs:
-      - /status
     volumes:
       - bitfiles:/bitfiles:ro
       - type: bind
@@ -277,12 +273,6 @@ services:
         read_only: true
         bind:
           create_host_path: false
-    healthcheck:
-      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
-      interval: 10s
-      timeout: 10s
-      retries: 10
-      start_period: 10s
     command:
       - /bin/bash
       - -c
@@ -301,10 +291,6 @@ services:
           /bitfiles/debug_nets.ltx \
           $FPGA_PCIE_DEV \
           # FORCE
-        if [ $$? ] ; then
-          touch /status/ok
-          sleep infinity
-        fi
     profiles:
       - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
@@ -315,27 +301,20 @@ services:
   smartnic-devunbind:
     <<: *smartnic-fw-service
     hostname: smartnic-devunbind
+    restart: no
     depends_on:
       smartnic-hw:
-        condition: service_healthy
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
     environment:
       - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
-    tmpfs:
-      - /status
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
       - /dev:/dev
       - /lib/modules:/lib/modules
-    healthcheck:
-      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
-      interval: 10s
-      timeout: 10s
-      retries: 6
-      start_period: 5s
     entrypoint:
       - /bin/bash
       - -c
@@ -351,35 +330,26 @@ services:
         # Manually enable device memory since there is no device driver in this mode
         setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2
         setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2
-        touch /status/ok
-        sleep infinity
     profiles:
       - smartnic-no-vfio
 
   smartnic-devbind:
     <<: *smartnic-fw-service
     hostname: smartnic-devbind
+    restart: no
     depends_on:
       smartnic-hw:
-        condition: service_healthy
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
     environment:
       - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
-    tmpfs:
-      - /status
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
       - /dev:/dev
       - /lib/modules:/lib/modules
-    healthcheck:
-      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
-      interval: 10s
-      timeout: 10s
-      retries: 6
-      start_period: 5s
     entrypoint:
       - /bin/bash
       - -c
@@ -398,8 +368,6 @@ services:
         # Note the <TAB> before vfio-pci in the grep command
         lspci -D -kvm -s $$FPGA_PCIE_DEV.0 | grep '^Driver:	vfio-pci'
         lspci -D -kvm -s $$FPGA_PCIE_DEV.1 | grep '^Driver:	vfio-pci'
-        touch /status/ok
-        sleep infinity
     profiles:
       - smartnic-mgr-user
       - smartnic-mgr-dpdk-portlink
@@ -409,12 +377,13 @@ services:
   smartnic-vfio-unlock:
     <<: *smartnic-fw-service
     hostname: smartnic-vfio-unlock
+    restart: no
     init: true
     user: root
     privileged: true
     depends_on:
       smartnic-devbind:
-        condition: service_healthy
+        condition: service_completed_successfully
     environment:
       # Tell python to do unbuffered IO to stdout
       - PYTHONUNBUFFERED=1
@@ -449,7 +418,7 @@ services:
     privileged: true
     depends_on:
       smartnic-devbind:
-        condition: service_healthy
+        condition: service_completed_successfully
     environment:
       - SN_PCIE_DEV=$FPGA_PCIE_DEV
       - SN_DEV_PCIEADDR=$FPGA_PCIE_DEV.0
@@ -486,7 +455,7 @@ services:
     privileged: true
     depends_on:
       smartnic-devbind:
-        condition: service_healthy
+        condition: service_completed_successfully
     stop_grace_period: 1m
     volumes:
       - /sys/bus/pci:/sys/bus/pci
@@ -524,7 +493,7 @@ services:
     init: true
     depends_on:
       smartnic-devbind:
-        condition: service_healthy
+        condition: service_completed_successfully
     # Python needs a tty to print logs to stdout
     tty: true
     # Run in the same network namespace as the smartnic-dpdk-portlink container so this
@@ -563,7 +532,7 @@ services:
     hostname: smartnic-fw
     depends_on:
       smartnic-hw:
-        condition: service_healthy
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
@@ -604,8 +573,7 @@ services:
     hostname: smartnic-p4
     depends_on:
       smartnic-hw:
-        condition: service_healthy
-        restart: true
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
@@ -662,8 +630,7 @@ services:
     hostname: smartnic-cfg
     depends_on:
       smartnic-hw:
-        condition: service_healthy
-        restart: true
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
