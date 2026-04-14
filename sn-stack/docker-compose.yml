@@ -1,10 +1,28 @@
+# https://docs.docker.com/engine/logging/drivers/journald/
+# https://docs.docker.com/engine/logging/log_tags/
+x-smartnic-logging: &smartnic-logging
+  logging:
+    driver: journald
+    options:
+      tag: "{{.Name}}({{.ID}})"
+      env: "SN_UNIQUE,SN_PROJECT"
+
+x-smartnic-logging-environment: &smartnic-logging-environment
+  SN_UNIQUE: ${UNIQUE}
+  SN_PROJECT: ${COMPOSE_PROJECT_NAME}
+
+x-smartnic-environment: &smartnic-environment
+  <<: *smartnic-logging-environment
+
 x-labtools-service: &labtools-service
   image: ${LABTOOLS_IMAGE_URI-xilinx-labtools-docker:$USER-dev}
-  restart: unless-stopped
+  restart: no
+  <<: *smartnic-logging
 
 x-smartnic-fw-service: &smartnic-fw-service
   image: ${SMARTNIC_FW_IMAGE_URI-esnet-smartnic-fw:$USER-dev}
   restart: unless-stopped
+  <<: *smartnic-logging
 
 # https://github.com/traefik/traefik/releases
 # https://traefik.io/traefik/
@@ -12,11 +30,13 @@ x-smartnic-fw-service: &smartnic-fw-service
 x-traefik-service: &traefik-service
   image: '${DOCKERHUB_PROXY-}library/traefik:3.6.5'
   restart: unless-stopped
+  <<: *smartnic-logging
 
 # https://github.com/prometheus/prometheus/releases
 x-prometheus-service: &prometheus-service
   image: '${DOCKERHUB_PROXY-}prom/prometheus:v3.7.3'
   restart: unless-stopped
+  <<: *smartnic-logging
 
 services:
   xilinx-hwserver:
@@ -29,6 +49,8 @@ services:
     #  - "${HW_SERVER_PORT-50000}:3121"
     expose:
       - 3121
+    environment:
+      <<: *smartnic-environment
     volumes:
       - /dev:/dev
       - /sys/bus/usb:/sys/bus/usb
@@ -55,13 +77,14 @@ services:
 
   xilinx-sc-console:
     <<: *smartnic-fw-service
+    restart: no
     init: true
     user: root
     privileged: true
-    restart: unless-stopped
     network_mode: none
     environment:
-      - HW_TARGET_SERIAL=${HW_TARGET_SERIAL:-*}
+      <<: *smartnic-environment
+      HW_TARGET_SERIAL: ${HW_TARGET_SERIAL:-*}
     volumes:
       - /dev:/dev
     entrypoint:
@@ -87,8 +110,11 @@ services:
   smartnic-unpack:
     <<: *smartnic-fw-service
     hostname: smartnic-unpack
+    restart: no
     init: true
     user: root
+    environment:
+      <<: *smartnic-environment
     volumes:
       - bitfiles:/bitfiles
     network_mode: none
@@ -122,22 +148,21 @@ services:
         fi
 
         touch /bitfiles/ok
-        sleep infinity
 
   smartnic-flash-rescue:
     <<: *labtools-service
     hostname: smartnic-flash-rescue
-    restart: no
     init: true
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      <<: *smartnic-environment
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     depends_on:
       xilinx-hwserver:
         condition: service_healthy
       smartnic-unpack:
-        condition: service_started
+        condition: service_completed_successfully
     volumes:
       - bitfiles:/bitfiles:ro
       - type: bind
@@ -178,13 +203,13 @@ services:
 
   smartnic-flash-update:
     <<: *labtools-service
-    restart: no
     hostname: smartnic-flash-update
     init: true
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      <<: *smartnic-environment
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - bitfiles:/bitfiles:ro
     network_mode: none
@@ -215,13 +240,13 @@ services:
 
   smartnic-flash-remove:
     <<: *labtools-service
-    restart: no
     hostname: smartnic-flash-remove
     init: true
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
+      <<: *smartnic-environment
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     network_mode: none
     command:
       - /bin/bash
@@ -250,14 +275,13 @@ services:
       xilinx-hwserver:
         condition: service_healthy
       smartnic-unpack:
-        condition: service_started
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
-    tmpfs:
-      - /status
+      <<: *smartnic-environment
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - bitfiles:/bitfiles:ro
       - type: bind
@@ -266,12 +290,6 @@ services:
         read_only: true
         bind:
           create_host_path: false
-    healthcheck:
-      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
-      interval: 10s
-      timeout: 10s
-      retries: 10
-      start_period: 10s
     command:
       - /bin/bash
       - -c
@@ -290,10 +308,6 @@ services:
           /bitfiles/debug_nets.ltx \
           $FPGA_PCIE_DEV \
           # FORCE
-        if [ $$? ] ; then
-          touch /status/ok
-          sleep infinity
-        fi
     profiles:
       - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
@@ -304,27 +318,21 @@ services:
   smartnic-devunbind:
     <<: *smartnic-fw-service
     hostname: smartnic-devunbind
+    restart: no
     depends_on:
       smartnic-hw:
-        condition: service_healthy
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
-    tmpfs:
-      - /status
+      <<: *smartnic-environment
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
       - /dev:/dev
       - /lib/modules:/lib/modules
-    healthcheck:
-      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
-      interval: 10s
-      timeout: 10s
-      retries: 6
-      start_period: 5s
     entrypoint:
       - /bin/bash
       - -c
@@ -340,35 +348,27 @@ services:
         # Manually enable device memory since there is no device driver in this mode
         setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2
         setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2
-        touch /status/ok
-        sleep infinity
     profiles:
       - smartnic-no-vfio
 
   smartnic-devbind:
     <<: *smartnic-fw-service
     hostname: smartnic-devbind
+    restart: no
     depends_on:
       smartnic-hw:
-        condition: service_healthy
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
     environment:
-      - FPGA_PCIE_DEV=$FPGA_PCIE_DEV
-    tmpfs:
-      - /status
+      <<: *smartnic-environment
+      FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
       - /dev:/dev
       - /lib/modules:/lib/modules
-    healthcheck:
-      test: ["CMD-SHELL", "/usr/bin/test -e /status/ok"]
-      interval: 10s
-      timeout: 10s
-      retries: 6
-      start_period: 5s
     entrypoint:
       - /bin/bash
       - -c
@@ -387,8 +387,6 @@ services:
         # Note the <TAB> before vfio-pci in the grep command
         lspci -D -kvm -s $$FPGA_PCIE_DEV.0 | grep '^Driver:	vfio-pci'
         lspci -D -kvm -s $$FPGA_PCIE_DEV.1 | grep '^Driver:	vfio-pci'
-        touch /status/ok
-        sleep infinity
     profiles:
       - smartnic-mgr-user
       - smartnic-mgr-dpdk-portlink
@@ -398,18 +396,20 @@ services:
   smartnic-vfio-unlock:
     <<: *smartnic-fw-service
     hostname: smartnic-vfio-unlock
+    restart: no
     init: true
     user: root
     privileged: true
     depends_on:
       smartnic-devbind:
-        condition: service_healthy
+        condition: service_completed_successfully
     environment:
+      <<: *smartnic-environment
       # Tell python to do unbuffered IO to stdout
-      - PYTHONUNBUFFERED=1
-      - VFIO_UNLOCK_PF=$FPGA_PCIE_DEV.0 $FPGA_PCIE_DEV.1
-      - VFIO_UNLOCK_VF=
-      - VFIO_UNLOCK_BAR=2
+      PYTHONUNBUFFERED: 1
+      VFIO_UNLOCK_PF: ${FPGA_PCIE_DEV}.0 ${FPGA_PCIE_DEV}.1
+      VFIO_UNLOCK_VF: ""
+      VFIO_UNLOCK_BAR: 2
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev/vfio:/dev/vfio
@@ -438,10 +438,11 @@ services:
     privileged: true
     depends_on:
       smartnic-devbind:
-        condition: service_healthy
+        condition: service_completed_successfully
     environment:
-      - SN_PCIE_DEV=$FPGA_PCIE_DEV
-      - SN_DEV_PCIEADDR=$FPGA_PCIE_DEV.0
+      <<: *smartnic-environment
+      SN_PCIE_DEV: ${FPGA_PCIE_DEV}
+      SN_DEV_PCIEADDR: ${FPGA_PCIE_DEV}.0
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /var/run/dpdk:/var/run/dpdk
@@ -475,8 +476,10 @@ services:
     privileged: true
     depends_on:
       smartnic-devbind:
-        condition: service_healthy
+        condition: service_completed_successfully
     stop_grace_period: 1m
+    environment:
+      <<: *smartnic-environment
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /var/run/dpdk:/var/run/dpdk
@@ -513,7 +516,7 @@ services:
     init: true
     depends_on:
       smartnic-devbind:
-        condition: service_healthy
+        condition: service_completed_successfully
     # Python needs a tty to print logs to stdout
     tty: true
     # Run in the same network namespace as the smartnic-dpdk-portlink container so this
@@ -522,10 +525,11 @@ services:
     # set the SN_PF_NETDEV_SERVICE env var to run this service in a different container context.
     network_mode: "service:${SN_PF_NETDEV_SERVICE:-smartnic-dpdk-portlink}"
     environment:
-      - SN_LLDP_SLOTADDR=$FPGA_PCIE_DEV
-      - SN_LLDP_HOST=${SN_HOST:-sn-host-unset}
-      - SN_LLDP_PHYS_SLOT=${SN_PHYS_SLOT:-${UNIQUE:-}}
-      - SN_LLDP_TTL=20
+      <<: *smartnic-environment
+      SN_LLDP_SLOTADDR: ${FPGA_PCIE_DEV}
+      SN_LLDP_HOST: ${SN_HOST:-sn-host-unset}
+      SN_LLDP_PHYS_SLOT: ${SN_PHYS_SLOT:-${UNIQUE:-}}
+      SN_LLDP_TTL: 20
     volumes:
       - type: bind
         source: ${SN_STACK_ROOT-${PWD}}/smartnic-lldp/scripts
@@ -552,19 +556,19 @@ services:
     hostname: smartnic-fw
     depends_on:
       smartnic-hw:
-        condition: service_healthy
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
-    restart: unless-stopped
     environment:
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CFG_CLI_ADDRESS=smartnic-cfg
-      - SN_CFG_CLI_TLS_INSECURE=true
-      - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
-      - SN_P4_CLI_ADDRESS=smartnic-p4
-      - SN_P4_CLI_TLS_INSECURE=true
-      - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
+      <<: *smartnic-environment
+      REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
+      SN_CFG_CLI_ADDRESS: smartnic-cfg
+      SN_CFG_CLI_TLS_INSECURE: true
+      SN_CFG_CLI_AUTH_TOKEN: ${SN_CFG_AUTH_TOKEN?}
+      SN_P4_CLI_ADDRESS: smartnic-p4
+      SN_P4_CLI_TLS_INSECURE: true
+      SN_P4_CLI_AUTH_TOKEN: ${SN_P4_AUTH_TOKEN?}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -594,27 +598,26 @@ services:
     hostname: smartnic-p4
     depends_on:
       smartnic-hw:
-        condition: service_healthy
-        restart: true
-    restart: unless-stopped
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
     expose:
       - 50050
     environment:
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_SW_VER=${SN_SW_VER:-unset}
+      <<: *smartnic-environment
+      REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
+      SN_SW_VER: ${SN_SW_VER:-unset}
 
-      - SN_P4_SERVER_AUTH_TOKENS=${SN_P4_AUTH_TOKEN}
-      - SN_P4_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
+      SN_P4_SERVER_AUTH_TOKENS: ${SN_P4_AUTH_TOKEN}
+      SN_P4_SERVER_DEVICES: ${FPGA_PCIE_DEV}.0
       # A colon-separated list of debug flags as shown by "sn-p4 show server config".
-      #- SN_P4_SERVER_DEBUG_FLAGS=all
+      #SN_P4_SERVER_DEBUG_FLAGS: all
 
       # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
       # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
-      #- GRPC_TRACE=tsi,http #all
-      #- GRPC_VERBOSITY=DEBUG
+      #GRPC_TRACE: "tsi,http" #all
+      #GRPC_VERBOSITY: DEBUG
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -653,31 +656,30 @@ services:
     hostname: smartnic-cfg
     depends_on:
       smartnic-hw:
-        condition: service_healthy
-        restart: true
-    restart: unless-stopped
+        condition: service_completed_successfully
     init: true
     user: root
     privileged: true
     expose:
       - 50100
     environment:
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_SW_VER=${SN_SW_VER:-unset}
+      <<: *smartnic-environment
+      REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
+      SN_SW_VER: ${SN_SW_VER:-unset}
 
-      - SN_CFG_SERVER_AUTH_TOKENS=${SN_CFG_AUTH_TOKEN}
-      - SN_CFG_SERVER_DEVICES=${FPGA_PCIE_DEV}.0
+      SN_CFG_SERVER_AUTH_TOKENS: ${SN_CFG_AUTH_TOKEN}
+      SN_CFG_SERVER_DEVICES: ${FPGA_PCIE_DEV}.0
 
       # A colon-separated list of debug flags as shown by "sn-cfg show server config".
-      #- SN_CFG_SERVER_DEBUG_FLAGS=all
+      #SN_CFG_SERVER_DEBUG_FLAGS: all
 
       # A colon-separated list of stats flags as show by "sn-cfg show server config".
-      #- SN_CFG_SERVER_STATS_FLAGS_DISABLE=all
+      #SN_CFG_SERVER_STATS_FLAGS_DISABLE: all
 
       # https://github.com/grpc/grpc/blob/master/TROUBLESHOOTING.md
       # https://github.com/grpc/grpc/blob/master/doc/trace_flags.md
-      #- GRPC_TRACE=tsi,http #all
-      #- GRPC_VERBOSITY=DEBUG
+      #GRPC_TRACE: "tsi,http" #all
+      #GRPC_VERBOSITY: DEBUG
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -723,14 +725,15 @@ services:
     user: root
     privileged: true
     environment:
-      - REGIO_ESNET_SMARTNIC_PCI_IDS=$FPGA_PCIE_DEV.0
-      - SN_CFG_CLI_ADDRESS=smartnic-cfg
-      - SN_CFG_CLI_TLS_INSECURE=true
-      - SN_CFG_CLI_AUTH_TOKEN=${SN_CFG_AUTH_TOKEN?}
-      - SN_P4_CLI_ADDRESS=smartnic-p4
-      - SN_P4_CLI_TLS_INSECURE=true
-      - SN_P4_CLI_AUTH_TOKEN=${SN_P4_AUTH_TOKEN?}
-      - SN_TEST_SUITE_NAME=${SN_TEST_SUITE_NAME:-esnet-smartnic-fw}
+      <<: *smartnic-environment
+      REGIO_ESNET_SMARTNIC_PCI_IDS: ${FPGA_PCIE_DEV}.0
+      SN_CFG_CLI_ADDRESS: smartnic-cfg
+      SN_CFG_CLI_TLS_INSECURE: true
+      SN_CFG_CLI_AUTH_TOKEN: ${SN_CFG_AUTH_TOKEN?}
+      SN_P4_CLI_ADDRESS: smartnic-p4
+      SN_P4_CLI_TLS_INSECURE: true
+      SN_P4_CLI_AUTH_TOKEN: ${SN_P4_AUTH_TOKEN?}
+      SN_TEST_SUITE_NAME: ${SN_TEST_SUITE_NAME:-esnet-smartnic-fw}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev:/dev
@@ -787,8 +790,9 @@ services:
         bind:
           create_host_path: false
     environment:
-      - SN_INGRESS_TLS_FULLCHAIN=${SN_INGRESS_TLS_FULLCHAIN-}
-      - SN_INGRESS_TLS_KEY=${SN_INGRESS_TLS_KEY-}
+      <<: *smartnic-environment
+      SN_INGRESS_TLS_FULLCHAIN: ${SN_INGRESS_TLS_FULLCHAIN-}
+      SN_INGRESS_TLS_KEY: ${SN_INGRESS_TLS_KEY-}
     healthcheck:
       test:
         - CMD
@@ -852,6 +856,8 @@ services:
       - 9090
     networks:
       - default
+    environment:
+      <<: *smartnic-environment
     volumes:
       - type: bind
         source: ./prometheus
