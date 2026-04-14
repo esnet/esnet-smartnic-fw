@@ -8,7 +8,7 @@ x-smartnic-logging: &smartnic-logging
       env: "SN_UNIQUE,SN_PROJECT"
 
 x-smartnic-logging-environment: &smartnic-logging-environment
-  SN_UNIQUE: ${UNIQUE}
+  SN_UNIQUE: ${UNIQUE-}
   SN_PROJECT: ${COMPOSE_PROJECT_NAME}
 
 x-smartnic-environment: &smartnic-environment
