@@ -210,6 +210,7 @@ sudo mkdir -p /usr/local/smartnic
 sudo chown root:smartnic /usr/local/smartnic
 sudo mkdir /usr/local/smartnic/{0..9}
 sudo chown smartnic:smartnic /usr/local/smartnic/{0..9}
+sudo chmod 775 /usr/local/smartnic/{0..9}
 ```
 
 **NOTE** By convention, the smartnic firmware stack for the card in server physical slot X should be deployed under `/usr/local/smartnic/X` to make it easy to match up the deployed firmware with the physical card it should apply to.
@@ -719,9 +720,55 @@ Satellite Controller firmware has been succesfully updated from 7.1.23 to 7.1.24
 
 # Enable automatic SmartNIC application restart at boot
 
-Now we need the list of physical slots containing a Xilinx FPGA card from the info captured during card install.  For each slot number, activate a systemd unit to automatically restart the SmartNIC at system boot.
+There are two possible approaches available to ensure correct startup of the SmartNIC application stacks on system boot.
+1. Allow the `smartnic` service account to self-manage application stack startup on boot (Recommended)
+   * Enables registration of persistent systemd units for execution on boot
+   * Allows application operators to self-manage the startup state of their application stacks without coordination with sysadmins
+2. Have `root` manage the systemd units to be executed on boot
+   * Requires coordination with sysadmins whenever stacks should be temporarily disabled
 
-**NOTE** This on-boot job is essential to the correct operation of the SmartNIC application stack after a boot.  Docker does not (on its own) perform a properly sequenced startup of the containers within the SmartNIC application stack.  This job ensures startup is properly sequenced.
+**NOTE** One of these two options must be chosen, do not skip this step.  The `smartnic-stack-restart` on-boot job is essential to the correct operation of the SmartNIC application stack after a boot.  Docker does not (on its own) perform a properly sequenced startup of the containers within the SmartNIC application stack.  This job ensures startup is properly sequenced.
+
+## Option #1: Allow the `smartnic` service account to self-manage application stack startup on boot (Recommended)
+
+Enable `linger` for the `smartnic` user to allow registration of persistent systemd user units which can run on boot
+``` bash
+sudo loginctl enable-linger smartnic
+```
+
+Confirm that the setting has been adjusted
+``` bash
+loginctl show-user smartnic --property=Linger
+```
+(should respond with `Linger=yes`)
+
+Confirm that the user now has a persistent `systemd --user` daemon running along with a `dbus-daemon`
+``` bash
+sudo systemctl status --machine smartnic@ --user
+```
+
+With the `linger` option enabled, the application operators will be able to enable on-boot systemd jobs which will run as the `smartnic` user.
+**NOTE** This is an example only and should not be done by `root` but rather by the application operators.  Shown here as general awareness in case this setup is not already well known.
+``` bash
+sudo su - smartnic
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+
+for card_slot in 1 2 4 5 ; do
+  systemctl enable --user smartnic-stack-restart@$card_slot
+done
+```
+(example for a system with four FPGA cards installed in physical slots 1,2,4 and 5 -- your physical slot numbers may differ)
+
+Please communicate clearly to the application operators that they will be responsible for managing this on-boot systemd unit for each of the individual application stacks that they run (one per SmartNIC FPGA card)
+
+## Option #2: Have `root` manage the systemd units to be executed on boot
+
+If the sysadmins have decided that stack auto-start at reboot should be exclusively managed by `root` on this system, the systemd on-boot jobs must be activated at the system level.
+
+**WARNING** DO NOT run the commands in this section if you have already enabled the `linger` option for the `smartnic` service account in the previous section.  Either `root` or `smartnic` should manage the SmartNIC stack restarts on boot but *not both*.
+
+Now we need the list of physical slots containing a Xilinx FPGA card from the info captured during card install.  For each slot number, activate a systemd unit to automatically restart the SmartNIC at system boot.
 
 ``` bash
 for card_slot in 1 2 4 5 ; do
@@ -730,7 +777,7 @@ done
 ```
 (example for a system with four FPGA cards installed in physical slots 1,2,4 and 5 -- your physical slot numbers may differ)
 
-Initially, there will not be any application installed under `/usr/local/smartnic/*` so these jobs won't be doing anything useful and might show up as failing.  These jobs should still be enabled during commissioning since they require root privs and will be required by the SmartNIC Application Operators.
+Initially, there will not be any application installed under `/usr/local/smartnic/*` so these jobs won't be doing anything useful and might show up as failing.
 
 # Check all the things before handing off to the smartnic application service owners
 

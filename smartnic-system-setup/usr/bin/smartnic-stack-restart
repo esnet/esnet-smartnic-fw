@@ -2,17 +2,9 @@
 
 SLOT="$1"
 
-STACK_PATH=/usr/local/smartnic/${SLOT}/active
-
-if [ ! -d ${STACK_PATH} ] ; then
-	echo "ERROR: Stack path '${STACK_PATH}' not accessible"
-	exit 1
-fi
-
-cd ${STACK_PATH}
-echo "Stopping stack ${SLOT}"
+echo "Stopping stack ${SLOT} in ${PWD}"
 docker compose down --remove-orphans
-echo "Starting stack ${SLOT}"
+echo "Starting stack ${SLOT} in ${PWD}"
 docker compose up -d
 
 docker compose ps

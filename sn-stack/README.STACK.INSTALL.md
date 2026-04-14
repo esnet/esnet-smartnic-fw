@@ -3,175 +3,192 @@ One-time Setup of the Host Server
 
 Server setup
 ------------
-All of the steps for setting up a server to host one or more ESnet SmartNIC application stacks is contained in the `README.SERVER.SETUP.md` file found next to this file in the `esnet-smartnic-fw` repository.
+All of the steps for setting up a server to host one or more ESnet SmartNIC application stacks is contained in the `README.SYSTEM.SETUP.md` file found next to this file in the `esnet-smartnic-fw` repository.
 
 The steps itemized in that document are typically performed by system adminstrators prior to handing off the system to the users operating the SmartNIC application stack.  Please ensure that all steps from that document are completed before proceeding.
+
+You should have received a table of information from your sysadmins providing this collection of information about the ESnet SmartNIC FPGA cards installed and commissioned in your system.
+
+```
+ --------------- ----------- --------------- ------------------ -----------
+| Physical Slot | Card Type | Card Serial # | PCIe Bus Address | SC FW Ver |
+|---------------|-----------|---------------|------------------|-----------|
+| Slot 1        | U55C      | XFL1......2V  | 0000:21:00.0     | 7.1.24    |
+| Slot 2        | U55C      | XFL1......0U  | 0000:22:00.0     | 7.1.24    |
+| Slot 4        | U55C      | XFL1......TC  | 0000:82:00.0     | 7.1.24    |
+| Slot 5        | U55C      | XFL1......Z0  | 0000:81:00.0     | 7.1.24    |
+ --------------- ----------- --------------- ------------------ -----------
+```
+(example from a system with 4 Alveo au55c FPGA cards -- your table will differ)
+
+You will need the information from the provided table when setting up the application stacks in later sections of this document.
 
 Set up Xilinx Labtools
 ----------------------
 
 In order to load a smartnic FPGA bitfile into the Xilinx U280 card, we need to make use of the Xilinx Labtools.  The instructions for setting up labtools can be found in a separate repository (https://github.com/esnet/xilinx-labtools-docker).  That repository will provide us with a docker container populated with the xilinx labtools.  That docker container will be used to program the FPGA bitfile.
 
+**NOTE** This container build should be executed as the `smartnic` user on your server.  This will allow the container image to be located using the defaults within the SmartNIC application stack.  If you build it differently, or use non-default tags for the image, you will need to adjust the `.env` file in each SmartNIC container stack.
+
+**NOTE** Once built, the `xilinx-labtools-docker` container should not be published outside of your organization as it contains proprietary tools that you have downloaded from AMD/Xilinx.  Publishing it to a **private** docker registry within your organization may be helpful if you will be deploying to multiple servers hosting SmartNIC FPGA cards.
+
+Installing the ESnet SmartNIC application stack(s)
+--------------------------------------------------
+
+The steps from the `README.SYSTEM.SETUP.md` file will have pre-created a directory hierarchy under `/usr/local/smartnic/{0..9}`.  The numbers in that path are associated with the physical slot containing the related SmartNIC FPGA card.  Keeping the paths related to the physical slot numbers of the FPGA cards helps when diagnosing any issues on the server or on the network.  This document will assume that you have followed this recommendation.
+
+You should have received (or built for yourself) a firmware artifact zip file which contains the SmartNIC application stack which will provision and manage a single SmartNIC FPGA card.  This file will be named in one of these forms, depending on how it was built:
+* Typical self-built filename: `artifacts.esnet-smartnic-fw.package.0.zip`
+* Typical production release filename: `artifacts.esnet-smartnic-fw.[au280|au55c].ejfat.package.<build#>.zip`
+
+Extract this file under each of the applicable numbered directories under `/usr/local/smartnic`, matching the physical slot #'s holding your SmartNIC FPGA cards.
+``` bash
+cd /usr/local/smartnic/1
+unzip ~/artifacts.esnet-smartnic-fw.au55c.ejfat.package.999999.zip
+```
+(example of extracting an au55c FPGA build of the ejfat application build # 999999 for a SmartNIC FPGA card located in physical slot #1)
+
+You should end up with a tree that looks something like this for each SmartNIC FPGA card physical slot:
+``` bash
+$ tree -L 2 -d /usr/local/smartnic/1
+/usr/local/smartnic/1
+└── sn-stack
+    ├── certs
+    ├── debs
+    ├── prometheus
+    ├── scratch
+    ├── smartnic-hw
+    ├── smartnic-lldp
+    ├── smartnic-vfio-unlock
+    ├── test
+    └── traefik
+```
+(abbreviated output, only top-level directories shown here for physical slot #1)
+
 Configuring the firmware runtime environment
 --------------------------------------------
 
-The firmware artifact produced by the build (see README.md at the top of this repo) should be transferred to the runtime system that hosts an FPGA card.
+Each of the SmartNIC application stacks requires configuration values to be set before you can use the firmware.
 
-```
-unzip artifacts.esnet-smartnic-fw.package.0.zip
-cd sn-stack
-# edit the .env file to provide sane values for
-#    FPGA_PCIE_DEV=0000:d8:00
-#    COMPOSE_PROFILES=smartnic-mgr-vfio-unlock
-# and IFF you have more than one JTAG you also need a line like this
-#    HW_TARGET_SERIAL=21760204S029A
+Your release zip file will typically contain a partially pre-populated `sn-stack/.env` file.  If present, this `.env` file should be used as the basis of your configuration.
+
+If **no** `.env` file is present, you can create one by taking a copy of the always provided `example.env` file.
+``` bash
+cd /usr/local/smartnic/1/sn-stack
+cp --no-clobber example.env .env
 ```
 
-Verify that the stack configuration is valid
+**NOTE** The `.env` file must be customized for each of the SmartNIC FPGA stacks individually.  If your system has more than one SmartNIC FPGA card installed, you will need to repeat this process with relevant settings for each card.  Refer to the information collected during the `README.SYSTEM.SETUP.md` workflow to assist with the required per-card customization.
 
+**NOTE** The `sn-stack/example.env` file within the application zip file is the official reference for the available settings for a given release.  Please review this file, paying close attention to any differences between your previous running `.env` file and the new `example.env` file during upgrades as options may have been added, changed or deprecated in the new version.
+
+The settings in the `.env` file configure and customize the following aspects of the application stack:
+* Binding between PCIe Bus Address (`FPGA_PCIE_DEV=`) and FPGA Card Serial Number (`HW_TARGET_SERIAL=`)
+  * Serial Number is used to identify the USB JTAG device used to program the FPGA
+  * PCIe Bus Address is used to identify the PCIe device from the OS perspective
+* Physical Slot Number (`UNIQUE=`)
+  * Used to bind each SmartNIC FPGA stack to a unique TCP port when remote access is enabled
+  * Used to identify this card's position within the server over LLDP
+* Application Profile Options (`COMPOSE_PROFILE=`)
+  * Selects which application stack components are started up
+  * A full-featured stack includes
+    * `smartnic-mgr-dpdk-portlink` which enables transmit of LLDP packets when the 100G ports are enabled
+    * `smartnic-ingress` which enables a TLS-enabled reverse proxy allowing remote access to metrics and control plane APIs
+    * `smartnic-metrics` which enables a Prometheus exporter allowing access to application metrics
+* TLS paths for certificate and private key
+  * This provides the TLS reverse proxy with a valid, trusted TLS certificate
+* Authentication tokens for control plane APIs
+  * All control plane APIs require authentication using bearer tokens
+  * These tokens must be configured or the application stack will not start
+
+Once you have reviewed and configured the settings in your `.env` file, verify that the stack configuration is valid
 ```
 docker compose config --quiet && echo "All good!"
 ```
 
 If this prints anything other than "All good!" then your `.env` configuration file has errors.  Do not proceed until this step passes.
 
-Converting from factory flash image to ESnet Smartnic flash image
+Starting and stopping the SmartNIC application stack
+====================================================
+
+Automatically (re)starting the SmartNIC application stack at boot
 -----------------------------------------------------------------
 
-From the factory, the FPGA cards have only a "gold" bitfile in flash with the "user" partition of flash being blank.  The "gold" bitfile has a narrow PCIe memory window for BAR1 and BAR2 which is insufficient for the ESnet Smartnic platform.  Fixing this requires a one-time flash programming step to install an ESnet Smartnic bitfile into the FPGA "user" partition in flash.  This initial setup is done using the JTAG.
+The SmartNIC appication stack requires special attention at server boot time.  This is required due to the various docker containers in the stack requiring a coordinated startup sequence.  In a default docker installation, the startup sequence after boot is disorderly.  To correct for this, a systemd unit (`smartnic-stack-restart@.service`) must be activated for each of the SmartNIC FPGA cards in the system.  As the name implies, the smartnic-stack-restart unit brings the stack down and then starts all the containers in the correct order.
 
-Ensure that any running `sn-stack` instances have been stopped so that they don't interfere with the flash programming operation.
+There are two approaches to which user will run these stack restart jobs at boot.  See `README.SYSTEM.SETUP.md` section "Enable automatic SmartNIC application restart at boot", and coordinate with your system administrator about which method you will be using.
+
+**ONLY IF** you are using the recommended option to have the `smartnic` user self-manage the application startup at boot (Option #1 from the other document), then you should activate a user-level systemd unit to restart each stack.
+``` bash
+sudo su - smartnic
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+
+for card_slot in 1 2 4 5 ; do
+  systemctl enable --user smartnic-stack-restart@$card_slot
+done
 ```
-docker compose down -v --remove-orphans
+(example for a system with four FPGA cards installed in physical slots 1,2,4 and 5 -- your physical slot numbers may differ)
+
+
+Running the SmartNIC application stack manually
+-----------------------------------------------
+
+Start up the full firmware docker stack using the `up` subcommand.
+``` bash
+sudo su - smartnic
+for card_slot in 1 2 4 5 ; do
+  docker compose --project-directory /usr/local/smartnic/$card_slot/sn-stack up -d
+done
 ```
-
-Start the flash rescue service to program an ESnet Smartnic bitfile into the FPGA card "user" partition using the JTAG interface.  This takes approximately 20 minutes.  This process should not be interrupted.
-```
-docker compose --profile smartnic-flash run --rm smartnic-flash-rescue
-```
-This will:
-* Use JTAG to write a small flash-programing helper bitfile into the FPGA
-* Use JTAG to write the current version of the bitfile into the FPGA card's "user" partition in flash
-  * Only the "user" partition of the flash is overwritten by this step
-  * The "gold" partition is left untouched
-
-Clean up by bringing down the running stack after flash writing has completed.
-```
-docker compose down -v --remove-orphans
-```
-
-**Perform a cold-boot (power cycle) of the server hosting the FPGA card**
-
-It is essential that this is a proper power cycle and not simply a warm reboot.  Specifically **do not** use `shutdown -r now` but rather use something like `ipmitool chassis power cycle`.  Failure to perform a cold-boot here will result in an unusable card.
-
-
-Normal Operation of the Runtime Environment
-===========================================
-
-**NOTE** the steps in this major section are only expected to work once you've completed the initial setup in "One-time Setup of the Runtime Environment".
-
-Running the firmware
---------------------
-
-Start up the full firmware docker stack like this
-```
-docker compose up -d
-```
-
-Verifying the bitfile download
-------------------------------
-
-```
-docker compose logs smartnic-hw
-```
+(example for a system with four FPGA cards installed in physical slots 1,2,4 and 5 -- your physical slot numbers may differ)
 
 Inspecting registers and interacting with the firmware
 ------------------------------------------------------
 
-The firmware runtime environment exists inside of the `smartnic-fw` container.  Here, we exec a shell inside of that container and have a look around.
+The firmware runtime interactive environment exists inside of the `smartnic-fw` container.  Here, we `exec` a shell inside of that container and have a look around.
 
-```
+``` bash
+sudo su - smartnic
+cd /usr/local/smartnic/1/sn-stack
 docker compose exec smartnic-fw bash
 sn-cfg show device info
 regio-esnet-smartnic dump dev0.bar2.syscfg
+exit
 ```
 
 Stopping the runtime environment
 --------------------------------
 
-When we're finished using the smartnic runtime environment, we can stop and remove our docker containers.
-
-```
+When we're finished using the smartnic runtime environment, we can stop and remove our docker containers using the `down` subcommand.
+``` bash
+sudo su - smartnic
+for card_slot in 1 2 4 5 ; do
+  docker compose --project-directory /usr/local/smartnic/$card_slot/sn-stack down -v
+done
 docker compose down -v
 ```
+(example for a system with four FPGA cards installed in physical slots 1,2,4 and 5 -- your physical slot numbers may differ)
 
-(OPTIONAL) Updating the flash image to a new ESnet Smartnic flash image
------------------------------------------------------------------------
+Normal Operation of the Runtime Environment
+===========================================
 
-The instructions in this section are used to **update** the Smartnic flash image **from an already working** Smartnic environment.  This update step is *optional* and only required if you want to change the contents of the FPGA card flash.  Normally, the "RAM" of the FPGA is loaded using JTAG during stack startup.
+**NOTE** the steps in remainder of this document are only expected to work once you've completed the initial setup in "One-time Setup of the Runtime Environment" and started the SmartNIC application stack for each FPGA card.
 
-**NOTE** This will not work for the very first time ever programming the flash.  See "Converting from factory flash image to ESnet Smartnic flash image" section above for first-time setup.
-
-Start up a any properly configured stack which will allow us to write the flash using a fast algorithm over PCIe.
-
-```
-docker compose up -d
-```
-
-Confirm that PCIe register IO is working in your stack by querying the version registers.
-
-```
-docker compose exec smartnic-fw sn-cfg show device info
-```
-Confirm that the "DNA" register is **not** showing 0xfffff... as its contents.
-
-Start the flash update service to write the currently active FPGA bitfile into the persistent flash on the FPGA card.  This takes approximately 7-8 minutes. This process should not be interrupted.
-```
-docker compose --profile smartnic-flash run --rm smartnic-flash-update
-```
-
-Bring down the running stack after flash writing has completed.
-```
-docker compose down -v --remove-orphans
-```
-
-(OPTIONAL) Remove the ESnet Smartnic flash image from the FPGA card to revert to factory image
-----------------------------------------------------------------------------------------------
-
-The instructions in this section are used to **remove** the Smartnic flash image **from an already working** Smartnic environment.  This removal step is *optional* and only required if you want to reset the contents of the FPGA card flash back to the factory bitfile.  If you want to keep using the card as an ESnet Smartnic, **do not** perform these operations or you'll have to re-do the  "Converting from factory flash image to ESnet Smartnic flash image" section above.
-
-Start up a any properly configured stack which will allow us to write the flash using a fast algorithm over PCIe.
-
-```
-docker compose up -d
-```
-
-Confirm that PCIe register IO is working in your stack by querying the version registers.
-
-```
-docker compose exec smartnic-fw sn-cfg show device info
-```
-Confirm that the "DNA" register is **not** showing 0xfffff... as its contents.
-
-Start the flash remove service to erase the ESnet Smartnic image from the "user" partition of the FPGA card flash.  This takes less than 1 minute. This process should not be interrupted.
-```
-docker compose --profile smartnic-flash run --rm smartnic-flash-remove
-```
-
-Bring down the running stack after flash reset is completed.
-```
-docker compose down -v --remove-orphans
-```
+**NOTE** if your SmartNIC application comes with its own control plane application, you will typically only need to start the application stack (see previous section).  The control plane application will typically take care of all remaining run-time configuration and monitoring.  Some of the commands documented in this section may be helpful for diagnosing any run-time issues you might encounter, so it's worthwhile becoming familiar with them even if you have a full control plane.
 
 Using the sn-cfg tool
 =====================
 
 The sn-cfg tool provides subcommands to help you accomplish many common tasks for inspecting and configuring the smartnic platform components.
 
-All commands described below are expected to be executed within the `smartnic-fw` container environment.  Use this command to enter the appropriate environment.
+All commands described below are expected to be executed as the within the `smartnic-fw` container environment in the context of a single FPGA card (shown as `$CARD_SLOT` below).  Use this command sequence to enter the appropriate environment.
 ```
+sudo su - smartnic
+cd /usr/local/smartnic/$CARD_SLOT/sn-stack
 docker compose exec smartnic-fw bash
 ```
+(Substitute the appropriate `$CARD_SLOT` value from 0..9 for the FPGA card of interest)
 
 Displaying device information with the "show device" subcommand
 ---------------------------------------------------------------
@@ -515,10 +532,13 @@ Using the sn-p4 tool
 
 The user's p4 application embedded within the smartnic design may have configurable lookup tables which are used during the wire-speed execution of the packet processing pipeline.  The sn-p4 tool provides subcommands to help you to manage the rules in all of the lookup tables defined in your p4 program.
 
-All commands described below are expected to be executed within the `smartnic-fw` container environment.  Use this command to enter the appropriate environment.
+All commands described below are expected to be executed within the `smartnic-fw` container environment in the context of a single FPGA card (shown as `$CARD_SLOT` below).  Use this command sequence to enter the appropriate environment.
 ```
+sudo su - smartnic
+cd /usr/local/smartnic/$CARD_SLOT/sn-stack
 docker compose exec smartnic-fw bash
 ```
+(Substitute the appropriate `$CARD_SLOT` value from 0..9 for the FPGA card of interest)
 
 The `sn-p4` tool will automatically look for an environment variable called `SN_P4_CLI_ADDRESS` which can be set to the hostname or IP address of the `smartnic-p4` container that will perform all of the requested actions on the real hardware.  In the `smartnic-fw` container, this value will already be set for you.
 
@@ -636,6 +656,8 @@ Using the smartnic-dpdk container
 
 The `sn-stack` environment can be started in a mode where the FPGA can be controlled by a DPDK application.  Running in this mode requires a few carefully ordered steps.
 
+**NOTE** Running the SmartNIC stack in this mode requires specific knowledge of how a custom DPDK application will interact with the FPGA PCIe memory as well as the steps to bind the FPGA device to a kernel driver.  This is not the typical way that the SmartNIC stack is used.  This section is for advanced users who would like to take control of many of the low-level infrastructure details within the SmartNIC stack and is typically only applicable for users who are writing their own custom application.  If none of that applies to you, this section should be ignored and you will be better off running the stack in a different mode.
+
 Broadly speaking, the steps required to bring up a DPDK application are as follows:
 * Bind the `vfio-pci` kernel driver to each FPGA PCIe physical function (PF)
   * This is handled automatically by the sn-stack.
@@ -729,6 +751,8 @@ Test Automation Framework
 =========================
 The `smartnic-fw-test` service incorporates the [Robot Framework](https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html) as an engine for executing test suites. The service mounts the `sn-stack/test/fw` directory into the container as `/test/fw`. The `suites` and `library` sub-directories contain the tests to be executed and the Python classes implementing the tests, respectively.
 
+**NOTE** This section is for advanced users, typically ones who have written their own custom SmartNIC appications.  It describes methods for hooking into the Test Automation Framework used by SmartNIC developers.  If this does not apply to your situation, this section should be skipped.
+
 A hardware application can optionally supply their own test suites and library. When the selected `sn-hw/artifacts.<board>.<app_name>.0.zip` archive contains a `robot-framework.tar.bz2` tarball, the tarball will be extracted into the `sn-stack/test/hw` directory for inclusion into the `sn-stack` build artifact. This process will only be automatic during a Gitlab CI build, but can be manually performed by executing the `build-setup-hw-test.sh` script prior to running the `build.sh` script to build the container.
 
 A regular test run is started with:
@@ -760,3 +784,34 @@ There are two primary methods for developing tests:
     - `SN_APP_TEST_ROOT`: Path to alternate application test files to be mounted at `/test/app` within the container.
 
 In both cases, any new Python package dependencies added to a `pip-requirements.txt` file can be installed into the container prior to executing the tests when the `--pip-install` (`-p`) option is passed to `./run-tests.sh`. Note that this doesn't modify the container image, only the running instance. Adding new dependencies is only possible when network connectivity is available and the Python package index is accessible by the container.
+
+
+Rescuing a "missing" FPGA card using JTAG to program the card flash
+===================================================================
+
+**NOTE** If your FPGA card is present on the PCIe Bus (`lspci -Dd 10ee:`) this method is not applicable and you should instead use the sequence documented in `README.SYSTEM.SETUP.md` and program the flash using the `xbflash2` tool.  The sequence described in this document should only be used if your FPGA card is **NOT PRESENT** on the PCIe Bus.
+
+Ensure that any running `sn-stack` instances have been stopped so that they don't interfere with the flash programming operation.
+```
+docker compose down -v --remove-orphans
+```
+
+Start the flash rescue service to program an ESnet Smartnic bitfile into the FPGA card "user" partition using the JTAG interface.  This takes approximately 20 minutes.  This process should not be interrupted.
+```
+docker compose --profile smartnic-flash run --rm smartnic-flash-rescue
+```
+This will:
+* Use JTAG to write a small flash-programing helper bitfile into the FPGA
+* Use JTAG to write the current version of the bitfile into the FPGA card's "user" partition in flash
+  * Only the "user" partition of the flash is overwritten by this step
+  * The "factory" / "golden" partition is left untouched
+
+Clean up by bringing down the running stack after flash writing has completed.
+```
+docker compose down -v --remove-orphans
+```
+
+**Perform a cold-boot (power cycle) of the server hosting the FPGA card**
+
+It is essential that this is a proper power cycle and not simply a warm reboot.  Specifically **do not** use `shutdown -r now` but rather use something like `ipmitool chassis power cycle`.  Failure to perform a cold-boot here will result in an unusable card.
+
