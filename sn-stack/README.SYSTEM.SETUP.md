@@ -253,7 +253,7 @@ sn-bootstrap/
 ├── esnet-smartnic.au280.mcs  <------------ FPGA card flash image for au280 FPGA card
 ├── esnet-smartnic.au55c.mcs  <------------ FPGA card flash image for au55c FPGA card
 ├── loadsc                    <------------ (optional) Xilinx tool for upgrading Satellite Controller
-├── smartnic-system-setup_0.4.0_all.deb <-- Debian package providing udev and systemd units for card management
+├── smartnic-system-setup_0.5.0_all.deb <-- Debian package providing udev and systemd units for card management
 └── xbflash2                  <------------ Xilinx tool for programming FPGA card flash images
 ```
 (version numbers above are latest as of March 2026)
@@ -281,7 +281,7 @@ The `smartnic-system-setup` package contains `udev` and `systemd` services and s
 
 ``` bash
 cd sn-bootstrap
-sudo dpkg -i smartnic-system-setup_0.4.0_all.deb
+sudo dpkg -i smartnic-system-setup_0.5.0_all.deb
 ```
 
 # Convert FPGA cards from factory images to ESnet SmartNIC images
@@ -729,7 +729,7 @@ There are two possible approaches available to ensure correct startup of the Sma
 
 **NOTE** One of these two options must be chosen, do not skip this step.  The `smartnic-stack-restart` on-boot job is essential to the correct operation of the SmartNIC application stack after a boot.  Docker does not (on its own) perform a properly sequenced startup of the containers within the SmartNIC application stack.  This job ensures startup is properly sequenced.
 
-## Option #1: Allow the `smartnic` service account to self-manage application stack startup on boot (Recommended)
+## Option # 1: Allow the `smartnic` service account to self-manage application stack startup on boot (Recommended)
 
 Enable `linger` for the `smartnic` user to allow registration of persistent systemd user units which can run on boot
 ``` bash
@@ -762,7 +762,7 @@ done
 
 Please communicate clearly to the application operators that they will be responsible for managing this on-boot systemd unit for each of the individual application stacks that they run (one per SmartNIC FPGA card)
 
-## Option #2: Have `root` manage the systemd units to be executed on boot
+## Option # 2: Have `root` manage the systemd units to be executed on boot
 
 If the sysadmins have decided that stack auto-start at reboot should be exclusively managed by `root` on this system, the systemd on-boot jobs must be activated at the system level.
 
