@@ -6,6 +6,7 @@ x-smartnic-logging: &smartnic-logging
     options:
       tag: "{{.Name}}({{.ID}})"
       env: "SN_UNIQUE,SN_PROJECT"
+      labels: "com.docker.compose.service"
 
 x-smartnic-logging-environment: &smartnic-logging-environment
   SN_UNIQUE: ${UNIQUE-}
