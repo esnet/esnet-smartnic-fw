@@ -53,11 +53,12 @@ variables:
 
 pull_sn_hw:
   stage: pull_sn_hw
-  image: wharf.es.net/dockerhub-proxy/library/ubuntu:jammy
+  image: wharf.es.net/dockerhub-proxy/library/ubuntu:noble
   variables:
     ESNET_SMARTNIC_HWAPI_URL: "$CI_API_V4_URL/projects/$SN_HW_GROUP%2F$SN_HW_REPO/jobs/artifacts/$SN_HW_BRANCH/download?job_token=$CI_JOB_TOKEN&job=$SN_HW_API_JOB"
     GIT_SUBMODULE_STRATEGY: none
   before_script:
+    - sed -i -re 's|(http://)([^/]+.*)/|\1linux.mirrors.es.net/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
     - apt update -y
     - ln -fs /usr/share/zoneinfo/UTC /etc/localtime
     - apt install -y --no-install-recommends wget ca-certificates
