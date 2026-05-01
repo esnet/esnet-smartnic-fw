@@ -825,3 +825,17 @@ trigger_sw_ht:
   needs:
     - package
 
+# trigger_sw_ejfat:
+#   extends: .trigger_sw
+#   variables:
+#     SN_HW_EXPECTED_APP_NAME: ejfat
+#     SN_SW_APP_NAME: ejfat
+#   trigger:
+#     project: esnet/udplbd2
+#     branch: develop
+#   needs:
+#     - package
+#     - job: ejfat-ci-trial
+#       artifacts: false
+#       parallel:
+#         matrix: *ejfat_ci_trial_matrix
