@@ -694,6 +694,13 @@ ejfat-ci-trial:
   extends: .ejfat_review
   variables:
     EXTRA_VAR_STACK_ROOT_PATH: /usr/local/smartnic/${EXTRA_VAR_STACK_UNIQUE}
+  rules:
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
+      when: never
+    - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH) && ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'ejfat')
+    - if: ($CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH) && ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'ejfat')
+      when: manual
+      allow_failure: true
   parallel:
     matrix: *ejfat_ci_trial_matrix
 
