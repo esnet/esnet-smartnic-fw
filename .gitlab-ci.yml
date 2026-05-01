@@ -632,10 +632,6 @@ ftap-test:
     - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'ejfat')
       when: manual
       allow_failure: true
-    # Deprecated HW app name.  The 'udplb' rule below can be removed any time after 2025 Nov 01
-    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
-      when: manual
-      allow_failure: true
   resource_group: ${AAP_LIMIT}/${EXTRA_VAR_STACK_UNIQUE}
 
 .ejfat_review:
