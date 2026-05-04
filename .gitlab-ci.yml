@@ -632,10 +632,6 @@ ftap-test:
     - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'ejfat')
       when: manual
       allow_failure: true
-    # Deprecated HW app name.  The 'udplb' rule below can be removed any time after 2025 Nov 01
-    - if: ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'udplb')
-      when: manual
-      allow_failure: true
   resource_group: ${AAP_LIMIT}/${EXTRA_VAR_STACK_UNIQUE}
 
 .ejfat_review:
@@ -698,6 +694,13 @@ ejfat-ci-trial:
   extends: .ejfat_review
   variables:
     EXTRA_VAR_STACK_ROOT_PATH: /usr/local/smartnic/${EXTRA_VAR_STACK_UNIQUE}
+  rules:
+    - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
+      when: never
+    - if: ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH) && ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'ejfat')
+    - if: ($CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH) && ($SN_HW_BOARD == $SYSTEM_HW_BOARD) && ($SN_HW_APP_NAME == 'ejfat')
+      when: manual
+      allow_failure: true
   parallel:
     matrix: *ejfat_ci_trial_matrix
 
@@ -822,16 +825,17 @@ trigger_sw_ht:
   needs:
     - package
 
-# Deprecated
-#   This entry is for backward compatibility with branches that use a SN_HW_APP_NAME of esnet-smartnic-ht
-#   This entry can be safely removed any time after 1 Nov 2025.
-trigger_sw_ht_old:
-  extends: .trigger_sw
-  variables:
-    SN_HW_EXPECTED_APP_NAME: esnet-smartnic-ht
-    SN_SW_APP_NAME: hightouch
-  trigger:
-    project: ht/hightouch-xilinx
-    branch: main
-  needs:
-    - package
+# trigger_sw_ejfat:
+#   extends: .trigger_sw
+#   variables:
+#     SN_HW_EXPECTED_APP_NAME: ejfat
+#     SN_SW_APP_NAME: ejfat
+#   trigger:
+#     project: esnet/udplbd2
+#     branch: develop
+#   needs:
+#     - package
+#     - job: ejfat-ci-trial
+#       artifacts: false
+#       parallel:
+#         matrix: *ejfat_ci_trial_matrix
