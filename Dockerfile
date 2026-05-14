@@ -51,8 +51,16 @@ RUN <<EOF
     mv /root/uv-x86_64-unknown-linux-gnu/uv{,x} /usr/local/bin/.
     rm -r /root/uv-x86_64-unknown-linux-gnu
 
+    # Create a system-level configuration file for the uv tool.
+    mkdir -p /etc/uv
+    cat <<__EOF >/etc/uv/uv.toml
+# uv run --show-settings
+no-cache = true
+exclude-newer = "1 week"
+__EOF
+
     # Create a new virtualenv for the root user.
-    uv venv --directory / --no-project --no-config --clear
+    uv venv --directory / --no-project --clear
 EOF
 
 # Make sure the Python virtualenv is always active.
@@ -76,7 +84,7 @@ RUN <<EOF
       python3
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     meson \
     ninja
 
@@ -102,7 +110,7 @@ RUN <<EOF
       zlib1g-dev
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     pyelftools
 
 COPY xilinx-qdma-for-opennic/QDMA/DPDK /QDMA/DPDK
@@ -219,7 +227,7 @@ RUN <<EOF
       zstd
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     grpcio-tools \
     poetry
 
@@ -229,7 +237,7 @@ WORKDIR /sn-fw/source
 # Build and install the Python regmap library.
 WORKDIR regio
 RUN poetry build
-RUN uv pip install --no-cache \
+RUN uv pip install \
     --find-links ./dist \
     regio[shells]
 
@@ -318,7 +326,7 @@ RUN <<EOF
     rm -rf /var/lib/apt/lists/*
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     grpcio-tools
 
 # Import the build artifacts from the firmware
@@ -328,7 +336,7 @@ COPY --from=firmware /sn-fw/source/regio/dist/ /usr/local/share/esnet-smartnic/p
 RUN ldconfig
 
 # Install the generated Python regmap and configuration client.
-RUN uv pip install --no-cache \
+RUN uv pip install \
     --find-links /usr/local/share/esnet-smartnic/python \
     regio[shells] \
     regmap_esnet_smartnic \
@@ -358,7 +366,7 @@ COPY ./sn-stack/test/ /test
 RUN <<EOF
     set -ex
     for req in $(find /test -type f -name pip-requirements.txt); do
-        uv pip install --no-cache --no-deps --requirement="${req}"
+        uv pip install --no-deps --requirement="${req}"
     done
 EOF
 
@@ -411,7 +419,7 @@ RUN <<EOF
     rm -rf /var/lib/apt/lists/*
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     scapy \
     yq
 
