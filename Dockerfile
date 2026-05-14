@@ -35,11 +35,12 @@ EOF
 
 # Setup a Python virtualenv for managing Python-based build tools/libraries
 # separately from system packages.
+# From https://github.com/astral-sh/uv/releases
 ADD \
     --unpack=true \
     --chown=root:root \
-    --checksum=sha256:5a360b0de092ddf4131f5313d0411b48c4e95e8107e40c3f8f2e9fcb636b3583 \
-    https://releases.astral.sh/github/uv/releases/download/0.10.11/uv-x86_64-unknown-linux-gnu.tar.gz \
+    --checksum=sha256:f3b623eb0e6141a7053d571d59a0bdc341e0f238ea8f5f0b4815ddbec9a2a296 \
+    https://releases.astral.sh/github/uv/releases/download/0.11.14/uv-x86_64-unknown-linux-gnu.tar.gz \
     /root
 
 RUN <<EOF
