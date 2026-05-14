@@ -362,18 +362,20 @@ RUN <<EOF
 EOF
 
 # Install the gRPC health-check command line tool.
+# From https://github.com/grpc-ecosystem/grpc-health-probe/releases
 ADD \
     --chmod=755 \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.45/grpc_health_probe-linux-amd64 \
+    --checksum=sha256:84fb8aa14a6f5467bf12144320e8e91f4e888956c3229efa7da0b8bdb10de8d2 \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.50/grpc_health_probe-linux-amd64 \
     /usr/local/bin/grpc_health_probe
 
 # Install gRPC debug tool (uncomment for inclusion).
-
-#ARG GRPCURL_VERSION="1.9.2"
+# From https://github.com/fullstorydev/grpcurl/releases
+#ARG GRPCURL_VERSION="1.9.3"
 #ARG GRPCURL_DEB="grpcurl_${GRPCURL_VERSION}_linux_amd64.deb"
 #ADD \
 #    --chown=root:root \
-#    --checksum=sha256:be1a79d01b1dd7c42f06a76eb497964be731ca76f4f3ff2b2c471fdc01dfac60 \
+#    --checksum=sha256:0710dc05a28f1fac2230fd438c1fc61b90e0431809372a65aea4b53a57947451 \
 #    https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}/${GRPCURL_DEB} \
 #    /root
 #
