@@ -35,11 +35,12 @@ EOF
 
 # Setup a Python virtualenv for managing Python-based build tools/libraries
 # separately from system packages.
+# From https://github.com/astral-sh/uv/releases
 ADD \
     --unpack=true \
     --chown=root:root \
-    --checksum=sha256:5a360b0de092ddf4131f5313d0411b48c4e95e8107e40c3f8f2e9fcb636b3583 \
-    https://releases.astral.sh/github/uv/releases/download/0.10.11/uv-x86_64-unknown-linux-gnu.tar.gz \
+    --checksum=sha256:f3b623eb0e6141a7053d571d59a0bdc341e0f238ea8f5f0b4815ddbec9a2a296 \
+    https://releases.astral.sh/github/uv/releases/download/0.11.14/uv-x86_64-unknown-linux-gnu.tar.gz \
     /root
 
 RUN <<EOF
@@ -50,8 +51,16 @@ RUN <<EOF
     mv /root/uv-x86_64-unknown-linux-gnu/uv{,x} /usr/local/bin/.
     rm -r /root/uv-x86_64-unknown-linux-gnu
 
+    # Create a system-level configuration file for the uv tool.
+    mkdir -p /etc/uv
+    cat <<__EOF >/etc/uv/uv.toml
+# uv run --show-settings
+no-cache = true
+exclude-newer = "1 week"
+__EOF
+
     # Create a new virtualenv for the root user.
-    uv venv --directory / --no-project --no-config --clear
+    uv venv --directory / --no-project --clear
 EOF
 
 # Make sure the Python virtualenv is always active.
@@ -75,7 +84,7 @@ RUN <<EOF
       python3
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     meson \
     ninja
 
@@ -101,7 +110,7 @@ RUN <<EOF
       zlib1g-dev
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     pyelftools
 
 COPY xilinx-qdma-for-opennic/QDMA/DPDK /QDMA/DPDK
@@ -218,7 +227,7 @@ RUN <<EOF
       zstd
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     grpcio-tools \
     poetry
 
@@ -228,7 +237,7 @@ WORKDIR /sn-fw/source
 # Build and install the Python regmap library.
 WORKDIR regio
 RUN poetry build
-RUN uv pip install --no-cache \
+RUN uv pip install \
     --find-links ./dist \
     regio[shells]
 
@@ -317,7 +326,7 @@ RUN <<EOF
     rm -rf /var/lib/apt/lists/*
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     grpcio-tools
 
 # Import the build artifacts from the firmware
@@ -327,7 +336,7 @@ COPY --from=firmware /sn-fw/source/regio/dist/ /usr/local/share/esnet-smartnic/p
 RUN ldconfig
 
 # Install the generated Python regmap and configuration client.
-RUN uv pip install --no-cache \
+RUN uv pip install \
     --find-links /usr/local/share/esnet-smartnic/python \
     regio[shells] \
     regmap_esnet_smartnic \
@@ -357,23 +366,25 @@ COPY ./sn-stack/test/ /test
 RUN <<EOF
     set -ex
     for req in $(find /test -type f -name pip-requirements.txt); do
-        uv pip install --no-cache --no-deps --requirement="${req}"
+        uv pip install --no-deps --requirement="${req}"
     done
 EOF
 
 # Install the gRPC health-check command line tool.
+# From https://github.com/grpc-ecosystem/grpc-health-probe/releases
 ADD \
     --chmod=755 \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.45/grpc_health_probe-linux-amd64 \
+    --checksum=sha256:84fb8aa14a6f5467bf12144320e8e91f4e888956c3229efa7da0b8bdb10de8d2 \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.50/grpc_health_probe-linux-amd64 \
     /usr/local/bin/grpc_health_probe
 
 # Install gRPC debug tool (uncomment for inclusion).
-
-#ARG GRPCURL_VERSION="1.9.2"
+# From https://github.com/fullstorydev/grpcurl/releases
+#ARG GRPCURL_VERSION="1.9.3"
 #ARG GRPCURL_DEB="grpcurl_${GRPCURL_VERSION}_linux_amd64.deb"
 #ADD \
 #    --chown=root:root \
-#    --checksum=sha256:be1a79d01b1dd7c42f06a76eb497964be731ca76f4f3ff2b2c471fdc01dfac60 \
+#    --checksum=sha256:0710dc05a28f1fac2230fd438c1fc61b90e0431809372a65aea4b53a57947451 \
 #    https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}/${GRPCURL_DEB} \
 #    /root
 #
@@ -408,7 +419,7 @@ RUN <<EOF
     rm -rf /var/lib/apt/lists/*
 EOF
 
-RUN uv pip install --no-cache \
+RUN uv pip install \
     scapy \
     yq
 
