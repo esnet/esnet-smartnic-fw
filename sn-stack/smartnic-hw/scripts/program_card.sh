@@ -37,6 +37,22 @@ echo "Using USB-JTAG cable with serial: $1"
 HW_TARGET_SERIAL=$1
 shift
 
+# Helper for running a TCL script via Vivado Lab.
+vivado_lab_cmd() {
+    local tcl_script="$1"; shift
+    local tcl_args="$@"
+
+    vivado_lab \
+        -nolog \
+        -nojournal \
+        -tempDir /tmp/ \
+        -mode batch \
+        -notrace \
+        -quiet \
+        -source "${tcl_script}" \
+        -tclargs "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$@"
+}
+
 # Make sure the bitfile exists and is readable
 if [ ! -e $1 ] ; then
     echo "ERROR: Bitfile does not exist: $1"
@@ -190,15 +206,7 @@ else
     remove_pcie_devices $FPGA_PCIE_DEV
 
     # Program the bitfile into the FPGA
-    vivado_lab \
-	-nolog \
-	-nojournal \
-	-tempDir /tmp/ \
-	-mode batch \
-	-notrace \
-        -quiet \
-	-source /scripts/program_card.tcl \
-	-tclargs "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
+    vivado_lab_cmd /scripts/program_card.tcl "$BITFILE_PATH"
     if [ $? -ne 0 ] ; then
 	echo "Failed to load FPGA, bailing out"
 	exit 1
@@ -224,15 +232,7 @@ if [ -e $PROBES_PATH ]; then
     remove_pcie_devices $FPGA_PCIE_DEV
 
     # Perform the reset of the PCIe endpoint via VIOs.
-    vivado_lab \
-        -nolog \
-        -nojournal \
-        -tempDir /tmp/ \
-        -mode batch \
-        -notrace \
-        -quiet \
-        -source /scripts/pcie_reset.tcl \
-        -tclargs "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$PROBES_PATH"
+    vivado_lab_cmd /scripts/pcie_reset.tcl "$PROBES_PATH"
     if [ $? -ne 0 ] ; then
         echo "Failed to reset PCIe endpoint, bailing out"
         exit 1
