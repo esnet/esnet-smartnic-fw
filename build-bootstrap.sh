@@ -88,8 +88,7 @@ unzip -q \
 
 # Download the xbflash2 .deb file
 XRT_XBFLASH2='xrt_202420.2.18.179_22.04-amd64-xbflash2.deb'
-wget -q \
-     -O- \
-     "https://packages.xilinx.com/artifactory/debian-packages/pool/${XRT_XBFLASH2}" \
-  | dpkg-deb --fsys-tarfile - \
+wget "https://packages.xilinx.com/artifactory/debian-packages/pool/${XRT_XBFLASH2}"
+dpkg-deb --fsys-tarfile "${XRT_XBFLASH2}" \
   | tar -C ${OUT} --strip-components 4 -xf - ./usr/local/bin/xbflash2
+rm -f "${XRT_XBFLASH2}"
