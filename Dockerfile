@@ -39,8 +39,8 @@ EOF
 ADD \
     --unpack=true \
     --chown=root:root \
-    --checksum=sha256:f3b623eb0e6141a7053d571d59a0bdc341e0f238ea8f5f0b4815ddbec9a2a296 \
-    https://releases.astral.sh/github/uv/releases/download/0.11.14/uv-x86_64-unknown-linux-gnu.tar.gz \
+    --checksum=sha256:aa9fca823c03289fb6e3460b3dc864f3ea895cafaf9b99247701a67b17d1b018 \
+    https://github.com/astral-sh/uv/releases/download/0.11.33/uv-x86_64-unknown-linux-gnu.tar.gz \
     /root
 
 RUN <<EOF
@@ -374,8 +374,8 @@ EOF
 # From https://github.com/grpc-ecosystem/grpc-health-probe/releases
 ADD \
     --chmod=755 \
-    --checksum=sha256:1c569de478b27292544e03bee75bd12e292f3ab040b00e8630162dcf9cd2cb0a \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.53/grpc_health_probe-linux-amd64 \
+    --checksum=sha256:e25b2f7e50176a909b9036e2c7598d8997b524a87d24af81d92b796e6dfb4897 \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.54/grpc_health_probe-linux-amd64 \
     /usr/local/bin/grpc_health_probe
 
 # Install gRPC debug tool (uncomment for inclusion).

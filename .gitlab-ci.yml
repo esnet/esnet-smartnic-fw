@@ -156,6 +156,9 @@ bootstrap:
     expire_in: 3 month
   needs:
     - pull_sn_hw
+  rules:
+    - when: manual
+      allow_failure: true
 
 package:
   stage: build
