@@ -248,11 +248,11 @@ $ tree sn-bootstrap/
 sn-bootstrap/
 ├── README.SYSTEM.SETUP.md    <------------ copy of this document
 ├── README.SYSTEM.DECOM.md    <------------ instructions to decommission an ESnet SmartNIC system
-├── SC_U280_4_3_31.zip        <------------ (optional) Satellite Controller Firmware Image (au280)
-├── SC_U55C_7_1_24.zip        <------------ (optional) Satellite Controller Firmware Image (au55c)
+├── SC_U280_4_3_31.txt        <------------ Satellite Controller Firmware Image (au280)
+├── SC_U55C_7_1_24.txt        <------------ Satellite Controller Firmware Image (au55c)
 ├── esnet-smartnic.au280.mcs  <------------ FPGA card flash image for au280 FPGA card
 ├── esnet-smartnic.au55c.mcs  <------------ FPGA card flash image for au55c FPGA card
-├── loadsc                    <------------ (optional) Xilinx tool for upgrading Satellite Controller
+├── loadsc                    <------------ Xilinx tool for upgrading Satellite Controller
 ├── smartnic-system-setup_0.5.0_all.deb <-- Debian package providing udev and systemd units for card management
 └── xbflash2                  <------------ Xilinx tool for programming FPGA card flash images
 ```
