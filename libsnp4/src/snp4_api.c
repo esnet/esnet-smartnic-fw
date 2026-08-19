@@ -6,6 +6,7 @@
 //
 
 #include <stdio.h>		/* fprintf */
+#include <stdlib.h>		/* calloc, free */
 #include <string.h>		/* memset, strcmp */
 #include "snp4.h"		/* API */
 #include "snp4_io.h"		/* snp4_io_reg_* */
