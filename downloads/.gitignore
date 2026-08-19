@@ -1,0 +1,10 @@
+# ignore everything
+*
+
+# except these files
+!.gitignore
+!.dockerignore
+!SHA256SUMS
+
+# even if they are in subdirectories
+!*/

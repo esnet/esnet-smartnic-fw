@@ -149,12 +149,17 @@ cd $(git rev-parse --show-toplevel)
 zip -r artifacts.esnet-smartnic-fw.package.0.zip sn-stack
 ```
 
-Download Xilinx Alveo Satellite Controller Update Tool (optional)
------------------------------------------------------------------
+# Build the smartnic-bootstrap package for Ubuntu Servers
+
+The smartnic-bootstrap package can be used to commission a new server to be used as a host for ESnet SmartNIC applications.  It is a sequence of steps that only need to be done once when bringing up new FPGA cards or a brand new server.
+
+Some components of this bootstrap package must be downloaded from the Internet manually **by you** since they are blocked from automatic downloads.  Once downloaded, these components will be combined with locally generated content to produce the final `smartnic-bootstrap.zip` file.
+
+## Download Xilinx Alveo Satellite Controller Update Tool
 
 The Satellite Controller is a small microcontroller that is adjacent to the FPGA chip on the Alveo au280/au55c FPGA cards.  This chip controlls the card initialization and monitoring.  The factory installed firmware is often old and missing bug fixes.
 
-These optional downloads from Xilinx will allow you to update the firmware on the Satellite Controller to the latest version.
+These downloads from Xilinx will allow you to update the firmware on the Satellite Controller to the latest version.
 
 Download the Alveo Smartnic Satellite Controller Update Tool
 * Open a web browser to this page: https://adaptivesupport.amd.com/s/article/73654
@@ -170,24 +175,42 @@ Download the latest Satellite Controller Firmware Releases
   * Download `SC_U55C_7_1_24.zip`
     * Save the file as exactly `SC_U55C_7_1_24.zip`
 
-Build the smartnic-bootstrap package for Ubuntu Servers (optional)
-------------------------------------------------------------------
+## Download Xilinx Alveo Flash Update Tool
 
-The smartnic-bootstrap package can be used to commission a new server to be used as a host for ESnet SmartNIC applications.  It is a sequence of steps that only need to be done once when bringing up new FPGA cards or a brand new server.
+The flash update tool (`xbflash2`) is used to convert the Xilinx FPGA card from a factory image to an ESnet SmartNIC FPGA application image.
+
+* Open a web browser to this page: https://packages.xilinx.com/artifactory/debian-packages/pool/xrt_202420.2.18.179_22.04-amd64-xbflash2.deb
+* The `.deb` file should be automatically downloaded
+  * Save the file as exactly `xrt_202420.2.18.179_22.04-amd64-xbflash2.deb`
+
+## Populate the downloads directory
+
+**Place all downloaded files into the `downloads` directory at the top level of this workspace.**  When you're finished, you should have all of these files in place.
+
+``` bash
+$ tree downloads/
+downloads/
+├── loadsc_v2.3.zip
+├── SC_U280_4_3_31.zip
+├── SC_U55C_7_1_24.zip
+├── SHA256SUMS
+└── xrt_202420.2.18.179_22.04-amd64-xbflash2.deb
+```
+
+Verify that your file contents exactly match the expected content
+``` bash
+cd downloads
+sha256sum -c SHA256SUMS
+```
+
+If any warnings or errors are printed, do not proceed before correcting the issues.
+
+## Build the combined smartnic-bootstrap zip file content
 
 ``` bash
 cd $(git rev-parse --show-toplevel)
 ./build-bootstrap.sh
 ```
-
-If you downloaded the (optional) `loadsc` zip file in the previous section, unzip the tool and place it into the `sn-bootstrap` directory so it will be available during server bootstrapping.
-``` bash
-cd $(git rev-parse --show-toplevel)
-unzip -j -d sn-bootstrap loadsc_v2.3.zip bin/loadsc
-chmod 755 sn-bootstrap/loadsc
-```
-
-If you downloaded the (optional) latest Satellite Controller firmware releases in the previous section, copy the `SC_*.zip` files into the `sn-bootstrap` directory so they will be available during server bootstrapping.
 
 The entire `sn-bootstrap` directory will need to be transferred to the runtime system.  Zip it up and make it available to the sysadmin who will be bootstrapping the server containing your FPGA cards.
 

@@ -86,9 +86,24 @@ unzip -q \
       esnet-smartnic-hwapi/firmware/esnet-smartnic.mcs.zst \
   | zstdcat > ${OUT}/esnet-smartnic.${SN_HW_BOARD}.mcs
 
-# Download the xbflash2 .deb file
+# Verify, unpack and import the user-supplied downloads
+
+# Verify user-supplied downloads, failing on any missing or currupted files
+if ! (cd downloads ; sha256sum -c SHA256SUMS) ; then
+    echo "ERROR: Missing or corrupted downloads identified when checking 'downloads' directory"
+    exit 1
+fi
+
+# Unpack xbflash2
 XRT_XBFLASH2='xrt_202420.2.18.179_22.04-amd64-xbflash2.deb'
-wget "https://packages.xilinx.com/artifactory/debian-packages/pool/${XRT_XBFLASH2}"
-dpkg-deb --fsys-tarfile "${XRT_XBFLASH2}" \
+dpkg-deb --fsys-tarfile "downloads/${XRT_XBFLASH2}" \
   | tar -C ${OUT} --strip-components 4 -xf - ./usr/local/bin/xbflash2
-rm -f "${XRT_XBFLASH2}"
+
+# Unpack loadsc
+unzip -o -j -d sn-bootstrap downloads/loadsc_v2.3.zip bin/loadsc
+chmod 755 sn-bootstrap/loadsc
+
+# Unpack SC FW images and normalize the embedded text file names
+unzip -o -j -d sn-bootstrap downloads/SC_U280_4_3_31.zip SC_U280_4_3_31.txt
+unzip -o -j -d sn-bootstrap downloads/SC_U55C_7_1_24.zip SC_U55C_7_1_24/SC_U55C_7_1_24.txt
+
