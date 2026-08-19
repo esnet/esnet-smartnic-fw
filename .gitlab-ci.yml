@@ -137,16 +137,22 @@ bootstrap:
       _EOF
     - cat .env
 
-    - ./build-bootstrap.sh
-
     # Download SC FW assets from dispense which match the files that external users would download manually
-    - wget -q -P sn-bootstrap ${DISPENSE_BASE_URL}/SC_U280_4_3_31.zip
-    - wget -q -P sn-bootstrap ${DISPENSE_BASE_URL}/SC_U55C_7_1_24.zip
+    - wget -q -P downloads ${DISPENSE_BASE_URL}/SC_U280_4_3_31.zip
+    - wget -q -P downloads ${DISPENSE_BASE_URL}/SC_U55C_7_1_24.zip
 
     # Download loadsc tool assets from dispense which are not directly available on xilinx.com
-    - wget -q ${DISPENSE_BASE_URL}/loadsc_v2.3.zip
-    - unzip -j -d sn-bootstrap loadsc_v2.3.zip bin/loadsc
-    - chmod 755 sn-bootstrap/loadsc
+    - wget -q -P downloads ${DISPENSE_BASE_URL}/loadsc_v2.3.zip
+
+    # Download xbflash2 tool assets from dispense which are often unavailable at xilinx.com
+    - wget -q -P downloads ${DISPENSE_BASE_URL}/xrt_202420.2.18.179_22.04-amd64-xbflash2.deb
+
+    # Check downloaded content
+    - tree downloads
+    - (cd downloads ; sha256sum -c SHA256SUMS)
+
+    # Combine the full content for the sn-bootstrap tree
+    - ./build-bootstrap.sh
 
     - tree sn-bootstrap
   artifacts:
