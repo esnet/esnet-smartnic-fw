@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>		/* free */
 #include <string.h>		/* strdup */
 #include "snp4.h"		/* API */
 #include "array_size.h"		/* ARRAY_SIZE */
@@ -128,7 +129,7 @@ void snp4_print_target_config(unsigned int sdnet_idx)
     return;
   }
 
-  struct XilVitisNetP4TargetConfig *tcfg = intf->target.config;
+  XilVitisNetP4TargetConfig *tcfg = intf->target.config;
 
   printf("Endian: %s\n", vitisnetp4_endian_str(tcfg->Endian));
   printf("Tables: [n=%u]\n", tcfg->TableListSize);
@@ -436,7 +437,7 @@ enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info
 
   pipeline->name = intf->info.name;
 
-  struct XilVitisNetP4TargetConfig *cfg = intf->target.config;
+  XilVitisNetP4TargetConfig *cfg = intf->target.config;
 
   enum snp4_status rc;
   rc = snp4_info_get_tables(pipeline->tables,

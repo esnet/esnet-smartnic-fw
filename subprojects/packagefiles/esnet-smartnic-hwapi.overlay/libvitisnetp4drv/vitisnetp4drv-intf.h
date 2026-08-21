@@ -1,15 +1,168 @@
 #ifndef VITISNETP4DRV_INTF_H
 #define VITISNETP4DRV_INTF_H
 
-#include "vitisnetp4_common.h"
-#include "vitisnetp4_table.h"
-#include "vitisnetp4_target.h"
-
 #include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifdef WITH_VITISNETP4_STUBS
+/*
+ * This section stubs out the vitisnetp4 driver definitions used by the wrapper
+ * layer in the event that it's being compiled in the absence of p4 IP in the
+ * FPGA.  Stubbed values don't matter since they are only used as a translation
+ * layer for structures and registers between the wrapper and lower level driver
+ * generated for the p4 IP (without IP, there's nothing to translate!).
+ */
+
+/*----------------------------------------------------------------------------*/
+// vitisnetp4_common.h
+typedef enum {
+    XIL_VITIS_NET_P4_SUCCESS,
+    XIL_VITIS_NET_P4_CAM_ERR_KEY_NOT_FOUND,
+    XIL_VITIS_NET_P4_TABLE_ERR_FUNCTION_NOT_SUPPORTED,
+    XIL_VITIS_NET_P4_GENERAL_ERR_NULL_PARAM,
+    XIL_VITIS_NET_P4_GENERAL_ERR_INTERNAL_ASSERTION,
+}  XilVitisNetP4ReturnType;
+
+typedef enum {
+    XIL_VITIS_NET_P4_LITTLE_ENDIAN,
+    XIL_VITIS_NET_P4_BIG_ENDIAN,
+} XilVitisNetP4Endian;
+
+typedef void* XilVitisNetP4UserCtxType;
+typedef uintptr_t XilVitisNetP4AddressType;
+typedef struct _XilVitisNetP4EnvIf XilVitisNetP4EnvIf;
+typedef XilVitisNetP4ReturnType (*XilVitisNetP4WordWrite32Fp)(
+    XilVitisNetP4EnvIf*, XilVitisNetP4AddressType, uint32_t);
+typedef XilVitisNetP4ReturnType (*XilVitisNetP4WordRead32Fp)(
+    XilVitisNetP4EnvIf*, XilVitisNetP4AddressType, uint32_t*);
+typedef XilVitisNetP4ReturnType (*XilVitisNetP4LogFp)(
+    XilVitisNetP4EnvIf*, const char*);
+
+struct _XilVitisNetP4EnvIf {
+    XilVitisNetP4UserCtxType UserCtx;
+    XilVitisNetP4WordWrite32Fp WordWrite32;
+    XilVitisNetP4WordRead32Fp WordRead32;
+    XilVitisNetP4LogFp LogError;
+    XilVitisNetP4LogFp LogInfo;
+};
+
+typedef enum {
+    XIL_VITIS_NET_P4_CAM_OPTIMIZE_NONE,
+    XIL_VITIS_NET_P4_CAM_OPTIMIZE_RAM,
+    XIL_VITIS_NET_P4_CAM_OPTIMIZE_LOGIC,
+    XIL_VITIS_NET_P4_CAM_OPTIMIZE_ENTRIES,
+    XIL_VITIS_NET_P4_CAM_OPTIMIZE_MASKS,
+} XilVitisNetP4CamOptimizationType;
+
+typedef enum {
+    XIL_VITIS_NET_P4_CAM_MEM_AUTO,
+    XIL_VITIS_NET_P4_CAM_MEM_BRAM,
+    XIL_VITIS_NET_P4_CAM_MEM_URAM,
+    XIL_VITIS_NET_P4_CAM_MEM_HBM,
+    XIL_VITIS_NET_P4_CAM_MEM_RAM,
+} XilVitisNetP4CamMemType;
+
+typedef struct {
+    XilVitisNetP4AddressType BaseAddr;
+    char *FormatStringPtr;
+    uint32_t NumEntries;
+    uint32_t RamFrequencyHz;
+    uint32_t LookupFrequencyHz;
+    uint32_t LookupsPerSec;
+    uint16_t ResponseSizeBits;
+    uint8_t PrioritySizeBits;
+    uint8_t NumMasks;
+    XilVitisNetP4Endian Endian;
+    XilVitisNetP4CamMemType MemType;
+    uint32_t RamSizeKbytes;
+    XilVitisNetP4CamOptimizationType OptimizationType;
+}  XilVitisNetP4CamConfig;
+
+
+typedef struct {
+    const char *NameStringPtr;
+    uint32_t Value;
+} XilVitisNetP4Attribute;
+
+/*----------------------------------------------------------------------------*/
+// vitisnetp4_table.h
+typedef enum {
+    XIL_VITIS_NET_P4_TABLE_MODE_DCAM,
+    XIL_VITIS_NET_P4_TABLE_MODE_BCAM,
+    XIL_VITIS_NET_P4_TABLE_MODE_TINY_BCAM,
+    XIL_VITIS_NET_P4_TABLE_MODE_STCAM,
+    XIL_VITIS_NET_P4_TABLE_MODE_TCAM,
+    XIL_VITIS_NET_P4_TABLE_MODE_TINY_TCAM,
+} XilVitisNetP4TableMode;
+
+typedef struct {
+} XilVitisNetP4TableCtx;
+
+typedef struct {
+    const char *NameStringPtr;
+    uint32_t ParamListSize;
+    XilVitisNetP4Attribute *ParamListPtr;
+} XilVitisNetP4Action;
+
+typedef struct {
+    XilVitisNetP4Endian Endian;
+    XilVitisNetP4TableMode Mode;
+    uint32_t KeySizeBits;
+    XilVitisNetP4CamConfig CamConfig;
+    uint32_t ActionIdWidthBits;
+    uint32_t ActionListSize;
+    XilVitisNetP4Action **ActionListPtr;
+} XilVitisNetP4TableConfig;
+
+/*----------------------------------------------------------------------------*/
+// counter_extern.h
+typedef enum {
+    XIL_VITIS_NET_P4_COUNTER_PACKETS,
+    XIL_VITIS_NET_P4_COUNTER_BYTES,
+    XIL_VITIS_NET_P4_COUNTER_PACKETS_AND_BYTES,
+    XIL_VITIS_NET_P4_COUNTER_FLAG,
+} XilVitisNetP4CounterType;
+
+typedef struct {
+} XilVitisNetP4CounterCtx;
+
+typedef struct {
+    XilVitisNetP4CounterType CounterType;
+    uint32_t NumCounters;
+    uint32_t Width;
+} XilVitisNetP4CounterConfig;
+
+/*----------------------------------------------------------------------------*/
+// vitisnetp4_target.h
+typedef struct {
+} XilVitisNetP4TargetCtx;
+
+typedef struct {
+    const char *NameStringPtr;
+    XilVitisNetP4TableConfig Config;
+} XilVitisNetP4TargetTableConfig;
+
+
+typedef struct {
+    const char *NameStringPtr;
+    XilVitisNetP4CounterConfig Config;
+} XilVitisNetP4TargetCounterConfig;
+
+typedef struct {
+    XilVitisNetP4Endian Endian;
+    uint32_t TableListSize;
+    XilVitisNetP4TargetTableConfig **TableListPtr;
+    size_t CounterListSize;
+    XilVitisNetP4TargetCounterConfig **CounterListPtr;
+} XilVitisNetP4TargetConfig;
+#else /* !WITH_VITISNETP4_STUBS ==> building with actual vitisnetp4 driver */
+#include "vitisnetp4_common.h"
+#include "vitisnetp4_table.h"
+#include "vitisnetp4_target.h"
 #endif
 
 /*----------------------------------------------------------------------------*/

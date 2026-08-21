@@ -53,11 +53,11 @@ ip_dir_prefixes = {}
 ip_names = []
 regmap_names = {}
 if n_ip_names == 0
-    # Legacy naming for backwards compatibility.
-    ip_name = 'sdnet_0'
-    ip_names += [ip_name]
-    ip_dir_prefixes += {ip_name: ''}
-    regmap_names += {ip_name: 'sdnet'}
+    # Don't fail the build when the driver sources are missing. Continue with
+    # stubbed out versions instead and allow the high level software to manage
+    # things appropriately.
+    warning('Missing vitisnetp4 drivers. Defaulting to stubs.')
+    ip_names += ['']
 elif n_ip_names > MAX_IP_NAMES
     # Fail the build if an unsupported number of drivers is found.
     error('Too many vitisnetp4 drivers. Expected no more than @0@, found @1@.'.
@@ -182,9 +182,16 @@ table = custom_target(
     ],
 )
 
+table_lib_cflags = []
+if n_ip_names == 0
+    table_lib_cflags += ['-DWITH_VITISNETP4_STUBS']
+endif
+
 # Tie the public interface library into the dependency search.
 table_lib_dep = declare_dependency(
     sources: table[0],
     dependencies: ip_lib_deps,
+    compile_args: table_lib_cflags,
+    include_directories: include_directories('.')
 )
 meson.override_dependency(intf_base, table_lib_dep)
