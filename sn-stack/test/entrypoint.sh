@@ -40,11 +40,14 @@ cmd+=( $(find /test -type d -regex '.+/suites/[^/]+$') )
 # dependencies are already installed at build-time and pip would have nothing
 # to do at run-time.
 if [[ "${TEST_DO_PIP_INSTALL}" != "" ]]; then
-    if curl --silent --output /dev/null 'https://pypi.org'; then
-        for req in $(find /test -type f -name pip-requirements.txt); do
-            uv pip install --no-deps --requirement="${req}"
-        done
-    fi
+    for req in $(find /test -type f -name pip-requirements.txt); do
+	echo '========================================'
+	echo "Installing Python packages from '${req}':"
+	echo '----------------------------------------'
+	cat "${req}"
+	echo '----------------------------------------'
+        uv pip install --no-deps --requirement="${req}"
+    done
 fi
 
 #-------------------------------------------------------------------------------
