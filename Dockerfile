@@ -258,7 +258,9 @@ RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
       ${PWD}/sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
       subprojects/packagefiles/esnet-smartnic-hwapi.zip
     meson subprojects download
-    meson setup /sn-fw/build /sn-fw/source
+    meson setup /sn-fw/build /sn-fw/source \
+      -DSN_HW_BOARD=${SN_HW_BOARD} \
+      -DSN_HW_APP_NAME=${SN_HW_APP_NAME}
     meson compile --clean -C /sn-fw/build
     meson install -C /sn-fw/build --destdir /firmware-install-root
 EOF

@@ -9,6 +9,10 @@ project(
   ],
 )
 
+board = get_option('SN_HW_BOARD')
+app_name = get_option('SN_HW_APP_NAME')
+message('Building for board "@0@" and application "@1@"'.format(board, app_name))
+
 subproject('gtest')
 subproject('cli11')
 subproject('prometheus-client-c')

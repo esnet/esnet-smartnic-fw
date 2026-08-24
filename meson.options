@@ -1,0 +1,2 @@
+option('SN_HW_BOARD', type: 'string', value: 'None')
+option('SN_HW_APP_NAME', type: 'string', value: 'None')
