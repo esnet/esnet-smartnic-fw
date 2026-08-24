@@ -10,7 +10,10 @@
 #include "sn_p4_v2.grpc.pb.h"
 
 #include "esnet_smartnic_toplevel.h"
+
+#ifdef WITH_SYSCFG
 #include "syscfg_block.h"
+#endif
 
 using namespace grpc;
 using namespace sn_p4::v2;
@@ -78,6 +81,7 @@ void SmartnicP4Impl::get_device_info(
         pci->set_device_id(read_hex_pci_id(dev->bus_id, "device"));
 
         auto build = info->mutable_build();
+#ifdef WITH_SYSCFG
         volatile auto syscfg = &dev->bar2->syscfg;
 
         build->set_number(syscfg->usr_access);
@@ -85,6 +89,7 @@ void SmartnicP4Impl::get_device_info(
         for (auto d = 0; d < SYSCFG_DNA_COUNT; ++d) {
             build->add_dna(syscfg->dna[d]);
         }
+#endif
 
         auto hw_ver = getenv("SN_HW_VER");
         auto fw_ver = getenv("SN_FW_VER");

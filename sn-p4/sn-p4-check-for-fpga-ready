@@ -10,10 +10,20 @@ def stdout(msg):
 def main():
     stdout('Checking for FPGA readiness ... ')
 
-    for dna in dev0.bar2.syscfg.dna:
-        if dna._r == 0xffffffff:
+    if hasattr(dev0.bar2, 'syscfg'):
+        stdout('Checking syscfg DNA registers ... ')
+        for dna in dev0.bar2.syscfg.dna:
+            if dna._r == 0xffffffff:
+                stdout('FPGA not ready.\n')
+                sys.exit(1)
+    elif hasattr(dev0.bar2, 'shell_cfg'):
+        stdout('Checking shell_cfg ID register ... ')
+        if dev0.bar2.shell_cfg.id == 0xffffffff:
             stdout('FPGA not ready.\n')
             sys.exit(1)
+    else:
+        stdout('Unknown regmap ... FPGA not ready.\n')
+        sys.exit(1)
 
     stdout('FPGA ready.\n')
     sys.exit(0)
