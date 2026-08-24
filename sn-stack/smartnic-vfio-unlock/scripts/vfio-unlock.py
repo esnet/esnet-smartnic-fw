@@ -26,7 +26,7 @@ SYSFS_BUS_PCI_DEVICES = "/sys/bus/pci/devices"
               multiple=True,
               show_default=True)
 @click.option('-b', '--bar',
-              help="Select which PCIe bar to use for IO",
+              help="Select which PCIe bar to use for IO.  Use '-1' to skip the initial IO.",
               default=2,
               show_default=True)
 @click.option('--vf-token',
@@ -45,10 +45,11 @@ def main(pf, vf, bar, vf_token, force_no_iommu):
             print("ERROR: Device", device, "does not exist at", device_path, ".  Is the FPGA loaded and the PCIe bus rescanned?")
             sys.exit(1)
         # Make sure the selected bar is valid for the device
-        resource_path = device_path / "resource{:d}".format(bar)
-        if not resource_path.exists():
-            print("ERROR: Selected bar does not exist for the device", device, ".  Is the FPGA loaded?")
-            sys.exit(1)
+        if bar != -1:
+            resource_path = device_path / "resource{:d}".format(bar)
+            if not resource_path.exists():
+                print("ERROR: Selected bar does not exist for the device", device, ".  Is the FPGA loaded?")
+                sys.exit(1)
 
         # Identify which vfio group this device is in
         iommu_group_link = device_path / "iommu_group"
@@ -253,19 +254,20 @@ def main(pf, vf, bar, vf_token, force_no_iommu):
         print("\t\tVendor ID = {:02x}".format(vendor_id))
         print("\t\tDevice ID = {:02x}".format(device_id))
 
-        # Read out smartnic version info from bar2
-        bar2_info = VfioRegionInfo(argsz=ctypes.sizeof(VfioRegionInfo), index=VFIO_PCI_BAR2_REGION_INDEX)
-        fcntl.ioctl(device_fd, vfio.VFIO_DEVICE_GET_REGION_INFO, bar2_info)
-        m = mmap.mmap(device_fd, bar2_info.size, prot=mmap.PROT_READ | mmap.PROT_WRITE, offset=bar2_info.offset)
-        mv = memoryview(m)
+        # Read out smartnic version info from the BAR
+        if bar != -1:
+            bar_info = VfioRegionInfo(argsz=ctypes.sizeof(VfioRegionInfo), index=int(bar))
+            fcntl.ioctl(device_fd, vfio.VFIO_DEVICE_GET_REGION_INFO, bar_info)
+            m = mmap.mmap(device_fd, bar_info.size, prot=mmap.PROT_READ | mmap.PROT_WRITE, offset=bar_info.offset)
+            mv = memoryview(m)
 
-        # Read the entire syscfg block
-        syscfg = mv[0:44].cast("@I")
-        print("\tDevice Version Info")
-        print("\t\tDNA          = 0x{:08x}{:08x}{:08x}".format(syscfg[10],syscfg[9],syscfg[8]))
-        print("\t\tUSR_ACCESS   = 0x{:08x} ({:d})".format(syscfg[7], syscfg[7]))
-        print("\t\tBUILD_STATUS = 0x{:08x}".format(syscfg[0]))
-        print()
+            # Read the entire syscfg block
+            syscfg = mv[0:44].cast("@I")
+            print("\tDevice Version Info")
+            print("\t\tDNA          = 0x{:08x}{:08x}{:08x}".format(syscfg[10],syscfg[9],syscfg[8]))
+            print("\t\tUSR_ACCESS   = 0x{:08x} ({:d})".format(syscfg[7], syscfg[7]))
+            print("\t\tBUILD_STATUS = 0x{:08x}".format(syscfg[0]))
+            print()
 
     while True:
         time.sleep(60)
