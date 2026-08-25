@@ -78,13 +78,23 @@ cp sn-stack/README.SYSTEM.DECOM.md ${OUT}
 # Build the smartnic-system-setup deb package after fixing up file and directory permissions
 dpkg-deb --build --root-owner-group smartnic-system-setup ${OUT}
 
-# Extract the firmware mcs file from the sn-hw artifact
+# Extract the firmware FLASH file from the sn-hw artifact
+case "${SN_HW_BOARD}" in
+    av80)
+        fw_ext='bin'
+        ;;
+
+    *)
+        fw_ext='mcs'
+        ;;
+esac
+
 unzip -q \
       -j \
       -c \
       ./sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
-      esnet-smartnic-hwapi/firmware/esnet-smartnic.mcs.zst \
-  | zstdcat > ${OUT}/esnet-smartnic.${SN_HW_BOARD}.mcs
+      esnet-smartnic-hwapi/firmware/esnet-smartnic.${fw_ext}.zst \
+  | zstdcat > ${OUT}/esnet-smartnic.${SN_HW_BOARD}.${fw_ext}
 
 # Verify, unpack and import the user-supplied downloads
 
