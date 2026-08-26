@@ -1,19 +1,27 @@
 sources = files(
-  [
+  'src/stats.c',
+  'src/pcie.c',
+)
+
+if board != 'av80'
+  sources += files(
     'src/cmac.c',
     'src/cms.c',
-    'src/flow_control.c',
     'src/qdma.c',
     'src/sff-8024.c',
     'src/sff-8089.c',
     'src/sff-8636.c',
-    'src/smartnic_probe.c',
-    'src/stats.c',
-    'src/switch.c',
     'src/sysmon.c',
-    'src/pcie.c',
-  ]
-)
+  )
+endif
+
+if app_name != 'versal_shell'
+  sources += files(
+    'src/smartnic_probe.c',
+    'src/flow_control.c',
+    'src/switch.c',
+  )
+endif
 
 ext_incdir = include_directories('include')
 libprom_dep = dependency('prom')
