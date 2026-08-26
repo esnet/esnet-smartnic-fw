@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
+#ifdef WITH_CMS
 #include "cms.h"
+#endif
+
 #include "esnet_smartnic_toplevel.h"
 #include "stats.h"
 
@@ -38,7 +41,9 @@ struct DeviceStats {
 struct Device {
     string bus_id;
     volatile struct esnet_smartnic_bar2* bar2;
+#ifdef WITH_CMS
     struct cms cms;
+#endif
 
     unsigned int nhosts;
     unsigned int nports;

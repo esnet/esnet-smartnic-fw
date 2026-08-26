@@ -28,9 +28,11 @@ public:
     // Batching of multiple RPCs.
     Status Batch(ServerContext*, ServerReaderWriter<BatchResponse, BatchRequest>*) override;
 
+#ifdef WITH_DEFAULTS
     // Defaults configuration.
     Status SetDefaults(
         ServerContext*, const DefaultsRequest*, ServerWriter<DefaultsResponse>*) override;
+#endif
 
     // General device configuration.
     Status GetDeviceInfo(
@@ -38,6 +40,7 @@ public:
     Status GetDeviceStatus(
         ServerContext*, const DeviceStatusRequest*, ServerWriter<DeviceStatusResponse>*) override;
 
+#ifdef WITH_HOST
     // Host configuration.
     Status GetHostConfig(
         ServerContext*, const HostConfigRequest*, ServerWriter<HostConfigResponse>*) override;
@@ -47,7 +50,9 @@ public:
         ServerContext*, const HostStatsRequest*, ServerWriter<HostStatsResponse>*) override;
     Status ClearHostStats(
         ServerContext*, const HostStatsRequest*, ServerWriter<HostStatsResponse>*) override;
+#endif
 
+#ifdef WITH_MODULE
     // Module configuration.
     Status GetModuleGpio(
         ServerContext*, const ModuleGpioRequest*, ServerWriter<ModuleGpioResponse>*) override;
@@ -61,7 +66,9 @@ public:
         ServerContext*, const ModuleMemRequest*, ServerWriter<ModuleMemResponse>*) override;
     Status GetModuleStatus(
         ServerContext*, const ModuleStatusRequest*, ServerWriter<ModuleStatusResponse>*) override;
+#endif
 
+#ifdef WITH_PORT
     // Port configuration.
     Status GetPortConfig(
         ServerContext*, const PortConfigRequest*, ServerWriter<PortConfigResponse>*) override;
@@ -73,6 +80,7 @@ public:
         ServerContext*, const PortStatsRequest*, ServerWriter<PortStatsResponse>*) override;
     Status ClearPortStats(
         ServerContext*, const PortStatsRequest*, ServerWriter<PortStatsResponse>*) override;
+#endif
 
     // Server configuration.
     Status GetServerConfig(
@@ -86,6 +94,7 @@ public:
     Status GetStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
     Status ClearStats(ServerContext*, const StatsRequest*, ServerWriter<StatsResponse>*) override;
 
+#ifdef WITH_SWITCH
     // Switch configuration.
     Status GetSwitchConfig(
         ServerContext*, const SwitchConfigRequest*, ServerWriter<SwitchConfigResponse>*) override;
@@ -95,6 +104,7 @@ public:
         ServerContext*, const SwitchStatsRequest*, ServerWriter<SwitchStatsResponse>*) override;
     Status ClearSwitchStats(
         ServerContext*, const SwitchStatsRequest*, ServerWriter<SwitchStatsResponse>*) override;
+#endif
 
     bool get_server_times(struct timespec* start, struct timespec* up);
 
@@ -153,9 +163,11 @@ private:
 
     const char* stats_flag_label(const ServerControlStatsFlag flag);
 
+#ifdef WITH_DEFAULTS
     void set_defaults(const DefaultsRequest&, function<void(const DefaultsResponse&)>);
     void batch_set_defaults(
         const DefaultsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+#endif
 
     void init_device(Device* dev);
     void deinit_device(Device* dev);
@@ -167,6 +179,7 @@ private:
     void batch_get_device_status(
         const DeviceStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
+#ifdef WITH_HOST
     void init_host(Device* dev);
     void deinit_host(Device* dev);
     void get_host_config(const HostConfigRequest&, function<void(const HostConfigResponse&)>);
@@ -181,7 +194,9 @@ private:
         const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_clear_host_stats(
         const HostStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+#endif
 
+#ifdef WITH_MODULE
     void init_module(Device* dev);
     void deinit_module(Device* dev);
     void get_module_gpio(const ModuleGpioRequest&, function<void(const ModuleGpioResponse&)>);
@@ -202,7 +217,9 @@ private:
     void get_module_status(const ModuleStatusRequest&, function<void(const ModuleStatusResponse&)>);
     void batch_get_module_status(
         const ModuleStatusRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+#endif
 
+#ifdef WITH_PORT
     void init_port(Device* dev);
     void deinit_port(Device* dev);
     void get_port_config(const PortConfigRequest&, function<void(const PortConfigResponse&)>);
@@ -220,6 +237,7 @@ private:
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_clear_port_stats(
         const PortStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+#endif
 
     void init_server(void);
     void init_server_debug(
@@ -243,6 +261,7 @@ private:
     void batch_get_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_clear_stats(const StatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
 
+#ifdef WITH_SWITCH
     void init_switch(Device* dev);
     void deinit_switch(Device* dev);
     void get_switch_config(const SwitchConfigRequest&, function<void(const SwitchConfigResponse&)>);
@@ -257,6 +276,7 @@ private:
         const SwitchStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
     void batch_clear_switch_stats(
         const SwitchStatsRequest&, ServerReaderWriter<BatchResponse, BatchRequest>*);
+#endif
 };
 
 #endif // AGENT_HPP
