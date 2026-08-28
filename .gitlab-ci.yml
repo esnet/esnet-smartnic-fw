@@ -1,8 +1,6 @@
 ---
 include:
   - template: 'Workflows/Branch-Pipelines.gitlab-ci.yml'
-  - project: 'security/container-scanning'
-    file: '.ESnet-container-scan.yml'
   - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.3.5
     inputs:
       aap_host:  $AAP_HOST
@@ -269,17 +267,6 @@ package:
 
 pull_cve_allowlist:
   extends: .harbor_cve_allowlist
-
-container_scanning:
-  variables:
-    CS_REGISTRY_USER: $HUSER_RO
-    CS_REGISTRY_PASSWORD: $HTOKEN_RO
-    CS_IMAGE: $SMARTNIC_FW_IMAGE_URI
-  # use 'dependencies' here rather than 'needs' since the gitlab container scanning
-  # include sets 'dependencies: []' which takes precedence over 'needs'
-  dependencies:
-    - pull_cve_allowlist
-    - package
 
 # Pure mixin job intended to be used for augmenting a manually triggered review job with support
 # for running Robot Framework tests.
