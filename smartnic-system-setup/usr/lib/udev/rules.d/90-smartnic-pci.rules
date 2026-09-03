@@ -109,7 +109,7 @@ ATTR{vendor}=="0x10ee", ATTR{device}=="0x50b4|0x50b5|0x50b6|0x50b7", \
 #
 
 # First rule works for all SmartNICs with or without valid VPD and handles PCIe parent port bindings
-ATTR{vendor}=="0x10ee", ATTR{device}=="0x903f|0x913f|0x923f|0x933f", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x9038|0x9138|0x9238|0x9338|0x903f|0x913f|0x923f|0x933f", \
   IMPORT{program}+="smartnic-pcie-parent", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-err-disable@$env{PCIE_PARENT_SLOT_NAME}", \
   ENV{SYSTEMD_WANTS}+="smartnic-pcie-power-control-disable@$env{PCIE_PARENT_SLOT_NAME}", \
@@ -122,7 +122,7 @@ ATTR{vendor}=="0x10ee", ATTR{device}=="0x903f|0x913f|0x923f|0x933f", \
 #             or a failure to parse VPD will result in NOT configuring
 #             the rules / systemd bindings for managing the parent port
 #
-ATTR{vendor}=="0x10ee", ATTR{device}=="0x903f|0x913f|0x923f|0x933f", \
+ATTR{vendor}=="0x10ee", ATTR{device}=="0x9038|0x9138|0x9238|0x9338|0x903f|0x913f|0x923f|0x933f", \
   IMPORT{program}+="smartnic-vpd-decoder $devpath", \
   ENV{ID_MODEL}="$env{VPD_IDENT} $env{VPD_SN}"
 
