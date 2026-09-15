@@ -69,11 +69,13 @@ void SmartnicP4Impl::clear_table(
             auto err = ErrorCode::EC_OK;
 
             // Request table_name empty means all tables in the pipeline.
+            const char* snp4_err_str = "";
             if (table_name.empty()) {
-                if (!snp4_reset_all_tables(pipeline->handle)) {
+                if (!snp4_reset_all_tables(pipeline->handle, &snp4_err_str)) {
                     err = ErrorCode::EC_FAILED_CLEAR_ALL_TABLES;
                     SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
-                        "Failed to clear all tables in pipeline ID " << pipeline_id <<
+                        "Failed to clear all tables (snp4 err " << snp4_err_str <<
+                        ") in pipeline ID " << pipeline_id <<
                         " on device ID " << dev_id);
                 } else {
                     SERVER_LOG_IF_DEBUG(debug_flag, INFO,
@@ -86,11 +88,12 @@ void SmartnicP4Impl::clear_table(
                     "Invalid table '" << table_name <<
                     "' in pipeline ID " << pipeline_id <<
                     " on device ID " << dev_id);
-            } else if (!snp4_reset_one_table(pipeline->handle, table_name.c_str())) {
+            } else if (!snp4_reset_one_table(pipeline->handle, table_name.c_str(), &snp4_err_str)) {
                 err = ErrorCode::EC_FAILED_CLEAR_TABLE;
                 SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                     "Failed to clear table '" << table_name <<
-                    "' in pipeline ID " << pipeline_id <<
+                    "' (snp4 err " << snp4_err_str <<
+                    ") in pipeline ID " << pipeline_id <<
                     " on device ID " << dev_id);
             } else {
                 SERVER_LOG_IF_DEBUG(debug_flag, INFO,
@@ -478,6 +481,7 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                         goto clear_rule;
                     }
 
+                    const char* snp4_err_str = "";
                     if (do_insert) {
                         if (!snp4_table_insert_kma(pipeline->handle,
                                                    sr.table_name,
@@ -486,11 +490,13 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                                                    sr.action_name,
                                                    pack.params, pack.params_len,
                                                    sr.priority,
-                                                   rule.replace())) {
+                                                   rule.replace(),
+                                                   &snp4_err_str)) {
                             err = ErrorCode::EC_FAILED_INSERT_TABLE_RULE;
                             SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                                 "Failed to insert rule into table '" << table_name <<
-                                "' in pipeline ID " << pipeline_id <<
+                                "' (snp4 err " << snp4_err_str <<
+                                ") in pipeline ID " << pipeline_id <<
                                 " on device ID " << dev_id <<
                                 " (rule " << rule_idx << "/" << rule_count << ")");
                         } else {
@@ -502,13 +508,15 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                         }
                     } else {
                         if (!snp4_table_delete_k(pipeline->handle,
-                                                    sr.table_name,
-                                                    pack.key, pack.key_len,
-                                                    pack.mask, pack.mask_len)) {
+                                                 sr.table_name,
+                                                 pack.key, pack.key_len,
+                                                 pack.mask, pack.mask_len,
+                                                 &snp4_err_str)) {
                             err = ErrorCode::EC_FAILED_DELETE_TABLE_RULE;
                             SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
                                 "Failed to delete rule from table '" << table_name <<
-                                "' in pipeline ID " << pipeline_id <<
+                                "' (snp4 err " << snp4_err_str <<
+                                ") in pipeline ID " << pipeline_id <<
                                 " on device ID " << dev_id <<
                                 " (rule " << rule_idx << "/" << rule_count << ")");
                         } else {

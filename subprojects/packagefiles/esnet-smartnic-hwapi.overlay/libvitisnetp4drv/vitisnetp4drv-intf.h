@@ -27,6 +27,8 @@ typedef enum {
     XIL_VITIS_NET_P4_TABLE_ERR_FUNCTION_NOT_SUPPORTED,
     XIL_VITIS_NET_P4_GENERAL_ERR_NULL_PARAM,
     XIL_VITIS_NET_P4_GENERAL_ERR_INTERNAL_ASSERTION,
+    XIL_VITIS_NET_P4_GENERAL_ERR_INVALID_CONTEXT,
+    XIL_VITIS_NET_P4_TARGET_ERR_MALLOC_FAILED,
 }  XilVitisNetP4ReturnType;
 
 typedef enum {
@@ -219,6 +221,7 @@ struct vitis_net_p4_drv_intf {
 
     struct {
         XilVitisNetP4ReturnType (*stub_env_if)(XilVitisNetP4EnvIf *EnvIfPtr);
+        const char *(*return_type_to_string)(XilVitisNetP4ReturnType Value);
     } common;
 
     struct {

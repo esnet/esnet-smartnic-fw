@@ -90,18 +90,21 @@ void SmartnicP4Impl::init_pipeline(Device* dev) {
             .stats = {},
         };
 
-        pipeline->handle = snp4_init(id, (uintptr_t)dev->bar2);
+        const char* snp4_err_str = "";
+        pipeline->handle = snp4_init(id, (uintptr_t)dev->bar2, &snp4_err_str);
         if (pipeline->handle == NULL) {
             SERVER_LOG_LINE_INIT(pipeline, ERROR,
-                "Failed to initialize snp4/vitisnetp4 library for pipeline ID " << id <<
+                "Failed to initialize snp4/vitisnetp4 library (snp4 err " << snp4_err_str <<
+                ") for pipeline ID " << id <<
                 " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
 
         SERVER_LOG_LINE_INIT(pipeline, INFO, "Resetting all tables of pipeline ID " << id);
-        if (!snp4_reset_all_tables(pipeline->handle)) {
+        if (!snp4_reset_all_tables(pipeline->handle, &snp4_err_str)) {
             SERVER_LOG_LINE_INIT(pipeline, ERROR,
-                "Failed to reset snp4/vitisnetp4 tables of pipeline ID " << id <<
+                "Failed to reset snp4/vitisnetp4 tables (snp4 err " << snp4_err_str <<
+                ") of pipeline ID " << id <<
                 " on device " << dev->bus_id);
             exit(EXIT_FAILURE);
         }
@@ -133,9 +136,11 @@ void SmartnicP4Impl::deinit_pipeline(Device* dev) {
         deinit_counters(pipeline);
         deinit_table_ecc(pipeline);
 
-        if (!snp4_deinit(pipeline->handle)) {
+        const char* snp4_err_str = "";
+        if (!snp4_deinit(pipeline->handle, &snp4_err_str)) {
             SERVER_LOG_LINE_INIT(pipeline, ERROR,
-                "Failed to deinit snp4/vitisnetp4 library for pipeline ID " << pipeline->id <<
+                "Failed to deinit snp4/vitisnetp4 library (snp4 err " << snp4_err_str <<
+                ") for pipeline ID " << pipeline->id <<
                 " on device " << dev->bus_id);
         }
 
