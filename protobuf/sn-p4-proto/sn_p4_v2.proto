@@ -68,6 +68,20 @@ enum ErrorCode {
     // Server configuration error codes.
     EC_SERVER_FAILED_GET_TIME = 500;
     EC_SERVER_INVALID_DEBUG_FLAG = 501;
+
+    // Register configuration error codes.
+    EC_FAILED_CLEAR_REGISTER = 600;
+    EC_FAILED_WRITE_REGISTER = 601;
+    EC_FAILED_READ_REGISTER = 602;
+    EC_FAILED_READ_AND_CLEAR_REGISTER = 603;
+    EC_INVALID_REGISTER_BLOCK_NAME = 610;
+    EC_INVALID_REGISTER_ID = 611;
+    EC_INVALID_REGISTER_ALIAS = 612;
+    EC_REGISTER_INDEX_OUT_OF_RANGE = 613;
+    EC_REGISTER_VALUE_INVALID_FORMAT = 614;
+    EC_REGISTER_VALUE_EXCEEDS_BIT_WIDTH = 615;
+    EC_MISSING_REGISTER_SLICES = 616;
+    EC_MISSING_REGISTERS_IN_SLICE = 617;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -365,10 +379,24 @@ message CounterBlockInfo {
     uint32 num_counters = 4;
 }
 
+enum RegisterMemoryType {
+     REGISTER_MEMORY_TYPE_UNKNOWN = 0;
+     REGISTER_MEMORY_TYPE_DRAM = 1;
+     REGISTER_MEMORY_TYPE_SRAM = 2;
+}
+
+message RegisterBlockInfo {
+    string name = 1;
+    RegisterMemoryType mem_type = 2;
+    uint32 width = 3;
+    uint32 num_registers = 4;
+}
+
 message PipelineInfo {
     string name = 1;
     repeated TableInfo tables = 2;
     repeated CounterBlockInfo counter_blocks = 3;
+    repeated RegisterBlockInfo register_blocks = 4;
 }
 
 message PipelineInfoRequest {
@@ -469,6 +497,57 @@ message TableRuleResponse {
 }
 
 //--------------------------------------------------------------------------------------------------
+message RegisterId {
+    string block_name = 1; // Name of the block containing the register.
+    uint32 index = 2; // 0-based index of a register within it's block.
+    string alias = 3; // Optional string name assigned to a specifc register by the P4 pipeline.
+                      // If a name is present, it can be used as an alternative to the index when
+                      // selecting the register to operate on.
+}
+
+message Register {
+    RegisterId id = 1;
+    string value = 2; // Integer value encoded as a string.
+                      // Supported formats (examples below for a 16-bit register width):
+                      // hexadecimal: prefix 0x (i.e. 0x1234)
+                      // binary:      prefix 0b (i.e. 0b0001001000110100)
+                      // decimal:     no prefix (i.e. 4660)
+}
+
+message RegisterSlice {
+    RegisterId first_id = 1; // For get/clear operations, ID of the first register in the slice.
+    uint32 count = 2; // For get/clear operations, number of contiguous values within the
+                      // slice. Use 0 to indicate all remaining values.
+
+    repeated Register registers = 3; // For get operations, specifies the values read.
+                                     // For set operations, specifies the values to be written for
+                                     // each of the requested registers.
+}
+
+message RegistersRequest {
+    sint32 dev_id = 1; // 0-based index. Set to -1 for all devices.
+    sint32 pipeline_id = 2; // 0-based index. Set to -1 for all pipelines.
+
+    repeated RegisterSlice slices = 3; // List of registers to operate on.
+                                       // For get/clear operations, leave unset to indicate all
+                                       // registers in all blocks.
+
+    bool clear_on_read = 4; // For get operations, each register is reset to the default for it's
+                            // block after the current value has been read.  This flag is a meant
+                            // as a convenience for performing a get operation immediately followed
+                            // by a clear for the same registers without requiring a separate
+                            // message.
+    bool non_zero = 5; // For get operations, restrict registers to those whose value is not zero.
+}
+
+message RegistersResponse {
+    ErrorCode error_code = 1; // Must be EC_OK before accessing remaining fields.
+    uint32 dev_id = 2;
+    uint32 pipeline_id = 3;
+    repeated RegisterSlice slices = 4;
+}
+
+//--------------------------------------------------------------------------------------------------
 message ServerStatus {
     google.protobuf.Timestamp start_time = 1; // UTC wall clock.
     google.protobuf.Duration up_time = 2; // Diff of monotonic system clock.
@@ -490,6 +569,7 @@ enum ServerDebugFlag {
     DEBUG_FLAG_PIPELINE_INFO = 10;
     DEBUG_FLAG_PIPELINE_DRIVER = 11;
     DEBUG_FLAG_STATS = 20;
+    DEBUG_FLAG_REGISTERS = 30;
 }
 
 message ServerDebug {
@@ -546,6 +626,9 @@ message BatchRequest {
         // Server configuration.
         ServerStatusRequest server_status = 50;
         ServerConfigRequest server_config = 51;
+
+        // Register configuration.
+        RegistersRequest registers = 60;
     };
 }
 
@@ -573,6 +656,9 @@ message BatchResponse {
         // Server configuration.
         ServerStatusResponse server_status = 50;
         ServerConfigResponse server_config = 51;
+
+        // Register configuration.
+        RegistersResponse registers = 60;
     };
 }
 
@@ -593,6 +679,11 @@ service SmartnicP4 {
     rpc ClearTable(TableRequest) returns (stream TableResponse);
     rpc InsertTableRule(TableRuleRequest) returns (stream TableRuleResponse);
     rpc DeleteTableRule(TableRuleRequest) returns (stream TableRuleResponse);
+
+    // Register configuration.
+    rpc ClearRegisters(RegistersRequest) returns (stream RegistersResponse);
+    rpc GetRegisters(RegistersRequest) returns (stream RegistersResponse);
+    rpc SetRegisters(RegistersRequest) returns (stream RegistersResponse);
 
     // Statistics configuration.
     rpc GetStats(StatsRequest) returns (stream StatsResponse);

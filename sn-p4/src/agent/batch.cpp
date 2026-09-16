@@ -141,6 +141,26 @@ Status SmartnicP4Impl::Batch(
             }
             break;
 
+        case BatchRequest::ItemCase::kRegisters:
+            switch (op) {
+            case BatchOperation::BOP_GET:
+                batch_get_registers(req.registers(), rdwr);
+                break;
+
+            case BatchOperation::BOP_SET:
+                batch_set_registers(req.registers(), rdwr);
+                break;
+
+            case BatchOperation::BOP_CLEAR:
+                batch_clear_registers(req.registers(), rdwr);
+                break;
+
+            default:
+                error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_OP, op);
+                break;
+            }
+            break;
+
         default:
             error_resp(rdwr, ErrorCode::EC_UNKNOWN_BATCH_REQUEST, op);
             break;

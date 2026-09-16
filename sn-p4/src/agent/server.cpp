@@ -25,6 +25,7 @@ const char* SmartnicP4Impl::debug_flag_label(const ServerDebugFlag flag) {
     CASE(PIPELINE_INFO);
     CASE(PIPELINE_DRIVER);
     CASE(STATS);
+    CASE(REGISTERS);
 
     case ServerDebugFlag::DEBUG_FLAG_UNKNOWN:
     default:

@@ -80,6 +80,7 @@ extern bool snp4_table_for_each_entry(void * snp4_handle,
 // NOTE: These are not necessarily related to the limits of the underlying hardware
 #define SNP4_MAX_PIPELINE_TABLES 64
 #define SNP4_MAX_PIPELINE_COUNTER_BLOCKS 64
+#define SNP4_MAX_PIPELINE_REGISTER_BLOCKS 64
 #define SNP4_MAX_TABLE_MATCHES 64
 #define SNP4_MAX_TABLE_ACTIONS 64
 #define SNP4_MAX_ACTION_PARAMS 64
@@ -165,12 +166,29 @@ struct snp4_info_counter_block {
   size_t num_aliases;
 };
 
+enum snp4_info_register_memory_type {
+  SNP4_INFO_REGISTER_MEMORY_TYPE_DRAM,
+  SNP4_INFO_REGISTER_MEMORY_TYPE_SRAM,
+};
+
+struct snp4_info_register_block {
+  const char * name;
+  enum snp4_info_register_memory_type mem_type;
+  uint32_t width;
+  uint32_t num_registers;
+
+  const char* const* aliases;
+  size_t num_aliases;
+};
+
 struct snp4_info_pipeline {
   const char * name;
   struct snp4_info_table tables[SNP4_MAX_PIPELINE_TABLES];
   uint16_t num_tables;
   struct snp4_info_counter_block counter_blocks[SNP4_MAX_PIPELINE_COUNTER_BLOCKS];
   uint16_t num_counter_blocks;
+  struct snp4_info_register_block register_blocks[SNP4_MAX_PIPELINE_REGISTER_BLOCKS];
+  uint16_t num_register_blocks;
 };
 
 enum snp4_status {
@@ -217,6 +235,8 @@ enum snp4_status {
 
   SNP4_STATUS_INFO_TOO_MANY_COUNTER_BLOCKS,
   SNP4_STATUS_INFO_INVALID_COUNTER_TYPE,
+
+  SNP4_STATUS_INFO_TOO_MANY_REGISTER_BLOCKS,
 };
 
 extern enum snp4_status snp4_info_get_pipeline(unsigned int sdnet_idx, struct snp4_info_pipeline * pipeline);
@@ -342,7 +362,10 @@ extern bool snp4_counter_block_simple_read(void * snp4_handle, const char * bloc
 extern bool snp4_counter_block_combo_read(void * snp4_handle, const char * block_name, uint64_t * packets, uint64_t * bytes, size_t ncounts); // packets/bytes are arrays of size ncounts
 extern bool snp4_counter_block_reset(void * snp4_handle, const char * block_name);
 extern bool snp4_counter_block_reset_all(void * snp4_handle);
-
+extern bool snp4_register_block_reset(void * snp4_handle, const char * block_name);
+extern bool snp4_register_reset(void * snp4_handle, const char * block_name, unsigned int index, size_t count);
+extern bool snp4_register_read(void * snp4_handle, const char * block_name, unsigned int index, size_t count, mpz_t * data);
+extern bool snp4_register_write(void * snp4_handle, const char * block_name, unsigned int index, size_t count, const mpz_t * data);
 #ifdef __cplusplus
 }
 #endif

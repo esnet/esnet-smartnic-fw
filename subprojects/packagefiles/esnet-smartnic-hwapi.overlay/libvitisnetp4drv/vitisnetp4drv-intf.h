@@ -9,6 +9,8 @@ extern "C" {
 #endif
 
 #ifdef WITH_VITISNETP4_STUBS
+#include <stdbool.h>
+
 /*
  * This section stubs out the vitisnetp4 driver definitions used by the wrapper
  * layer in the event that it's being compiled in the absence of p4 IP in the
@@ -137,6 +139,18 @@ typedef struct {
 } XilVitisNetP4CounterConfig;
 
 /*----------------------------------------------------------------------------*/
+// register_top.h
+typedef struct {
+} XilVitisNetP4RegisterTopCtx;
+
+typedef struct {
+    uint32_t largest_index;
+    uint16_t data_size;
+    uint32_t InitialData[0];
+    bool dram;
+} XilVitisNetP4RegisterTopConfig;
+
+/*----------------------------------------------------------------------------*/
 // vitisnetp4_target.h
 typedef struct {
 } XilVitisNetP4TargetCtx;
@@ -153,11 +167,18 @@ typedef struct {
 } XilVitisNetP4TargetCounterConfig;
 
 typedef struct {
+    const char *NameStringPtr;
+    XilVitisNetP4RegisterTopConfig Config;
+} XilVitisNetP4TargetRegisterConfig;
+
+typedef struct {
     XilVitisNetP4Endian Endian;
     uint32_t TableListSize;
     XilVitisNetP4TargetTableConfig **TableListPtr;
-    size_t CounterListSize;
+    uint32_t CounterListSize;
     XilVitisNetP4TargetCounterConfig **CounterListPtr;
+    uint32_t RegisterListSize;
+    XilVitisNetP4TargetRegisterConfig **RegisterListPtr;
 } XilVitisNetP4TargetConfig;
 #else /* !WITH_VITISNETP4_STUBS ==> building with actual vitisnetp4 driver */
 #include "vitisnetp4_common.h"
@@ -173,9 +194,19 @@ struct vitis_net_p4_drv_metadata_counter_block {
 };
 
 /*----------------------------------------------------------------------------*/
+struct vitis_net_p4_drv_metadata_register_block {
+    const char* name;
+    const char* const* aliases;
+    size_t num_aliases;
+};
+
+/*----------------------------------------------------------------------------*/
 struct vitis_net_p4_drv_metadata {
     const struct vitis_net_p4_drv_metadata_counter_block* const* counter_blocks;
     size_t num_counter_blocks;
+
+    const struct vitis_net_p4_drv_metadata_register_block* const* register_blocks;
+    size_t num_register_blocks;
 };
 
 /*----------------------------------------------------------------------------*/
@@ -221,6 +252,22 @@ struct vitis_net_p4_drv_intf {
             XilVitisNetP4CounterCtx *CtxPtr,  uint32_t Index,
             uint32_t NumCounters, uint64_t *Packets, uint64_t *Bytes);
     } counter;
+
+    struct {
+        XilVitisNetP4ReturnType (*init)(
+            XilVitisNetP4RegisterTopCtx *CtxPtr, XilVitisNetP4EnvIf *EnvIfPtr,
+            XilVitisNetP4RegisterTopConfig *ConfigPtr);
+
+        XilVitisNetP4ReturnType (*exit)(XilVitisNetP4RegisterTopCtx *CtxPtr);
+
+        XilVitisNetP4ReturnType (*reset)(XilVitisNetP4RegisterTopCtx *CtxPtr);
+
+        XilVitisNetP4ReturnType (*read)(
+            XilVitisNetP4RegisterTopCtx *CtxPtr, uint32_t Index, uint8_t *Data_ptr);
+
+        XilVitisNetP4ReturnType (*write)(
+            XilVitisNetP4RegisterTopCtx *CtxPtr, uint32_t Index, uint8_t *Data_ptr);
+    } registers;
 
     struct {
         XilVitisNetP4ReturnType (*reset)(XilVitisNetP4TableCtx *CtxPtr);

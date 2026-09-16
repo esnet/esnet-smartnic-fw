@@ -382,6 +382,27 @@ void SmartnicP4Impl::get_pipeline_info(
                 block->set_type(type);
             }
 
+            for (auto bidx = 0; bidx < pi->num_register_blocks; ++bidx) {
+                const auto bi = &pi->register_blocks[bidx];
+                auto block = info->add_register_blocks();
+
+                block->set_name(bi->name);
+                block->set_width(bi->width);
+                block->set_num_registers(bi->num_registers);
+
+                auto mem_type = RegisterMemoryType::REGISTER_MEMORY_TYPE_UNKNOWN;
+                switch (bi->mem_type) {
+                case SNP4_INFO_REGISTER_MEMORY_TYPE_DRAM:
+                    mem_type = RegisterMemoryType::REGISTER_MEMORY_TYPE_DRAM;
+                    break;
+
+                case SNP4_INFO_REGISTER_MEMORY_TYPE_SRAM:
+                    mem_type = RegisterMemoryType::REGISTER_MEMORY_TYPE_SRAM;
+                    break;
+                }
+                block->set_mem_type(mem_type);
+            }
+
             resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_pipeline_id(pipeline_id);

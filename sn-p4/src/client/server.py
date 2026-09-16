@@ -32,6 +32,7 @@ DEBUG_FLAG_MAP = {
     ServerDebugFlag.DEBUG_FLAG_PIPELINE_INFO: 'pipeline-info',
     ServerDebugFlag.DEBUG_FLAG_PIPELINE_DRIVER: 'pipeline-driver',
     ServerDebugFlag.DEBUG_FLAG_STATS: 'stats',
+    ServerDebugFlag.DEBUG_FLAG_REGISTERS: 'registers',
 }
 DEBUG_FLAG_RMAP = dict((name, enum) for enum, name in DEBUG_FLAG_MAP.items())
 

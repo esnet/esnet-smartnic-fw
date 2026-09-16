@@ -8,6 +8,7 @@
 #include <stdio.h>		/* fprintf */
 #include <stdlib.h>		/* calloc, free */
 #include <string.h>		/* memset, strcmp */
+#include <gmp.h>		/* mpz_* */
 #include "snp4.h"		/* API */
 #include "snp4_io.h"		/* snp4_io_reg_* */
 #include "unused.h"		/* UNUSED() */
@@ -17,6 +18,13 @@
 struct snp4_counter_block {
   XilVitisNetP4CounterCtx ctx;
   size_t num_counters;
+};
+
+struct snp4_register_block {
+  XilVitisNetP4RegisterTopCtx ctx;
+  size_t num_registers;
+  size_t words_per_reg;
+  const uint32_t * initial_data;
 };
 
 struct snp4_user_context {
@@ -29,6 +37,7 @@ struct snp4_user_context {
   XilVitisNetP4EnvIf env;
   XilVitisNetP4TargetCtx target;
   struct snp4_counter_block * counter_blocks;
+  struct snp4_register_block * register_blocks;
   unsigned int sdnet_idx;
   const struct vitis_net_p4_drv_intf* intf;
 };
@@ -125,15 +134,16 @@ static bool snp4_init_counter_blocks(struct snp4_user_context * snp4_user)
   unsigned int n;
   for (n = 0; n < tcfg->CounterListSize; ++n) {
     XilVitisNetP4TargetCounterConfig * cnt = tcfg->CounterListPtr[n];
+    const XilVitisNetP4CounterConfig * cfg = &cnt->Config;
     struct snp4_counter_block * block = &blocks[n];
 
 #ifdef SDNETCONFIG_DEBUG
     printf("    DEBUG[%s]: idx=%u, name='%s', base=0x%016lx, counter_type=%u, num_counters=%u, "
-           "width=%u\n", __func__, n, cnt->NameStringPtr, cnt->Config.BaseAddr,
-           cnt->Config.CounterType, cnt->Config.NumCounters, cnt->Config.Width);
+           "width=%u\n", __func__, n, cnt->NameStringPtr, cfg->BaseAddr, cfg->CounterType,
+           cfg->NumCounters, cfg->Width);
 #endif
 
-    block->num_counters = cnt->Config.NumCounters;
+    block->num_counters = cfg->NumCounters;
     if (intf->counter.init(&block->ctx, &snp4_user->env, &cnt->Config) != XIL_VITIS_NET_P4_SUCCESS) {
       goto out_free_blocks;
     }
@@ -161,6 +171,69 @@ static void snp4_deinit_counter_blocks(struct snp4_user_context * snp4_user)
 
   free(snp4_user->counter_blocks);
   snp4_user->counter_blocks = NULL;
+}
+
+static bool snp4_init_register_blocks(struct snp4_user_context * snp4_user)
+{
+  const struct vitis_net_p4_drv_intf * intf = snp4_user->intf;
+  const XilVitisNetP4TargetConfig * tcfg = intf->target.config;
+
+  if (tcfg->RegisterListSize == 0) {
+    return true;
+  }
+
+  struct snp4_register_block * blocks = calloc(tcfg->RegisterListSize, sizeof(*blocks));
+  if (blocks == NULL) {
+    return false;
+  }
+
+#ifdef SDNETCONFIG_DEBUG
+  printf("DEBUG[%s]: RegisterListSize=%u\n", __func__, tcfg->RegisterListSize);
+#endif
+
+  unsigned int n;
+  for (n = 0; n < tcfg->RegisterListSize; ++n) {
+    XilVitisNetP4TargetRegisterConfig * reg = tcfg->RegisterListPtr[n];
+    const XilVitisNetP4RegisterTopConfig * cfg = &reg->Config;
+    struct snp4_register_block * block = &blocks[n];
+
+#ifdef SDNETCONFIG_DEBUG
+    printf("    DEBUG[%s]: idx=%u, name='%s', base=0x%016lx, version=%u, table_id=%u, "
+           "largest_index=%u, data_size=%u, is_dram=%s\n", __func__, n, reg->NameStringPtr,
+           cfg->BaseAddr, cfg->version, cfg->table_id, cfg->largest_index, cfg->data_size,
+           cfg->dram ? "yes" : "no");
+#endif
+
+    block->num_registers = cfg->largest_index + 1;
+    block->words_per_reg = (cfg->data_size + 32 - 1) / 32;
+    block->initial_data = cfg->InitialData;
+    if (intf->registers.init(&block->ctx, &snp4_user->env, &reg->Config) != XIL_VITIS_NET_P4_SUCCESS) {
+      goto out_free_blocks;
+    }
+  }
+
+  snp4_user->register_blocks = blocks;
+  return true;
+
+ out_free_blocks:
+  for (unsigned int b = 0; b < n; ++b) {
+      intf->registers.exit(&blocks[b].ctx);
+  }
+  free(blocks);
+  return false;
+}
+
+static void snp4_deinit_register_blocks(struct snp4_user_context * snp4_user)
+{
+  const struct vitis_net_p4_drv_intf * intf = snp4_user->intf;
+  const XilVitisNetP4TargetConfig * tcfg = intf->target.config;
+
+  for (unsigned int n = 0; n < tcfg->RegisterListSize; ++n) {
+    intf->registers.exit(&snp4_user->register_blocks[n].ctx);
+  }
+
+  free(snp4_user->register_blocks);
+  snp4_user->register_blocks = NULL;
 }
 
 void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr)
@@ -198,9 +271,15 @@ void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr)
     goto out_fail_counters;
   }
 
+  if (!snp4_init_register_blocks(snp4_user)) {
+    goto out_fail_registers;
+  }
+
   snp4_log_enable(snp4_user, false, NULL);
   return (void *) snp4_user;
 
+ out_fail_registers:
+  snp4_deinit_counter_blocks(snp4_user);
  out_fail_counters:
   snp4_user->intf->target.exit(&snp4_user->target);
  out_fail_user:
@@ -213,6 +292,7 @@ bool snp4_deinit(void * snp4_handle)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
 
+  snp4_deinit_register_blocks(snp4_user);
   snp4_deinit_counter_blocks(snp4_user);
   if (snp4_user->intf->target.exit(&snp4_user->target) != XIL_VITIS_NET_P4_SUCCESS) {
     return false;
@@ -692,5 +772,91 @@ bool snp4_counter_block_reset_all(void * snp4_handle)
       return false;
     }
   }
+  return true;
+}
+
+static struct snp4_register_block * snp4_register_block_by_name(struct snp4_user_context * snp4_user, const char * block_name)
+{
+  const XilVitisNetP4TargetConfig * tcfg = snp4_user->intf->target.config;
+  for (unsigned int n = 0; n < tcfg->RegisterListSize; ++n) {
+    if (strcmp(block_name, tcfg->RegisterListPtr[n]->NameStringPtr) == 0) {
+      return &snp4_user->register_blocks[n];
+    }
+  }
+  return NULL;
+}
+
+bool snp4_register_block_reset(void * snp4_handle, const char * block_name)
+{
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
+  struct snp4_register_block * block = snp4_register_block_by_name(snp4_user, block_name);
+  if (block == NULL) {
+    return false;
+  }
+
+  return snp4_user->intf->registers.reset(&block->ctx) == XIL_VITIS_NET_P4_SUCCESS;
+}
+
+bool snp4_register_reset(void * snp4_handle, const char * block_name, unsigned int index, size_t count)
+{
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
+  struct snp4_register_block * block = snp4_register_block_by_name(snp4_user, block_name);
+  if (block == NULL || index + count > block->num_registers) {
+    return false;
+  }
+
+  uint32_t words[block->words_per_reg];
+  for (unsigned int w = 0; w < block->words_per_reg; ++w) {
+      words[w] = block->initial_data[w];
+  }
+
+  for (unsigned int n = 0; n < count; ++n, ++index) {
+    XilVitisNetP4ReturnType rt = snp4_user->intf->registers.write(&block->ctx, index, (uint8_t*)words);
+    if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool snp4_register_read(void * snp4_handle, const char * block_name, unsigned int index, size_t count, mpz_t * data)
+{
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
+  struct snp4_register_block * block = snp4_register_block_by_name(snp4_user, block_name);
+  if (block == NULL || index + count > block->num_registers) {
+    return false;
+  }
+
+  uint32_t words[block->words_per_reg];
+  for (unsigned int n = 0; n < count; ++n, ++index) {
+    XilVitisNetP4ReturnType rt = snp4_user->intf->registers.read(&block->ctx, index, (uint8_t*)words);
+    if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+      return false;
+    }
+    mpz_import(data[n], block->words_per_reg, -1, sizeof(words[0]), 0, 0, words);
+  }
+
+  return true;
+}
+
+bool snp4_register_write(void * snp4_handle, const char * block_name, unsigned int index, size_t count, const mpz_t * data)
+{
+  struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;
+  struct snp4_register_block * block = snp4_register_block_by_name(snp4_user, block_name);
+  if (block == NULL || index + count > block->num_registers) {
+    return false;
+  }
+
+  uint32_t words[block->words_per_reg];
+  for (unsigned int n = 0; n < count; ++n, ++index) {
+    memset(words, 0, sizeof(words[0])*block->words_per_reg);
+    mpz_export(words, NULL, -1, sizeof(words[0]), 0, 0, data[n]);
+    XilVitisNetP4ReturnType rt = snp4_user->intf->registers.write(&block->ctx, index, (uint8_t*)words);
+    if (rt != XIL_VITIS_NET_P4_SUCCESS) {
+      return false;
+    }
+  }
+
   return true;
 }
