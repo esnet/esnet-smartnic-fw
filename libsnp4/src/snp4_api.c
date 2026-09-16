@@ -271,6 +271,12 @@ void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr, const char **
   snp4_user->env.LogError    = (XilVitisNetP4LogFp)         &log_error;
   snp4_user->env.LogInfo     = (XilVitisNetP4LogFp)         &log_info;
 
+  snp4_user->intf->cam.set_debug_flags(
+    CAM_DEBUG_CONFIG |
+    CAM_DEBUG_CONFIG_ARGS |
+    CAM_DEBUG_VERBOSE_VERIFY
+  );
+
   // Initialize the vitisnetp4 target
   snp4_log_enable(snp4_user, true, NULL);
   rt = snp4_user->intf->target.init(&snp4_user->target, &snp4_user->env, snp4_user->intf->target.config);

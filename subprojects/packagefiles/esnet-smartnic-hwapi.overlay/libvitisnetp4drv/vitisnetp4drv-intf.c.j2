@@ -115,6 +115,11 @@ const struct vitis_net_p4_drv_intf vitis_net_p4_drv_intf_{{ ip_name }} = {
 {%- endif %}
     },
 
+    .cam = {
+        .get_debug_flags = XilVitisNetP4CamGetDebugFlags,
+        .set_debug_flags = XilVitisNetP4CamSetDebugFlags,
+    },
+
     .common = {
         .stub_env_if = XilVitisNetP4StubEnvIf,
         .return_type_to_string = XilVitisNetP4ReturnTypeToString,
