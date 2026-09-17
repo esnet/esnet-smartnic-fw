@@ -87,6 +87,7 @@ static XilVitisNetP4ReturnType log_info(XilVitisNetP4EnvIf *EnvIfPtr, const char
   struct snp4_user_context * user_ctx = (struct snp4_user_context *)EnvIfPtr->UserCtx;
   if (user_ctx->log.enabled) {
     fprintf(stdout, "%s%s\n", user_ctx->log.prefix, MessagePtr);
+    fflush(stdout);
   }
 
   return XIL_VITIS_NET_P4_SUCCESS;
@@ -97,6 +98,7 @@ static XilVitisNetP4ReturnType log_error(XilVitisNetP4EnvIf *EnvIfPtr, const cha
   struct snp4_user_context * user_ctx = (struct snp4_user_context *)EnvIfPtr->UserCtx;
   if (user_ctx->log.enabled) {
     fprintf(stderr, "%s%s\n", user_ctx->log.prefix, MessagePtr);
+    fflush(stderr);
   }
 
   return XIL_VITIS_NET_P4_SUCCESS;
