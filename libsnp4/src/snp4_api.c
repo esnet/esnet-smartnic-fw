@@ -11,7 +11,6 @@
 #include <gmp.h>		/* mpz_* */
 #include "snp4.h"		/* API */
 #include "snp4_io.h"		/* snp4_io_reg_* */
-#include "unused.h"		/* UNUSED() */
 
 #include "vitisnetp4drv-intf.h"	/* Vitis driver wrapper */
 
@@ -380,12 +379,9 @@ bool snp4_reset_one_table(void * snp4_handle, const char * table_name, const cha
 bool snp4_table_insert_kma(void * snp4_handle,
 			   const char * table_name,
 			   uint8_t * key,
-			   size_t UNUSED(key_len),
 			   uint8_t * mask,
-			   size_t UNUSED(mask_len),
 			   const char * action_name,
 			   uint8_t * params,
-			   size_t UNUSED(params_len),
 			   uint32_t priority,
 			   bool replace,
                            const char ** error_str)
@@ -450,9 +446,7 @@ bool snp4_table_insert_kma(void * snp4_handle,
 bool snp4_table_delete_k(void * snp4_handle,
 			 const char * table_name,
 			 uint8_t * key,
-			 size_t    UNUSED(key_len),
 			 uint8_t * mask,
-			 size_t    UNUSED(mask_len),
                          const char ** error_str)
 {
   struct snp4_user_context * snp4_user = (struct snp4_user_context *) snp4_handle;

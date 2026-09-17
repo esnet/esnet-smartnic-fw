@@ -485,10 +485,10 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                     if (do_insert) {
                         if (!snp4_table_insert_kma(pipeline->handle,
                                                    sr.table_name,
-                                                   pack.key, pack.key_len,
-                                                   pack.mask, pack.mask_len,
+                                                   pack.key,
+                                                   pack.mask,
                                                    sr.action_name,
-                                                   pack.params, pack.params_len,
+                                                   pack.params,
                                                    sr.priority,
                                                    rule.replace(),
                                                    &snp4_err_str)) {
@@ -509,8 +509,8 @@ void SmartnicP4Impl::insert_or_delete_table_rule(
                     } else {
                         if (!snp4_table_delete_k(pipeline->handle,
                                                  sr.table_name,
-                                                 pack.key, pack.key_len,
-                                                 pack.mask, pack.mask_len,
+                                                 pack.key,
+                                                 pack.mask,
                                                  &snp4_err_str)) {
                             err = ErrorCode::EC_FAILED_DELETE_TABLE_RULE;
                             SERVER_LOG_IF_DEBUG(debug_flag, ERROR,
