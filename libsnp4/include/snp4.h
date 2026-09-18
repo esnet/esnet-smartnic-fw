@@ -22,28 +22,25 @@ extern "C"
 
 extern size_t snp4_sdnet_count(void);
 extern bool snp4_sdnet_present(unsigned int sdnet_idx);
-extern void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr);
-extern bool snp4_deinit(void * snp4_handle);
+extern void * snp4_init(unsigned int sdnet_idx, uintptr_t snp4_base_addr, const char ** error_str);
+extern bool snp4_deinit(void * snp4_handle, const char ** error_str);
 extern void snp4_log_enable(void * snp4_handle, bool enable, const char * prefix);
-extern bool snp4_reset_all_tables(void * snp4_handle);
-extern bool snp4_reset_one_table(void * snp4_handle, const char * table_name);
+extern bool snp4_reset_all_tables(void * snp4_handle, const char ** error_str);
+extern bool snp4_reset_one_table(void * snp4_handle, const char * table_name, const char ** error_str);
 extern bool snp4_table_insert_kma(void * snp4_handle,
 				  const char * table_name,
 				  uint8_t * key,
-				  size_t key_len,
 				  uint8_t * mask,
-				  size_t mask_len,
 				  const char * action_name,
 				  uint8_t * params,
-				  size_t params_len,
 				  uint32_t priority,
-				  bool replace);
+                                  bool replace,
+                                  const char ** error_str);
 extern bool snp4_table_delete_k(void * snp4_handle,
 				const char * table_name,
 				uint8_t * key,
-				size_t    key_len,
 				uint8_t * mask,
-				size_t    mask_len);
+                                const char ** error_str);
 extern bool snp4_table_ecc_counters_read(void * snp4_handle,
                                          const char * table_name,
                                          uint32_t * corrected_single_bit_errors,

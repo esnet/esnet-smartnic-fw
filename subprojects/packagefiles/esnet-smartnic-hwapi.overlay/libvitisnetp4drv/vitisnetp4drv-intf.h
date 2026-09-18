@@ -27,6 +27,8 @@ typedef enum {
     XIL_VITIS_NET_P4_TABLE_ERR_FUNCTION_NOT_SUPPORTED,
     XIL_VITIS_NET_P4_GENERAL_ERR_NULL_PARAM,
     XIL_VITIS_NET_P4_GENERAL_ERR_INTERNAL_ASSERTION,
+    XIL_VITIS_NET_P4_GENERAL_ERR_INVALID_CONTEXT,
+    XIL_VITIS_NET_P4_TARGET_ERR_MALLOC_FAILED,
 }  XilVitisNetP4ReturnType;
 
 typedef enum {
@@ -218,7 +220,33 @@ struct vitis_net_p4_drv_intf {
     } info;
 
     struct {
+        // From vivado 2025.2 cam_v5_0/sw/cam_src/cam_obf.c:
+        #define CAM_DEBUG_NONE 0x00000000
+        #define CAM_DEBUG_NO_ERROR_MSG 0x00000001
+        #define CAM_DEBUG_ARGS 0x00000002
+        #define CAM_DEBUG_VERIFY_WR 0x00000004
+        #define CAM_DEBUG_VERIFY_SHADOW 0x00000008
+        #define CAM_DEBUG_VERBOSE_VERIFY 0x00000010
+        #define CAM_DEBUG_SKIP_MEM_INIT 0x00000020
+        #define CAM_DEBUG_CONFIG 0x00000040
+        #define CAM_DEBUG_KEY_MASKING 0x00000100
+        #define CAM_DEBUG_STATS 0x00000200
+        #define CAM_DEBUG_SEGMENTS 0x00000400
+        #define CAM_DEBUG_SKIP_VERIFY_CONFIG 0x00000800
+        #define CAM_DEBUG_SET_COVER 0x00001000
+        #define CAM_DEBUG_CONFIG_ARGS 0x00002000
+        #define CAM_DEBUG_HW_WR 0x00010000
+        #define CAM_DEBUG_HW_RD 0x00020000
+        #define CAM_DEBUG_HW_LOOKUP 0x00040000
+        #define CAM_DEBUG_HW_OP 0x08000000
+
+        uint32_t (*get_debug_flags)(void);
+        void (*set_debug_flags)(uint32_t flags);
+    } cam;
+
+    struct {
         XilVitisNetP4ReturnType (*stub_env_if)(XilVitisNetP4EnvIf *EnvIfPtr);
+        const char *(*return_type_to_string)(XilVitisNetP4ReturnType Value);
     } common;
 
     struct {
