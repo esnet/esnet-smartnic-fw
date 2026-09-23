@@ -455,11 +455,7 @@ void SmartnicConfigImpl::get_or_clear_port_stats(
         end_dev_id = dev_id;
     }
 
-    GetStatsContext ctx{
-        .filters = req.filters(),
-        .stats = NULL,
-    };
-
+    auto filters = req.filters();
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
 
@@ -482,15 +478,15 @@ void SmartnicConfigImpl::get_or_clear_port_stats(
         auto& zones = dev->stats.zones[DeviceStatsZone::PORT_COUNTERS];
         for (port_id = begin_port_id; port_id <= end_port_id; ++port_id) {
             PortStatsResponse resp;
+            auto err = ErrorCode::EC_OK;
 
             if (do_clear) {
-                clear_stats_zone(zones[port_id]->zone, ctx.filters);
+                err = clear_stats_zone(zones[port_id]->zone, filters);
             } else {
-                ctx.stats = resp.mutable_stats();
-                stats_zone_for_each_metric(zones[port_id]->zone, get_stats_for_each_metric, &ctx);
+                err = get_stats_zone(zones[port_id]->zone, filters, resp.mutable_stats());
             }
 
-            resp.set_error_code(ErrorCode::EC_OK);
+            resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_port_id(port_id);
 
