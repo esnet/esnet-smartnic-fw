@@ -17,6 +17,8 @@ using namespace grpc;
 using namespace sn_p4::v2;
 using namespace std;
 
+static const int MAX_METRIC_FILTER_DEPTH = 16;
+
 //--------------------------------------------------------------------------------------------------
 class BitArray {
 public:
@@ -226,16 +228,22 @@ static bool apply_metric_filter_match_string_regexp(const StringRegexp& regexp, 
 }
 
 //--------------------------------------------------------------------------------------------------
-static bool apply_metric_filter_match_string(const StatsMetricMatchString& match, const string str);
+static bool apply_metric_filter_match_string(
+    const StatsMetricMatchString& match, const string str, int& depth);
 
 static bool apply_metric_filter_match_string_split_part_attr(
     const StatsMetricMatchString::Split::Part::Match& match,
     const string str,
-    const unsigned int index) {
+    const unsigned int index,
+    int& depth) {
+    if (--depth < 0) {
+        return false;
+    }
+
     bool ok = false;
     switch (match.attribute_case()) {
     case StatsMetricMatchString::Split::Part::Match::AttributeCase::kValue:
-        ok = apply_metric_filter_match_string(match.value(), str);
+        ok = apply_metric_filter_match_string(match.value(), str, depth);
         break;
 
     case StatsMetricMatchString::Split::Part::Match::AttributeCase::kIndex:
@@ -248,6 +256,9 @@ static bool apply_metric_filter_match_string_split_part_attr(
         break;
     }
 
+    if (depth >= 0) {
+        ++depth;
+    }
     return ok;
 }
 
@@ -255,18 +266,23 @@ static bool apply_metric_filter_match_string_split_part_attr(
 static bool apply_metric_filter_match_string_split_part(
     const StatsMetricMatchString::Split::Part& part,
     const string str,
-    const unsigned int index) {
+    const unsigned int index,
+    int& depth) {
+    if (--depth < 0) {
+        return false;
+    }
+
     bool ok = false;
     switch (part.term_case()) {
     case StatsMetricMatchString::Split::Part::TermCase::kMatch:
-        ok = apply_metric_filter_match_string_split_part_attr(part.match(), str, index);
+        ok = apply_metric_filter_match_string_split_part_attr(part.match(), str, index, depth);
         break;
 
     case StatsMetricMatchString::Split::Part::TermCase::kAnySet: {
         auto set = part.any_set();
         ok = set.members_size() < 1; // Treat as a wildcard that always matches.
         for (const auto& member : set.members()) {
-            ok = ok || apply_metric_filter_match_string_split_part(member, str, index);
+            ok = ok || apply_metric_filter_match_string_split_part(member, str, index, depth);
             if (ok) { // Short-circuit logical OR.
                 break;
             }
@@ -278,7 +294,7 @@ static bool apply_metric_filter_match_string_split_part(
         auto set = part.all_set();
         ok = true; // Treat as a wildcard that always matches.
         for (const auto& member : set.members()) {
-            ok = ok && apply_metric_filter_match_string_split_part(member, str, index);
+            ok = ok && apply_metric_filter_match_string_split_part(member, str, index, depth);
             if (!ok) { // Short-circuit logical AND.
                 break;
             }
@@ -296,36 +312,57 @@ static bool apply_metric_filter_match_string_split_part(
         ok = !ok;
     }
 
+    if (depth >= 0) {
+        ++depth;
+    }
     return ok;
 }
 
 //--------------------------------------------------------------------------------------------------
 static bool apply_metric_filter_match_string_split(
     const StatsMetricMatchString::Split& split,
-    const string str) {
+    const string str,
+    int& depth) {
+    if (--depth < 0) {
+        return false;
+    }
+
     regex split_re(split.pattern(), regex_constants::ECMAScript);
     sregex_token_iterator parts(str.begin(), str.end(), split_re, -1);
     sregex_token_iterator parts_end;
 
+    bool ok;
     auto part = split.part();
     auto any = split.any();
     unsigned int index = 0;
     for (; parts != parts_end; ++parts, ++index) {
-        bool ok = apply_metric_filter_match_string_split_part(part, *parts, index);
-        if (any && ok) { // Short-circuit logical OR.
-            return true;
+        bool part_ok = apply_metric_filter_match_string_split_part(part, *parts, index, depth);
+        if (any && part_ok) { // Short-circuit logical OR.
+            ok = true;
+            goto done;
         }
-        if (!any && !ok) { // Short-circuit logical AND.
-            return false;
+        if (!any && !part_ok) { // Short-circuit logical AND.
+            ok = false;
+            goto done;
         }
     }
+    ok = !any && index > 0;
 
-    return !any && index > 0;
+ done:
+    if (depth >= 0) {
+        ++depth;
+    }
+    return ok;
 }
 
 //--------------------------------------------------------------------------------------------------
 static bool apply_metric_filter_match_string(const StatsMetricMatchString& match,
-                                             const string str) {
+                                             const string str,
+                                             int& depth) {
+    if (--depth < 0) {
+        return false;
+    }
+
     bool ok = false;
     switch (match.method_case()) {
     case StatsMetricMatchString::MethodCase::kExact:
@@ -365,7 +402,7 @@ static bool apply_metric_filter_match_string(const StatsMetricMatchString& match
         break;
 
     case StatsMetricMatchString::MethodCase::kSplit:
-        ok = apply_metric_filter_match_string_split(match.split(), str);
+        ok = apply_metric_filter_match_string_split(match.split(), str, depth);
         break;
 
     case StatsMetricMatchString::MethodCase::METHOD_NOT_SET:
@@ -374,6 +411,9 @@ static bool apply_metric_filter_match_string(const StatsMetricMatchString& match
         break;
     }
 
+    if (depth >= 0) {
+        ++depth;
+    }
     return ok;
 }
 
@@ -435,7 +475,8 @@ static void apply_metric_filter_match_indices(const StatsMetricMatchIndices& ind
 //--------------------------------------------------------------------------------------------------
 static void apply_metric_filter_match_label(const StatsMetricMatchLabel& label,
                                             const struct stats_for_each_spec* spec,
-                                            BitArray& valid) {
+                                            BitArray& valid,
+                                            int& depth) {
     bool has_key = label.has_key();
     auto key = label.key();
 
@@ -446,12 +487,12 @@ static void apply_metric_filter_match_label(const StatsMetricMatchLabel& label,
         auto v = &spec->values[n];
         for (auto vl = v->labels; vl < &v->labels[v->nlabels]; ++vl) {
             // Treat missing key as a wildcard that always matches.
-            if (has_key && !apply_metric_filter_match_string(key, vl->key)) {
+            if (has_key && !apply_metric_filter_match_string(key, vl->key, depth)) {
                 continue;
             }
 
             // Treat missing value as a wildcard that always matches.
-            if (has_value && !apply_metric_filter_match_string(value, vl->value)) {
+            if (has_value && !apply_metric_filter_match_string(value, vl->value, depth)) {
                 continue;
             }
 
@@ -465,7 +506,8 @@ static void apply_metric_filter_match_label(const StatsMetricMatchLabel& label,
 static void apply_metric_filter_match(const struct stats_for_each_spec* spec,
                                       const StatsMetricMatch& match,
                                       const StatsMetricType type,
-                                      BitArray& valid) {
+                                      BitArray& valid,
+                                      int& depth) {
     bool ok = false;
     switch (match.attribute_case()) {
     case StatsMetricMatch::AttributeCase::kType:
@@ -475,22 +517,22 @@ static void apply_metric_filter_match(const struct stats_for_each_spec* spec,
 
     case StatsMetricMatch::AttributeCase::kDomain:
         // Validity is computed once for all indices since the attribute is shared by all values.
-        ok = apply_metric_filter_match_string(match.domain(), spec->domain->name);
+        ok = apply_metric_filter_match_string(match.domain(), spec->domain->name, depth);
         break;
 
     case StatsMetricMatch::AttributeCase::kZone:
         // Validity is computed once for all indices since the attribute is shared by all values.
-        ok = apply_metric_filter_match_string(match.zone(), spec->zone->name);
+        ok = apply_metric_filter_match_string(match.zone(), spec->zone->name, depth);
         break;
 
     case StatsMetricMatch::AttributeCase::kBlock:
         // Validity is computed once for all indices since the attribute is shared by all values.
-        ok = apply_metric_filter_match_string(match.block(), spec->block->name);
+        ok = apply_metric_filter_match_string(match.block(), spec->block->name, depth);
         break;
 
     case StatsMetricMatch::AttributeCase::kName:
         // Validity is computed once for all indices since the attribute is shared by all values.
-        ok = apply_metric_filter_match_string(match.name(), spec->metric->name);
+        ok = apply_metric_filter_match_string(match.name(), spec->metric->name, depth);
         break;
 
     case StatsMetricMatch::AttributeCase::kIndices:
@@ -500,7 +542,7 @@ static void apply_metric_filter_match(const struct stats_for_each_spec* spec,
 
     case StatsMetricMatch::AttributeCase::kLabel:
         // Validity is computed per index based on whether each value has the given labels.
-        apply_metric_filter_match_label(match.label(), spec, valid);
+        apply_metric_filter_match_label(match.label(), spec, valid, depth);
         return;
 
     case StatsMetricMatch::AttributeCase::ATTRIBUTE_NOT_SET:
@@ -516,10 +558,16 @@ static void apply_metric_filter_match(const struct stats_for_each_spec* spec,
 static void apply_metric_filter(const struct stats_for_each_spec* spec,
                                 const StatsMetricFilter& filter,
                                 const StatsMetricType type,
-                                BitArray& valid) {
+                                BitArray& valid,
+                                int& depth) {
+    if (--depth < 0) {
+        valid.clear_all();
+        return;
+    }
+
     switch (filter.term_case()) {
     case StatsMetricFilter::TermCase::kMatch:
-        apply_metric_filter_match(spec, filter.match(), type, valid);
+        apply_metric_filter_match(spec, filter.match(), type, valid, depth);
         break;
 
     case StatsMetricFilter::TermCase::kAnySet: {
@@ -532,7 +580,7 @@ static void apply_metric_filter(const struct stats_for_each_spec* spec,
 
         BitArray v(valid.size());
         for (const auto& member : set.members()) {
-            apply_metric_filter(spec, member, type, v);
+            apply_metric_filter(spec, member, type, v, depth);
             valid |= v;
             if (valid.is_all_set()) { // Short-circuit logical OR.
                 break;
@@ -552,7 +600,7 @@ static void apply_metric_filter(const struct stats_for_each_spec* spec,
 
         BitArray v(valid.size());
         for (const auto& member : set.members()) {
-            apply_metric_filter(spec, member, type, v);
+            apply_metric_filter(spec, member, type, v, depth);
             valid &= v;
             if (valid.is_all_cleared()) { // Short-circuit logical AND.
                 break;
@@ -571,13 +619,18 @@ static void apply_metric_filter(const struct stats_for_each_spec* spec,
     if (filter.negated()) {
         valid.negate_all();
     }
+
+    if (depth >= 0) {
+        ++depth;
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
 static void apply_filters(const struct stats_for_each_spec* spec,
                           const StatsFilters& filters,
                           const StatsMetricType type,
-                          BitArray& valid) {
+                          BitArray& valid,
+                          int& depth) {
     bool non_zero = filters.non_zero();
     for(unsigned int n = 0; n < spec->nvalues; ++n) {
         valid.assign_bit(n, !non_zero || spec->values[n].u64 != 0);
@@ -589,7 +642,7 @@ static void apply_filters(const struct stats_for_each_spec* spec,
 
     if (filters.has_metric_filter()) {
         BitArray v(valid.size());
-        apply_metric_filter(spec, filters.metric_filter(), type, v);
+        apply_metric_filter(spec, filters.metric_filter(), type, v, depth);
         valid &= v;
     }
 }
@@ -624,7 +677,8 @@ extern "C" {
         }
 
         BitArray valid(spec->nvalues);
-        apply_filters(spec, ctx->filters, type, valid);
+        int depth = MAX_METRIC_FILTER_DEPTH;
+        apply_filters(spec, ctx->filters, type, valid, depth);
         if (valid.is_all_cleared()) {
             return 0;
         }
@@ -706,7 +760,8 @@ extern "C" {
             .arg = NULL,
         };
         ctx->valid = new BitArray(spec->nvalues);
-        apply_metric_filter(&for_each_spec, ctx->filters.metric_filter(), type, *ctx->valid);
+        int depth = MAX_METRIC_FILTER_DEPTH;
+        apply_metric_filter(&for_each_spec, ctx->filters.metric_filter(), type, *ctx->valid, depth);
     }
 
     void clear_stats_filter_teardown([[maybe_unused]] const struct stats_clear_filter_spec* spec,
