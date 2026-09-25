@@ -73,6 +73,9 @@ enum ErrorCode {
     EC_SERVER_FAILED_GET_TIME = 800;
     EC_SERVER_INVALID_DEBUG_FLAG = 801;
     EC_SERVER_INVALID_CONTROL_STATS_FLAG = 802;
+
+    // Stats configuration error codes.
+    EC_STATS_METRIC_FILTER_TOO_DEEP = 900;
 }
 
 //--------------------------------------------------------------------------------------------------

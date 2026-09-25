@@ -66,6 +66,9 @@ ERROR_MAP = {
     ErrorCode.EC_MODULE_GPIO_READ_FAILED: 'module-gpio-read-failed',
     ErrorCode.EC_MODULE_GPIO_WRITE_FAILED: 'module-gpio-write-failed',
     ErrorCode.EC_MODULE_NOT_PRESENT: 'module-not-present',
+
+    # Stats configuration error codes.
+    ErrorCode.EC_STATS_METRIC_FILTER_TOO_DEEP: 'stats-metric-filter-too-deep',
 }
 
 def error_code_str(ec):

@@ -82,6 +82,9 @@ enum ErrorCode {
     EC_REGISTER_VALUE_EXCEEDS_BIT_WIDTH = 615;
     EC_MISSING_REGISTER_SLICES = 616;
     EC_MISSING_REGISTERS_IN_SLICE = 617;
+
+    // Stats configuration error codes.
+    EC_STATS_METRIC_FILTER_TOO_DEEP = 700;
 }
 
 //--------------------------------------------------------------------------------------------------

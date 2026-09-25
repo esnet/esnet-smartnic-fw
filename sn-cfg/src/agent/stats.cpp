@@ -626,25 +626,23 @@ static void apply_metric_filter(const struct stats_for_each_spec* spec,
 }
 
 //--------------------------------------------------------------------------------------------------
-static void apply_filters(const struct stats_for_each_spec* spec,
-                          const StatsFilters& filters,
-                          const StatsMetricType type,
-                          BitArray& valid,
-                          int& depth) {
+static int apply_filters(const struct stats_for_each_spec* spec,
+                         const StatsFilters& filters,
+                         const StatsMetricType type,
+                         BitArray& valid) {
     bool non_zero = filters.non_zero();
     for(unsigned int n = 0; n < spec->nvalues; ++n) {
         valid.assign_bit(n, !non_zero || spec->values[n].u64 != 0);
     }
 
-    if (valid.is_all_cleared()) {
-        return;
-    }
-
-    if (filters.has_metric_filter()) {
+    int depth = MAX_METRIC_FILTER_DEPTH;
+    if (!valid.is_all_cleared() && filters.has_metric_filter()) {
         BitArray v(valid.size());
         apply_metric_filter(spec, filters.metric_filter(), type, v, depth);
         valid &= v;
     }
+
+    return depth;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -677,8 +675,12 @@ extern "C" {
         }
 
         BitArray valid(spec->nvalues);
-        int depth = MAX_METRIC_FILTER_DEPTH;
-        apply_filters(spec, ctx->filters, type, valid, depth);
+        int depth = apply_filters(spec, ctx->filters, type, valid);
+        if (depth < 0) {
+            ctx->err = ErrorCode::EC_STATS_METRIC_FILTER_TOO_DEEP;
+            return 0;
+        }
+
         if (valid.is_all_cleared()) {
             return 0;
         }
@@ -762,6 +764,9 @@ extern "C" {
         ctx->valid = new BitArray(spec->nvalues);
         int depth = MAX_METRIC_FILTER_DEPTH;
         apply_metric_filter(&for_each_spec, ctx->filters.metric_filter(), type, *ctx->valid, depth);
+        if (depth < 0) {
+            ctx->err = ErrorCode::EC_STATS_METRIC_FILTER_TOO_DEEP;
+        }
     }
 
     void clear_stats_filter_teardown([[maybe_unused]] const struct stats_clear_filter_spec* spec,
