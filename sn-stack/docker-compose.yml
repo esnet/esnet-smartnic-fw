@@ -102,8 +102,14 @@ services:
           # trim the extra trailing "A" from the quirky JTAG serial number to get the actual USB serial number
           export HW_USB_SERIAL="$${HW_TARGET_SERIAL%A}"
         fi
+
+        case "$${SN_HW_BOARD}" in
+            av80) INTF_PORT_ID='if02-port0' ;;
+               *) INTF_PORT_ID='if01-port0' ;;
+        esac
+
         ls -l /dev/serial/by-id/
-        export HW_SC_UART_DEV="$$(ls /dev/serial/by-id/usb-Xilinx_*_$${HW_USB_SERIAL}-if01-port0)"
+        export HW_SC_UART_DEV="$$(ls /dev/serial/by-id/usb-Xilinx_*_$${HW_USB_SERIAL}-$${INTF_PORT_ID})"
         echo "Logging console output from device $${HW_SC_UART_DEV}"
         [ -r $$HW_SC_UART_DEV ] || exit 1
         socat stdout $${HW_SC_UART_DEV},sane,rawer,b115200,cs8,parenb=0,igncr
