@@ -22,6 +22,15 @@ foreach reg {extended_idcode usercode dna jtag_status error_status} {
     puts "----------------------------------------\n[device status -hex $reg]"
 }
 
+set USR_ACCESS_ADRR    0xf2014168
+set JTAG_USERCODE_ADRR 0xf11a0008
+
+puts "----------------------------------------"
+puts "PLM_RTCA USR_ACCESS   => [mrd $USR_ACCESS_ADRR]"
+puts "PMC_JTAG_CSR USERCODE => [mrd $JTAG_USERCODE_ADRR]"
+puts "                      => [rrd pmc_tap]"
+puts "----------------------------------------"
+
 puts "\nAsserting reset of PCIe controllers."
 rwr cpm5_crx rst_pcie0 1
 rwr cpm5_crx rst_pcie1 1

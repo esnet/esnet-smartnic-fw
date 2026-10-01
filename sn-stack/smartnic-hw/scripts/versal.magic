@@ -1,4 +1,11 @@
 #----------------------------------------------------------------------------------------------------
+0             name optional_data_table
+>0            leshort !33
+>>(&0.s*4)    use optional_data_table
+>0            leshort 33
+>>4           string x <ESnet optional data: %s>
+
+#----------------------------------------------------------------------------------------------------
 # Rules for parsing the Versal Adaptive SoC Image Header Table
 # Reference: https://docs.amd.com/r/en-US/ug1283-bootgen-user-guide/Versal-Adaptive-SoC-Image-Header-Table
 0          name image_header_table
@@ -48,6 +55,8 @@
 0                 name boot_header
 >(0xc4.l)         use image_header_table
 >0x00             use boot_header_smap_bus_width
+>(0xc4.l+0x58)    lelong !0
+>>&0x24           use optional_data_table
 
 #----------------------------------------------------------------------------------------------------
 # Rules for parsing the Versal Adaptive SoC Boot Header
