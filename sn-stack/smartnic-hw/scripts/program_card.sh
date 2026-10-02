@@ -133,11 +133,8 @@ case "${dev_type}" in
         echo "Using target PDI: ${IMAGE_PATH}"
         echo "    ${file_type}"
 
-        # TODO: Missing support for checking the version and for resetting PCIe using VIO probes.
-        #       Skip the check until version info can be inserted into PDI optional data section.
+        # Resetting PCIe is performed via xsdb register writes, not VIO probes.
         PROBES_PATH=''
-        LOAD_MODE='FORCE'
-        FPGA_VERSION_OK=1
         ;;
 
     *)
@@ -154,11 +151,15 @@ case "${dev_type}" in
         echo "Using target bitfile: ${IMAGE_PATH}"
         echo "    ${file_type}"
 
-        # Check if we are already running the correct FPGA version
-        /scripts/check_fpga_version.sh "${HW_SERVER_URL}" "${HW_TARGET_SERIAL}" "${IMAGE_PATH}"
-        FPGA_VERSION_OK=$?
         ;;
 esac
+
+# Check if we are already running the correct FPGA version
+/scripts/${dev_type:+${dev_type}_}check_fpga_version.sh \
+    "${HW_SERVER_URL}" \
+    "${HW_TARGET_SERIAL}" \
+    "${IMAGE_PATH}"
+FPGA_VERSION_OK=$?
 
 # Helper for mapping a single endpoint to it's parent root port.
 PCI_DEVICES='/sys/bus/pci/devices'
