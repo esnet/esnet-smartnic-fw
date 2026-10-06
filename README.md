@@ -170,6 +170,8 @@ Download the Alveo Smartnic Satellite Controller Update Tool
 Download the latest Satellite Controller Firmware Releases
 * Open a web browser to this page: https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
 * At the bottom of the page under the `Files` section
+  * Download `SC_U200_U250_4_6_21.zip`
+    * Save the file as exactly `SC_U200_U250_4_6_21.zip`
   * Download `SC_U280_4_3_31.zip`
     * Save the file as exactly `SC_U280_4_3_31.zip`
   * Download `SC_U55C_7_1_24.zip`
@@ -191,6 +193,7 @@ The flash update tool (`xbflash2`) is used to convert the Xilinx FPGA card from 
 $ tree downloads/
 downloads/
 ├── loadsc_v2.3.zip
+├── SC_U200_U250_4_6_21.zip
 ├── SC_U280_4_3_31.zip
 ├── SC_U55C_7_1_24.zip
 ├── SHA256SUMS

@@ -562,9 +562,10 @@ sudo journalctl --output=short-iso-precise -u 'smartnic-*' --boot
 # Upgrade the Alveo FPGA card's Satellite Controller (SC) firmware
 
 The SmartNIC application stack requires a minimum firmware version on the Satellite Controller (SC).  If your SC firmware is older than these versions, you must upgrade it in order to use the SmartNIC application stack provided in this repository.
+* au250: `4.6.21`
 * au280: `4.3.31`
 * au55c: `7.1.24`
-(minimum required SC FW versions as of 2026-04)
+(minimum required SC FW versions as of 2026-10)
 
 **WARNING** This process has some risk of "bricking" (ie. rendering it unrecoverable / unusable) the Xilinx FPGA card.  If it is bricked, it will have to be returned/repaired via an RMA process with the vendor.  We have never had this happen to a U280 card (>200 individual SC FW upgrades over 80+ cards).  We have had one U55C FPGA card become bricked during an SC FW upgrade (at the time, this card was attached to QSFP optics that seemed to be causing communication problems but the root cause of the bricked card is still unknown as of March 2026).
 
