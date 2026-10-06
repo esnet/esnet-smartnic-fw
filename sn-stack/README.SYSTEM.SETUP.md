@@ -574,10 +574,10 @@ The implementation of the SC firmware update process is entirely within the clos
 
 **WARNING** If you are unsure of what you are doing, please consult your Xilinx support team for advice and assistance rather than following these instructions on your own.  Please include a pointer to this project's git repo in your Xilinx support request so that they have context for your request.
 
-For general information about the Satellite Controller, refer to: https://xilinx.github.io/Alveo-Cards/master/management-specification/oob-intro.html
-For general information about the Card Management Controller blocks, refer to: https://docs.amd.com/r/en-US/pg348-cms-subsystem/Introduction
-For the latest Satellite Controller Firmware versions, refer to: https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
-For details about the Xilinx Alveo FPGA card RMA process, refer to: https://adaptivesupport.amd.com/s/article/72533
+* For general information about the Satellite Controller, refer to: https://xilinx.github.io/Alveo-Cards/master/management-specification/oob-intro.html
+* For general information about the Card Management Controller blocks, refer to: https://docs.amd.com/r/en-US/pg348-cms-subsystem/Introduction
+* For the latest Satellite Controller Firmware versions, refer to: https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
+* For details about the Xilinx Alveo FPGA card RMA process, refer to: https://adaptivesupport.amd.com/s/article/72533
 
 **WARNING** Do NOT automate this sequence and run it repeatedly expecting it to be idempotent.  It will erase and re-write the SC firmware even if it's already running the desired version.  The `loadsc` tool does not detect/skip this scenario and automating this update step may repeatedly risk bricking your card for no benefit.
 
