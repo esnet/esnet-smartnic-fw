@@ -562,9 +562,10 @@ sudo journalctl --output=short-iso-precise -u 'smartnic-*' --boot
 # Upgrade the Alveo FPGA card's Satellite Controller (SC) firmware
 
 The SmartNIC application stack requires a minimum firmware version on the Satellite Controller (SC).  If your SC firmware is older than these versions, you must upgrade it in order to use the SmartNIC application stack provided in this repository.
+* au250: `4.6.21`
 * au280: `4.3.31`
 * au55c: `7.1.24`
-(minimum required SC FW versions as of 2026-04)
+(minimum required SC FW versions as of 2026-10)
 
 **WARNING** This process has some risk of "bricking" (ie. rendering it unrecoverable / unusable) the Xilinx FPGA card.  If it is bricked, it will have to be returned/repaired via an RMA process with the vendor.  We have never had this happen to a U280 card (>200 individual SC FW upgrades over 80+ cards).  We have had one U55C FPGA card become bricked during an SC FW upgrade (at the time, this card was attached to QSFP optics that seemed to be causing communication problems but the root cause of the bricked card is still unknown as of March 2026).
 
@@ -574,10 +575,10 @@ The implementation of the SC firmware update process is entirely within the clos
 
 **WARNING** If you are unsure of what you are doing, please consult your Xilinx support team for advice and assistance rather than following these instructions on your own.  Please include a pointer to this project's git repo in your Xilinx support request so that they have context for your request.
 
-For general information about the Satellite Controller, refer to: https://xilinx.github.io/Alveo-Cards/master/management-specification/oob-intro.html
-For general information about the Card Management Controller blocks, refer to: https://docs.amd.com/r/en-US/pg348-cms-subsystem/Introduction
-For the latest Satellite Controller Firmware versions, refer to: https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
-For details about the Xilinx Alveo FPGA card RMA process, refer to: https://adaptivesupport.amd.com/s/article/72533
+* For general information about the Satellite Controller, refer to: https://xilinx.github.io/Alveo-Cards/master/management-specification/oob-intro.html
+* For general information about the Card Management Controller blocks, refer to: https://docs.amd.com/r/en-US/pg348-cms-subsystem/Introduction
+* For the latest Satellite Controller Firmware versions, refer to: https://adaptivesupport.amd.com/s/article/Alveo-Custom-Flow-Latest-CMS-IP-and-SC-FW
+* For details about the Xilinx Alveo FPGA card RMA process, refer to: https://adaptivesupport.amd.com/s/article/72533
 
 **WARNING** Do NOT automate this sequence and run it repeatedly expecting it to be idempotent.  It will erase and re-write the SC firmware even if it's already running the desired version.  The `loadsc` tool does not detect/skip this scenario and automating this update step may repeatedly risk bricking your card for no benefit.
 

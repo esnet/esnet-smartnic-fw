@@ -106,4 +106,5 @@ chmod 755 sn-bootstrap/loadsc
 # Unpack SC FW images and normalize the embedded text file names
 unzip -o -j -d sn-bootstrap downloads/SC_U280_4_3_31.zip SC_U280_4_3_31.txt
 unzip -o -j -d sn-bootstrap downloads/SC_U55C_7_1_24.zip SC_U55C_7_1_24/SC_U55C_7_1_24.txt
+unzip -o -j -d sn-bootstrap downloads/SC_U200_U250_4_6_21.zip SC_U200_U250_4_6_21.txt
 

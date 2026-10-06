@@ -140,6 +140,7 @@ bootstrap:
     # Download SC FW assets from dispense which match the files that external users would download manually
     - wget -q -P downloads ${DISPENSE_BASE_URL}/SC_U280_4_3_31.zip
     - wget -q -P downloads ${DISPENSE_BASE_URL}/SC_U55C_7_1_24.zip
+    - wget -q -P downloads ${DISPENSE_BASE_URL}/SC_U200_U250_4_6_21.zip
 
     # Download loadsc tool assets from dispense which are not directly available on xilinx.com
     - wget -q -P downloads ${DISPENSE_BASE_URL}/loadsc_v2.3.zip
