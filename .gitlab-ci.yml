@@ -1,18 +1,21 @@
 ---
 include:
   - template: 'Workflows/Branch-Pipelines.gitlab-ci.yml'
-  - project: 'security/container-scanning'
-    file: '.ESnet-container-scan.yml'
-  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.3.5
+  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.4.0
     inputs:
       aap_host:  $AAP_HOST
       aap_token: $AAP_TOKEN
-  - component: $CI_SERVER_FQDN/ht/cicd-common/harbor-cve@v0.3.5
+  - component: $CI_SERVER_FQDN/ht/cicd-common/harbor-cve@v0.4.0
     inputs:
       harbor_host:    $HSITE
       harbor_user:    $HUSER_CVE
       harbor_token:   $HTOKEN_CVE
       harbor_project: $CI_PROJECT_NAMESPACE
+  - component: $CI_SERVER_FQDN/ht/cicd-common/trivy-scan@v0.4.0
+    inputs:
+      #trivy_version: 0.74.0
+      trivy_username: $HUSER_RO
+      trivy_password: $HTOKEN_RO
 
 workflow:
   name: '$SN_HW_APP_NAME - $SN_HW_GROUP/$SN_HW_REPO ($SN_HW_BRANCH) $SN_HW_BOARD'
@@ -267,17 +270,28 @@ package:
       variables:
         TAG_SUFFIX: -dev
 
+# Instantiates the template from the cicd-common/harbor-cve component
 pull_cve_allowlist:
   extends: .harbor_cve_allowlist
 
-container_scanning:
+# Instantiates the template from the cicd-common/trivy-scan component
+trivy_scan:
+  extends: .trivy_scan
   variables:
-    CS_REGISTRY_USER: $HUSER_RO
-    CS_REGISTRY_PASSWORD: $HTOKEN_RO
+    TRIVY_IGNORE_POLICY: vulnerability-policy.rego
     CS_IMAGE: $SMARTNIC_FW_IMAGE_URI
-  # use 'dependencies' here rather than 'needs' since the gitlab container scanning
-  # include sets 'dependencies: []' which takes precedence over 'needs'
-  dependencies:
+  before_script:
+    # Provide an OPA vulnerability policy file
+    - |
+      cat <<_EOF > vulnerability-policy.rego
+      package trivy
+
+      ignore {
+        input.Type == "vulnerability"
+        input.PkgName == "linux-libc-dev"
+      }
+      _EOF
+  needs:
     - pull_cve_allowlist
     - package
 
