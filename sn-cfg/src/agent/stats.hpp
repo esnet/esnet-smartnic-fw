@@ -7,15 +7,7 @@ using namespace sn_cfg::v2;
 using namespace std;
 
 //--------------------------------------------------------------------------------------------------
-struct GetStatsContext {
-    const StatsFilters& filters;
-    Stats* stats;
-};
-
-extern "C" {
-int get_stats_for_each_metric(const struct stats_for_each_spec* spec);
-}
-
-void clear_stats_zone(struct stats_zone* zone, const StatsFilters& filters);
+ErrorCode get_stats_zone(struct stats_zone* zone, const StatsFilters& filters, Stats* stats);
+ErrorCode clear_stats_zone(struct stats_zone* zone, const StatsFilters& filters);
 
 #endif // STATS_HPP

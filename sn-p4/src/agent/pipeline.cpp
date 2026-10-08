@@ -463,11 +463,7 @@ void SmartnicP4Impl::get_or_clear_pipeline_stats(
         end_dev_id = dev_id;
     }
 
-    GetStatsContext ctx{
-        .filters = req.filters(),
-        .stats = NULL,
-    };
-
+    auto filters = req.filters();
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
 
@@ -490,18 +486,18 @@ void SmartnicP4Impl::get_or_clear_pipeline_stats(
         for (pipeline_id = begin_pipeline_id; pipeline_id <= end_pipeline_id; ++pipeline_id) {
             auto pipeline = dev->pipelines[pipeline_id];
             PipelineStatsResponse resp;
+            auto err = ErrorCode::EC_OK;
 
             if (pipeline->stats.counters != NULL) {
                 if (do_clear) {
-                    clear_stats_zone(pipeline->stats.counters->zone, ctx.filters);
+                    err = clear_stats_zone(pipeline->stats.counters->zone, filters);
                 } else {
-                    ctx.stats = resp.mutable_stats();
-                    stats_zone_for_each_metric(
-                        pipeline->stats.counters->zone, get_stats_for_each_metric, &ctx);
+                    err = get_stats_zone(
+                        pipeline->stats.counters->zone, filters, resp.mutable_stats());
                 }
             }
 
-            resp.set_error_code(ErrorCode::EC_OK);
+            resp.set_error_code(err);
             resp.set_dev_id(dev_id);
             resp.set_pipeline_id(pipeline_id);
 

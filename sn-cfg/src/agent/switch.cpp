@@ -423,24 +423,20 @@ void SmartnicConfigImpl::get_or_clear_switch_stats(
         end_dev_id = dev_id;
     }
 
-    GetStatsContext ctx{
-        .filters = req.filters(),
-        .stats = NULL,
-    };
-
+    auto filters = req.filters();
     for (dev_id = begin_dev_id; dev_id <= end_dev_id; ++dev_id) {
         const auto dev = devices[dev_id];
         auto& zones = dev->stats.zones[DeviceStatsZone::SWITCH_COUNTERS];
         SwitchStatsResponse resp;
+        auto err = ErrorCode::EC_OK;
 
         if (do_clear) {
-            clear_stats_zone(zones[0]->zone, ctx.filters);
+            err = clear_stats_zone(zones[0]->zone, filters);
         } else {
-            ctx.stats = resp.mutable_stats();
-            stats_zone_for_each_metric(zones[0]->zone, get_stats_for_each_metric, &ctx);
+            err = get_stats_zone(zones[0]->zone, filters, resp.mutable_stats());
         }
 
-        resp.set_error_code(ErrorCode::EC_OK);
+        resp.set_error_code(err);
         resp.set_dev_id(dev_id);
 
         write_resp(resp);
