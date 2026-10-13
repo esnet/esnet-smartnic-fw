@@ -1,0 +1,56 @@
+#----------------------------------------------------------------------------------------------------
+# Rules for parsing the Versal Adaptive SoC Image Header Table
+# Reference: https://docs.amd.com/r/en-US/ug1283-bootgen-user-guide/Versal-Adaptive-SoC-Image-Header-Table
+0          name image_header_table
+>0x00      lelong !0
+>>0x28     string/3/f IDP       Programmable Device Image
+>>>0x2b    string/1/f F         (Full)
+>>>0x2b    string/1/f P         (Partial)
+
+>0x00      lelong !0            \b (Version
+>>0x00     lelong 0x00020000    2)
+>>0x00     lelong 0x00030000    3)
+>>0x00     lelong 0x00040000    4)
+
+>0x04      lelong x             (# Images %u)
+>0x0c      lelong x             (# Partitions %u)
+>0x20      lelong x             (ID 0x%08x)
+
+>0x40      lelong 0             (Unencrypted)
+>0x40      lelong !0            \b (Encrypted
+>>0x40     lelong 0xa5c3c5a3    eFUSE Red Key)
+>>0x40     lelong 0xa5c3c5a5    eFUSE Black Key)
+>>0x40     lelong 0x3a5c3c5a    BBRAM Red Key)
+>>0x40     lelong 0x3a5c3c59    BBRAM Black Key)
+>>0x40     lelong 0xa35c7c53    Boot Header Black Key)
+
+#----------------------------------------------------------------------------------------------------
+# Rules for parsing the Boot Header's SelectMAP Bus Width field
+0         name boot_header_smap_bus_width
+>0x00     lelong 0xdd000000
+>>0x04    lelong 0x44332211
+>>0x08    lelong 0x88776655
+>>0x0c    lelong 0xccbbaa99    (SelectMAP Bus Width x8)
+
+>0x00     lelong 0x00dd0000
+>>0x04    lelong 0x33441122
+>>0x08    lelong 0x77885566
+>>0x0c    lelong 0xbbcc99aa    (SelectMAP Bus Width x16)
+
+>0x00     lelong 0x000000dd
+>>0x04    lelong 0x11223344
+>>0x08    lelong 0x55667788
+>>0x0c    lelong 0x99aabbcc    (SelectMAP Bus Width x32)
+
+#----------------------------------------------------------------------------------------------------
+# Rules for parsing the Versal Adaptive SoC Boot Header
+# Reference: https://docs.amd.com/r/en-US/ug1283-bootgen-user-guide/Versal-Adaptive-SoC-Boot-Header
+0                 name boot_header
+>(0xc4.l)         use image_header_table
+>0x00             use boot_header_smap_bus_width
+
+#----------------------------------------------------------------------------------------------------
+# Rules for parsing the Versal Adaptive SoC Boot Header
+# Reference https://docs.amd.com/r/en-US/ug1283-bootgen-user-guide/Versal-Adaptive-SoC-Boot-Image-Format
+0x14       string/4/f XNLX    AMD/Xilinx
+>&-0x18    use boot_header
