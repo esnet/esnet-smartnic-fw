@@ -513,11 +513,10 @@ services:
         condition: service_completed_successfully
     environment:
       <<: *smartnic-environment
+      EXTRA_PCIE_DEVS: ${EXTRA_PCIE_DEVS:-}
+
       # Tell python to do unbuffered IO to stdout
       PYTHONUNBUFFERED: 1
-      VFIO_UNLOCK_PF: ${FPGA_PCIE_DEV}.0 ${FPGA_PCIE_DEV}.1
-      VFIO_UNLOCK_VF: ""
-      VFIO_UNLOCK_BAR: 2
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev/vfio:/dev/vfio
@@ -534,7 +533,35 @@ services:
       - -o
       - pipefail
       - -x
-      - /scripts/vfio-unlock.py
+      - |
+        opts=()
+        opts+=("--pf=${FPGA_PCIE_DEV}.0")
+        opts+=("--pf=${FPGA_PCIE_DEV}.1")
+
+        case "$${SN_HW_BOARD}" in
+            av80)
+                for dev in $${EXTRA_PCIE_DEVS}; do
+                    for func in 0 1; do
+                        bdf="$${dev}.$${func}"
+                        drv="/sys/bus/pci/devices/$${bdf}/driver"
+                        if [ -e "$${drv}" ]; then
+                            drv_name=$$(basename $$(readlink "$${drv}"))
+                            if [ "$${drv_name}" = "vfio-pci" ]; then
+                                opts+=("--pf=$${bdf}")
+                            fi
+                        fi
+                    done
+                done
+
+                opts+=("--bar=-1")
+                ;;
+
+            *)
+                opts+=("--bar=2")
+                ;;
+        esac
+
+        /scripts/vfio-unlock.py "$${opts[@]}"
     profiles:
       - smartnic-mgr-vfio-unlock
 
