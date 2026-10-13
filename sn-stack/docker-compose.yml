@@ -308,6 +308,7 @@ services:
     environment:
       <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
+      EXTRA_PCIE_DEVS: ${EXTRA_PCIE_DEVS:-}
     volumes:
       - bitfiles:/bitfiles:ro
       - type: bind
@@ -330,10 +331,11 @@ services:
         /scripts/program_card.sh \
           xilinx-hwserver:3121 \
           "${HW_TARGET_SERIAL:-*}" \
-          /bitfiles/esnet-smartnic.bit \
-          /bitfiles/debug_nets.ltx \
+          /bitfiles/esnet-smartnic.img \
+          /bitfiles/esnet-smartnic.ltx \
+          AUTO `# Use "FORCE" to ignore version check` \
           $FPGA_PCIE_DEV \
-          # FORCE
+          $${EXTRA_PCIE_DEVS}
     profiles:
       - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual

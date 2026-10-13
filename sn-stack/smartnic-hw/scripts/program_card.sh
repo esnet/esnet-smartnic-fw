@@ -2,20 +2,23 @@
 
 function usage() {
     echo ""
-    echo "Usage: $(basename $0) <hw_server_url> <hw_target_serial> <bitfile_path> <probes_path> <pcie_device_addr> [FORCE]"
+    echo "Usage: $(basename $0) <hw_server_url> <hw_target_serial> <image_path> <probes_path> <load_mode> <pcie_device_addrs>"
     echo "  hw_server_url: host:port for xilinx hw_server (e.g. xilinx-hwserver:3121)"
     echo "  hw_target_serial: serial number of serial JTAG device (e.g. 21770205K01Y)"
     echo "     can be discovered with: lsusb -v -d 0403:6011 | grep iSerial"
     echo "     can be set to '*' to select the first serial JTAG device that is found"
-    echo "  bitfile_path: full path to the .bit file to be loaded into the fpga"
+    echo "  image_path: full path to the .bit/.pdi image file to be loaded into the fpga"
     echo "  probes_path: full path to the .ltx debug probes file containing the VIOs for resetting the PCIe endpoint. If the file does not exist, the reset is skipped"
-    echo "  pcie_device_addr: pcie domain:bus:device (e.g. 0000:81:00)"
-    echo "  FORCE: optionally force a reload even if the USERCODE/UserID fields match"
+    echo "  load_mode: specifies the conditions under which the FPGA is loaded"
+    echo "    - AUTO:  don't reload if the USERCODE/UserID fields match"
+    echo "    - FORCE: force a reload even if the USERCODE/UserID fields match"
+    echo "  pcie_device_addrs: one (or more) pcie domain:bus:device (e.g. 0000:81:00)"
+    echo "    Note that multiple device addresses are supported in the event that the FPGA's PCIe interface has been bifurcated into two or more endpoints."
     echo ""
 }
 
 # Make sure the caller has provided the required parameters
-if [ "$#" -lt 5 ] ; then
+if [ "$#" -lt 6 ] ; then
     echo "ERROR: Missing required parameter(s)"
     usage
     exit 1
@@ -37,10 +40,55 @@ echo "Using USB-JTAG cable with serial: $1"
 HW_TARGET_SERIAL=$1
 shift
 
+# Make sure the image file exists and is readable
+IMAGE_PATH="$(readlink -f $1)"
+shift
+
+if [ ! -e "${IMAGE_PATH}" ] ; then
+    echo "ERROR: Image file does not exist: ${IMAGE_PATH}"
+    exit 1
+fi
+if [ ! -r "${IMAGE_PATH}" ] ; then
+    echo "ERROR: Image file at ${IMAGE_PATH} is not readable"
+    exit 1
+fi
+
+echo "Using debug probes file: $1"
+PROBES_PATH=$1
+shift
+
+echo "Using FPGA loading mode: $1"
+LOAD_MODE=$1
+shift
+
+# Grab the FPGA device addresses
+echo "Expecting to reprogram PCIe device(s): $@"
+FPGA_PCIE_DEVS=("$@")
+
+# Check if we're running on an AMD system and FORCE the FPGA to be reloaded even if USERCODE/UserID registers match
+# This is necessary due to many AMD systems not providing a proper PCIe hot-reset to the cards
+if ! [ -e "${PROBES_PATH}" ]; then
+    case $(lscpu --json | jq -r '.lscpu[] | select(.field == "Vendor ID:") | .data') in
+        AuthenticAMD)
+            echo "NOTE: Detected AMD CPU/chipset, enabling workaround for missing PCIe Hot Reset.  FPGA will be reloaded even if USERCODE/UserID registers match."
+            LOAD_MODE='FORCE'
+            ;;
+
+        GenuineIntel)
+            ;;
+
+        *)
+            ;;
+    esac
+fi
+
+if [ "${LOAD_MODE}" = "FORCE" ] ; then
+    echo "NOTE: Using the FORCE.  FPGA will be reloaded even if USERCODE/UserID registers match."
+fi
+
 # Helper for running a TCL script via Vivado Lab.
 vivado_lab_cmd() {
     local tcl_script="$1"; shift
-    local tcl_args="$@"
 
     vivado_lab \
         -nolog \
@@ -50,77 +98,70 @@ vivado_lab_cmd() {
         -notrace \
         -quiet \
         -source "${tcl_script}" \
-        -tclargs "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$@"
+        -tclargs "${HW_SERVER_URL}" "${HW_TARGET_SERIAL}" "$@"
 }
 
-# Make sure the bitfile exists and is readable
-if [ ! -e $1 ] ; then
-    echo "ERROR: Bitfile does not exist: $1"
-    exit 1
-fi
-if [ ! -r $1 ] ; then
-    echo "ERROR: Bitfile at $1 is not readable"
-    exit 1
-fi
+# Helper for running a TCL script via the Xilinx Software Debugger.
+xsdb_cmd() {
+    local tcl_script="$1"; shift
+    xsdb "${tcl_script}" "${HW_SERVER_URL}" "$@"
+}
 
-# Make sure the provided file looks like a xilinx bitfile
-file -b $1 | grep 'Xilinx BIT data' 2>&1 > /dev/null
+# Determine the type of FPGA device being operated on via JTAG.
+hw_dev=$(vivado_lab_cmd /scripts/get_hw_device.tcl)
 if [ $? -ne 0 ] ; then
-    echo "ERROR: Provided file does not appear to be Xilinx BIT data"
+    echo "Failed to determine HW device type, bailing out"
     exit 1
 fi
 
-# Looks like we have a sane bitfile to work with
-echo "Using target bitfile: $1"
-echo "    $(file -b $1)"
-BITFILE_PATH=$1
-shift
+case "${hw_dev}" in
+    xcv80_1) dev_type=versal ;;
+    *)       dev_type=''     ;;
+esac
 
-echo "Using debug probes file: $1"
-PROBES_PATH=$1
-shift
+case "${dev_type}" in
+    versal)
+        echo "Discovered Versal HW device: '${hw_dev}'"
 
-# Grab the FPGA device address
-echo "Expecting to reprogram PCIe device: $1"
-FPGA_PCIE_DEV=$1
-shift
+        file_type=$(file -m /scripts/versal.magic -b "${IMAGE_PATH}")
+        if ! echo "${file_type}" | grep -q ^'AMD/Xilinx Programmable Device Image'; then
+            echo "ERROR: Provided image file ${IMAGE_PATH} does not appear to be a Xilinx PDI"
+            exit 1
+        fi
 
-# Check for the optional FORCE parameter
-FORCE=0
-if [ "$#" -ge 1 ] ; then
-    if [ "x$1" = "xFORCE" ] ; then
-	echo "NOTE: Using the FORCE.  FPGA will be reloaded even if USERCODE/UserID registers match."
-	FORCE=1
-	shift
-    fi
-fi
+        # Looks like we have a sane pdi to work with
+        echo "Using target PDI: ${IMAGE_PATH}"
+        echo "    ${file_type}"
 
-# Check if we're running on an AMD system and FORCE the FPGA to be reloaded even if USERCODE/UserID registers match
-# This is necessary due to many AMD systems not providing a proper PCIe hot-reset to the cards
-if ! [ -e $PROBES_PATH ]; then
-    case $(lscpu --json | jq -r '.lscpu[] | select(.field == "Vendor ID:") | .data') in
-        AuthenticAMD)
-            echo "NOTE: Detected AMD CPU/chipset, enabling workaround for missing PCIe Hot Reset.  FPGA will be reloaded even if USERCODE/UserID registers match."
-            FORCE=1
-            ;;
-        GenuineIntel)
-            ;;
-        *)
-            ;;
-    esac
-fi
+        # TODO: Missing support for checking the version and for resetting PCIe using VIO probes.
+        #       Skip the check until version info can be inserted into PDI optional data section.
+        PROBES_PATH=''
+        LOAD_MODE='FORCE'
+        FPGA_VERSION_OK=1
+        ;;
 
-# Make note of any extra, ignored command line parameters
-if [ "$#" -gt 0 ] ; then
-    echo "WARNING: Ignoring extra command line parameters $@"
-fi
+    *)
+        echo "Discovered HW device: '${hw_dev}'"
 
-# First, check if we are already running the correct FPGA version
-/scripts/check_fpga_version.sh "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
-FPGA_VERSION_OK=$?
+        # Make sure the provided image file looks like a xilinx bitfile
+        file_type=$(file -b "${IMAGE_PATH}")
+        if ! echo "${file_type}" | grep -q 'Xilinx BIT data'; then
+            echo "ERROR: Provided image file ${IMAGE_PATH} does not appear to be Xilinx BIT data"
+            exit 1
+        fi
 
+        # Looks like we have a sane bitfile to work with
+        echo "Using target bitfile: ${IMAGE_PATH}"
+        echo "    ${file_type}"
+
+        # Check if we are already running the correct FPGA version
+        /scripts/check_fpga_version.sh "${HW_SERVER_URL}" "${HW_TARGET_SERIAL}" "${IMAGE_PATH}"
+        FPGA_VERSION_OK=$?
+        ;;
+esac
+
+# Helper for mapping a single endpoint to it's parent root port.
 PCI_DEVICES='/sys/bus/pci/devices'
-
 find_root_port() {
     local dev="$1"; shift
     local pci_id=($(echo "${dev}" | tr ':' ' '))
@@ -143,83 +184,112 @@ find_root_port() {
     return 1
 }
 
+# Helper for removing all physical functions associated with the given endpoints.
 remove_pcie_devices() {
-    local dev_id="$1"; shift
-    local devices=( $(find "${PCI_DEVICES}" -mindepth 1 -maxdepth 1 \
-                          -name "${dev_id}.*" -printf '%P\n' | sort -n) )
+    local dev_id
+    for dev_id in "$@"; do
+        local devices=( $(find "${PCI_DEVICES}" -mindepth 1 -maxdepth 1 \
+                              -name "${dev_id}.*" -printf '%P\n' | sort -n) )
 
-    # Disconnect any devices from the kernel
-    for dev in "${devices[@]}"; do
-        local dev_path="${PCI_DEVICES}/${dev}"
+        # Disconnect any devices from the kernel
+        for dev in "${devices[@]}"; do
+            local dev_path="${PCI_DEVICES}/${dev}"
 
-        echo "Removing PCIe device ${dev}"
-        echo 1 >"${dev_path}/remove"
+            echo "Removing PCIe device ${dev}"
+            echo 1 >"${dev_path}/remove"
 
-        echo "Waiting for uevent processing to settle"
-        udevadm settle
-        echo "Done settling uevents"
+            echo "Waiting for uevent processing to settle"
+            udevadm settle
+            echo "Done settling uevents"
 
-        echo "Waiting for removal of PCIe device ${dev}"
-        local remove_done=0
-        for ((i=0; i<10; i++)); do
-            if ! udevadm info "${dev_path}" &>/dev/null; then
-                echo "==> Done removal of PCIe device ${dev}"
-                remove_done=1
-                break
+            echo "Waiting for removal of PCIe device ${dev}"
+            local remove_done=0
+            for ((i=0; i<10; i++)); do
+                if ! udevadm info "${dev_path}" &>/dev/null; then
+                    echo "==> Done removal of PCIe device ${dev}"
+                    remove_done=1
+                    break
+                fi
+                sleep 1s
+            done
+
+            if ((remove_done != 1)); then
+                echo "==> Timed out waiting for removal of PCIe device ${dev}"
+                exit 1
             fi
-            sleep 1s
         done
-
-        if ((remove_done != 1)); then
-            echo "==> Timed out waiting for removal of PCIe device ${dev}"
-            exit 1
-        fi
     done
 
     return 0
 }
 
-ROOT_PORT=$(find_root_port "${FPGA_PCIE_DEV}")
-if [[ $? -eq 0 ]]; then
-    # Removing all devices from a PCIe root port that supports automatic power management will
-    # force the root port to transition from the D0 power state to D3hot.  When attempting a
-    # rescan, the wakeup proceedure on the root port is triggered rather than actually searching
-    # for devices as expected.  This results in no devices appearing and the need for a second
-    # rescan to actually find them.  By disabling automatic power control on the root port, it
-    # stays in the D0 state when it's devices are removed and does not require multiple rescans.
-    echo "Disabling automatic power control on PCIe root port ${ROOT_PORT} for device ${FPGA_PCIE_DEV}"
-    echo 'on' >"${PCI_DEVICES}/${ROOT_PORT}/power/control"
-else
-    echo "ERROR: Failed to find root port for PCIe device ${FPGA_PCIE_DEV}"
-    exit 1
-fi
+# Force power control in all parent root ports.
+for dev in "${FPGA_PCIE_DEVS[@]}"; do
+    root_port=$(find_root_port "${dev}")
+    if [[ $? -eq 0 ]]; then
+        # Removing all devices from a PCIe root port that supports automatic power management will
+        # force the root port to transition from the D0 power state to D3hot.  When attempting a
+        # rescan, the wakeup proceedure on the root port is triggered rather than actually searching
+        # for devices as expected.  This results in no devices appearing and the need for a second
+        # rescan to actually find them.  By disabling automatic power control on the root port, it
+        # stays in the D0 state when it's devices are removed and does not require multiple rescans.
+        echo "Disabling automatic power control on PCIe root port ${root_port} for device ${dev}"
+        echo 'on' >"${PCI_DEVICES}/${root_port}/power/control"
+    else
+        echo "ERROR: Failed to find root port for PCIe device ${dev}"
+        exit 1
+    fi
+done
 
-if [[ $FORCE -eq 0 && $FPGA_VERSION_OK -eq 0 ]] ; then
+if [[ "${LOAD_MODE}" != "FORCE" && ${FPGA_VERSION_OK} -eq 0 ]] ; then
     echo "Running and Target FPGA versions match"
 else
-    if [ $FPGA_VERSION_OK -eq 0 ] ; then
+    if [ ${FPGA_VERSION_OK} -eq 0 ] ; then
 	echo "Running versions match but an FPGA reprogramming was FORCE'd anyway"
     else
 	echo "Running version does not match Target version, reprogramming"
     fi
 
-    remove_pcie_devices $FPGA_PCIE_DEV
+    remove_pcie_devices "${FPGA_PCIE_DEVS[@]}"
+
+    case "${dev_type}" in
+        versal)
+            xsdb_cmd /scripts/versal_boot_mode.tcl JTAG yes
+            if [ $? -ne 0 ] ; then
+                echo "Failed to switch to JTAG boot mode, bailing out"
+                exit 1
+            fi
+            ;;
+
+        *)
+            ;;
+    esac
 
     # Program the bitfile into the FPGA
-    vivado_lab_cmd /scripts/program_card.tcl "$BITFILE_PATH"
+    vivado_lab_cmd /scripts/program_card.tcl "$IMAGE_PATH"
     if [ $? -ne 0 ] ; then
 	echo "Failed to load FPGA, bailing out"
 	exit 1
     fi
 
-    # Re-check if we have all expected devices on the bus now
-    /scripts/check_fpga_version.sh "$HW_SERVER_URL" "$HW_TARGET_SERIAL" "$BITFILE_PATH"
-    FPGA_VERSION_OK=$?
+    # Re-check if we have all expected version programmed now
+    case "${dev_type}" in
+        versal)
+            # TODO: Missing support for checking the version.
+            FPGA_VERSION_OK=0
+            ;;
+
+        *)
+            /scripts/check_fpga_version.sh "${HW_SERVER_URL}" "${HW_TARGET_SERIAL}" "${IMAGE_PATH}"
+            FPGA_VERSION_OK=$?
+            ;;
+    esac
+
     if [ $FPGA_VERSION_OK -eq 0 ] ; then
 	echo "Running and Target FPGA versions match"
     else
 	echo -n "Running version STILL does not match Target version.  "
-	if [ $FORCE -eq 1 ] ; then
+	if [ "${LOAD_MODE}" = "FORCE" ] ; then
 	    echo "Continuing anyway due to FORCE option."
 	else
 	    echo "Bailing out!"
@@ -228,18 +298,50 @@ else
     fi
 fi
 
-if [ -e $PROBES_PATH ]; then
-    remove_pcie_devices $FPGA_PCIE_DEV
+case "${dev_type}" in
+    versal)
+        remove_pcie_devices "${FPGA_PCIE_DEVS[@]}"
+        xsdb_cmd /scripts/versal_pcie_reset.tcl
+        if [ $? -ne 0 ] ; then
+            echo "Failed to reset PCIe endpoint, bailing out"
+            exit 1
+        fi
+        ;;
 
-    # Perform the reset of the PCIe endpoint via VIOs.
-    vivado_lab_cmd /scripts/pcie_reset.tcl "$PROBES_PATH"
-    if [ $? -ne 0 ] ; then
-        echo "Failed to reset PCIe endpoint, bailing out"
-        exit 1
-    fi
-else
-    echo "Skipping reset of PCIe endpoint due to not having probes"
-fi
+    *)
+        if [ -e "${PROBES_PATH}" ]; then
+            remove_pcie_devices "${FPGA_PCIE_DEVS[@]}"
 
-# Always rescan the PCIe bus under the parent port for this FPGA card
-/scripts/rescan_pcie_bus.sh ${FPGA_PCIE_DEV}
+            # Perform the reset of the PCIe endpoint via VIOs.
+            vivado_lab_cmd /scripts/pcie_reset.tcl "${PROBES_PATH}"
+            if [ $? -ne 0 ] ; then
+                echo "Failed to reset PCIe endpoint, bailing out"
+                exit 1
+            fi
+        else
+            echo "Skipping reset of PCIe endpoint due to not having probes"
+        fi
+        ;;
+esac
+
+# Always rescan the PCIe bus under the parent port for the given FPGA endpoints.
+for dev in "${FPGA_PCIE_DEVS[@]}"; do
+    echo '========================================'
+    echo "Rescanning for endpoint ${dev}"
+    echo '----------------------------------------'
+    /scripts/rescan_pcie_bus.sh "${dev}"
+done
+
+# Restore boot mode to FLASH in the event of cold boot.
+case "${dev_type}" in
+    versal)
+        xsdb_cmd /scripts/versal_boot_mode.tcl FLASH no
+        if [ $? -ne 0 ] ; then
+            echo "Failed to restore FLASH boot mode, bailing out"
+            exit 1
+        fi
+        ;;
+
+    *)
+        ;;
+esac
