@@ -127,26 +127,51 @@ services:
       - pipefail
       - -x
       - |
-        rm -f /bitfiles/ok
-        fw_dir=/usr/local/lib/firmware/esnet-smartnic
-        for f in $${fw_dir}/esnet-smartnic.{bit,mcs} ; do
-          if [ -e $${f}.zst ] ; then
+        # Cleanup the any files if the volume already exists.
+        rm -f /bitfiles/*
+
+        declare -A IMG_EXTS
+        IMG_EXTS[bit]=1
+        IMG_EXTS[pdi]=1
+
+        NAME=esnet-smartnic
+        fw_dir=/usr/local/lib/firmware/$${NAME}
+
+        for ext in bit bin mcs pdi ; do
+          name=$${NAME}.$${ext}
+          path=$${fw_dir}/$${name}
+          if [ -e $${path}.zst ] ; then
             # input file is compressed, uncompress to output
-            unzstd --force --output-dir-flat /bitfiles $${f}.zst
-          else
+            unzstd --force --output-dir-flat /bitfiles $${path}.zst
+          elif [ -e $${path} ] ; then
             # input file is not compressed, just copy it to output
-            cp -a $${f} /bitfiles
+            cp -a $${path} /bitfiles
+          else
+            continue
           fi
+
+          if [ -v IMG_EXTS[$${ext}] ] ; then
+            ln -s $${name} /bitfiles/$${NAME}.img
+          fi
+
+          # Copy any metadata associated with a particular file type.
+          case $${ext} in
+            pdi)
+              cp -a $${fw_dir}/$${NAME}-uuid.txt /bitfiles
+              ;;
+
+            *)
+              ;;
+          esac
         done
 
-        probes=$${fw_dir}/debug_nets.ltx
-        if [ -e $${probes} ]; then
-          cp -a $${probes} /bitfiles
-        else
-          # Cleanup leftovers in a pre-existing volume when moving
-          # from an FPGA with VIOs to one without them.
-          rm -f /bitfiles/$$(basename $${probes})
-        fi
+        for name in debug_nets $${NAME} ; do
+          probes=$${fw_dir}/$${name}.ltx
+          if [ -e $${probes} ] ; then
+            cp -a $${probes} /bitfiles/$${NAME}.ltx
+            break
+          fi
+        done
 
         touch /bitfiles/ok
 
