@@ -390,6 +390,7 @@ services:
     environment:
       <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
+      EXTRA_PCIE_DEVS: ${EXTRA_PCIE_DEVS:-}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
@@ -405,14 +406,59 @@ services:
       - |
         # When vfio-pci is not builtin, ensure that it is loaded
         modinfo vfio-pci | egrep -q '^filename:\s+\(builtin\)$' || modprobe vfio-pci
+
+        PCIE_DEVS=()
+        case "$${SN_HW_BOARD}" in
+            av80)
+                dev_group=''
+                for dev in $${FPGA_PCIE_DEV} $${EXTRA_PCIE_DEVS}; do
+                    group=$$(basename $$(readlink "/sys/bus/pci/devices/$${dev}.0/iommu_group"))
+                    if [ "$${dev_group}" = "" ]; then
+                        dev_group="$${group}"
+                        PCIE_DEVS+=("$${dev}")
+                        continue
+                    fi
+
+                    if [ "$${group}" != "$${dev_group}" ]; then
+                        echo "IOMMU groups are different for $${dev} ($${group} != $${dev_group})"
+                        continue
+                    fi
+
+                    echo "IOMMU groups are the same for $${dev}"
+                    PCIE_DEVS+=("$${dev}")
+
+                    for func in 0 1; do
+                        bdf="$${dev}.$${func}"
+                        drv="/sys/bus/pci/devices/$${bdf}/driver"
+                        if [ -e "$${drv}" ]; then
+                            echo "Unbinding driver for $${bdf} (current driver $$(readlink $${drv}))"
+                            echo "$${bdf}" | tee "$${drv}/unbind"
+                        fi
+                    done
+                done
+                ;;
+
+            *)
+                PCIE_DEVS+=("$${FPGA_PCIE_DEV}")
+                ;;
+        esac
+
         # Bind the vfio-pci driver to each FPGA PF
-        dpdk-devbind.py -b vfio-pci $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
+        for dev in "$${PCIE_DEVS[@]}"; do
+            dpdk-devbind.py -b vfio-pci "$${dev}.0" "$${dev}.1"
+        done
+
+        # Wait for the binding events to settle and then check the status.
         udevadm settle
         dpdk-devbind.py --status
+
         # Confirm that the driver is properly bound to each FPGA PF
         # Note the <TAB> before vfio-pci in the grep command
-        lspci -D -kvm -s $$FPGA_PCIE_DEV.0 | grep '^Driver:	vfio-pci'
-        lspci -D -kvm -s $$FPGA_PCIE_DEV.1 | grep '^Driver:	vfio-pci'
+        for dev in "$${PCIE_DEVS[@]}"; do
+            for func in 0 1; do
+                lspci -D -kvm -s "$${dev}.$${func}" | grep '^Driver:	vfio-pci'
+            done
+        done
     profiles:
       - smartnic-mgr-user
       - smartnic-mgr-dpdk-portlink
