@@ -120,7 +120,7 @@ COPY dpdk-patches /dpdk-patches
 
 # Download build and install DPDK
 ARG DPDK_BASE_URL="https://fast.dpdk.org/rel"
-ARG DPDK_VER="22.11.2"
+ARG DPDK_VER="24.11.8"
 ARG DPDK_TOPDIR="/root/dpdk-stable-${DPDK_VER}"
 ARG DPDK_PLATFORM
 ARG DPDK_CPU_INSTRUCTION_SET
@@ -129,7 +129,7 @@ ARG SN_HW_BOARD
 ADD \
     --unpack=true \
     --chown=root:root \
-    --checksum=sha256:af64bdda15087ff8d429894b9ea6cbbbb6ee7a932bdb344f82b0dc366379a2d4 \
+    --checksum=sha256:f3dbfac841b2db8e53a97d68a5e14ebc943327a955f0afb97f8c14f544fbc4aa \
     $DPDK_BASE_URL/dpdk-$DPDK_VER.tar.xz \
     /root
 
