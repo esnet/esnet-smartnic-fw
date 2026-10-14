@@ -167,7 +167,6 @@ FROM builder AS pktgen
 
 # Import build artifacts from dpdk stage
 COPY --from=dpdk /dpdk-install-root/ /
-COPY pktgen-patches /pktgen-patches
 RUN ldconfig
 
 # Install the build dependencies for libdpdk
@@ -194,20 +193,19 @@ EOF
 
 # Build and install pktgen-dpdk
 ARG PKTGEN_BASE_URL="https://github.com/pktgen/Pktgen-DPDK/archive/refs/tags"
-ARG PKTGEN_VER=23.03.0
+ARG PKTGEN_VER=24.10.3
 ARG PKTGEN_TOPDIR="/root/Pktgen-DPDK-pktgen-${PKTGEN_VER}"
 
 ADD \
     --unpack=true \
     --chown=root:root \
-    --checksum=sha256:bc26afd81d25d4ba4f8307edaf59e29f23525af6bc10de77472cb41390412df9 \
+    --checksum=sha256:ff20b8a022fdfb0792e3a3a9c97298693d9d844a66f318e06f2bbe68c57caba4 \
     $PKTGEN_BASE_URL/pktgen-$PKTGEN_VER.tar.gz \
     /root
 
 RUN <<EOF
     set -ex
     cd $PKTGEN_TOPDIR
-    patch -p 1 < /pktgen-patches/0000-pktgen-compile-errors.patch
     export PKTGEN_DESTDIR=/pktgen-install-root
     make buildlua
     make install
