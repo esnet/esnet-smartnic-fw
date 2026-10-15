@@ -384,8 +384,8 @@ EOF
 # From https://github.com/grpc-ecosystem/grpc-health-probe/releases
 ADD \
     --chmod=755 \
-    --checksum=sha256:9193773627d3ed5a0fabe37ed81264b4a8e9d5a2156ce09fb6010caaabb0f06b \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.57/grpc_health_probe-linux-amd64 \
+    --checksum=sha256:b74ea9e3fe0e4fb19008a77422b6475e29141b30833a6f82c18941bf6eb6a136 \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.59/grpc_health_probe-linux-amd64 \
     /usr/local/bin/grpc_health_probe
 
 # Install gRPC debug tool (uncomment for inclusion).
