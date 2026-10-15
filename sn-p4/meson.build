@@ -1,5 +1,13 @@
 #---------------------------------------------------------------------------------------------------
 # C++ Agent
+
+extra_c_args = []
+if board != 'av80'
+    extra_c_args += [
+        '-DWITH_SYSCFG',
+    ]
+endif
+
 cpp = meson.get_compiler('cpp')
 libgmp_dep = cc.find_library('gmp')
 libgrpcpp_reflection_dep = cpp.find_library('grpc++_reflection')
@@ -48,6 +56,7 @@ executable(
         libsn_p4_proto_dep,
         regmap_dep,
     ],
+    cpp_args: extra_c_args,
     # Force linking all libs so that the unreferenced grpc++_reflection lib gets linked
     link_args: '-Wl,--no-as-needed',
     install: true,

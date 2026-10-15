@@ -10,10 +10,20 @@
 #include <grpc/grpc.h>
 #include "sn_cfg_v2.grpc.pb.h"
 
-#include "cms.h"
 #include "esnet_smartnic_toplevel.h"
+
+
+#ifdef WITH_CMS
+#include "cms.h"
+#endif
+
+#ifdef WITH_SYSCFG
 #include "syscfg_block.h"
+#endif
+
+#ifdef WITH_SYSMON
 #include "sysmon.h"
+#endif
 
 using namespace grpc;
 using namespace sn_cfg::v2;
@@ -52,7 +62,8 @@ static uint16_t read_hex_pci_id(const string& bus_id, const string& file) {
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::init_device(Device* dev) {
+void SmartnicConfigImpl::init_device([[maybe_unused]] Device* dev) {
+#ifdef WITH_SYSMON
     sysmon_master_reset(&dev->bar2->sysmon0);
 
     struct sysmon_info {
@@ -116,7 +127,9 @@ void SmartnicConfigImpl::init_device(Device* dev) {
         SERVER_LOG_LINE_INIT(device, INFO,
             "Setup monitors for sysmon " << n << " on device " << dev->bus_id);
     }
+#endif
 
+#ifdef WITH_CMS
     SERVER_LOG_LINE_INIT(device, INFO, "Initializing CMS on device " << dev->bus_id);
     dev->cms.blk = &dev->bar2->cms;
     cms_init(&dev->cms);
@@ -140,10 +153,12 @@ void SmartnicConfigImpl::init_device(Device* dev) {
     }
     dev->stats.zones[DeviceStatsZone::CARD_MONITORS].push_back(stats);
     SERVER_LOG_LINE_INIT(device, INFO, "Setup monitors for CMS on device " << dev->bus_id);
+#endif
 }
 
 //--------------------------------------------------------------------------------------------------
-void SmartnicConfigImpl::deinit_device(Device* dev) {
+void SmartnicConfigImpl::deinit_device([[maybe_unused]] Device* dev) {
+#ifdef WITH_SYSMON
     auto zones = &dev->stats.zones[DeviceStatsZone::SYSMON_MONITORS];
     while (!zones->empty()) {
         auto stats = zones->back();
@@ -152,7 +167,9 @@ void SmartnicConfigImpl::deinit_device(Device* dev) {
         zones->pop_back();
         delete stats;
     }
+#endif
 
+#ifdef WITH_CMS
     zones = &dev->stats.zones[DeviceStatsZone::CARD_MONITORS];
     while (!zones->empty()) {
         auto stats = zones->back();
@@ -163,8 +180,10 @@ void SmartnicConfigImpl::deinit_device(Device* dev) {
     }
 
     cms_destroy(&dev->cms);
+#endif
 }
 
+#ifdef WITH_CMS
 //--------------------------------------------------------------------------------------------------
 static void card_info_add_mac_addr(DeviceCardInfo* card, const struct ether_addr* addr) {
     const uint8_t* octets = addr->ether_addr_octet;
@@ -173,9 +192,11 @@ static void card_info_add_mac_addr(DeviceCardInfo* card, const struct ether_addr
              octets[0], octets[1], octets[2], octets[3], octets[4], octets[5]);
     card->add_mac_addrs(str);
 }
+#endif
 
 //--------------------------------------------------------------------------------------------------
-static ErrorCode add_card_info(Device* dev, DeviceInfo* info) {
+static ErrorCode add_card_info([[maybe_unused]] Device* dev, [[maybe_unused]] DeviceInfo* info) {
+#ifdef WITH_CMS
     auto ci = cms_card_info_read(&dev->cms);
     if (ci == NULL) {
         return ErrorCode::EC_CARD_INFO_READ_FAILED;
@@ -213,6 +234,7 @@ static ErrorCode add_card_info(Device* dev, DeviceInfo* info) {
     }
 
     cms_card_info_free(ci);
+#endif
 
     return ErrorCode::EC_OK;
 }
@@ -249,6 +271,7 @@ void SmartnicConfigImpl::get_device_info(
         pci->set_device_id(read_hex_pci_id(dev->bus_id, "device"));
 
         auto build = info->mutable_build();
+#ifdef WITH_SYSCFG
         volatile auto syscfg = &dev->bar2->syscfg;
 
         build->set_number(syscfg->usr_access);
@@ -256,6 +279,7 @@ void SmartnicConfigImpl::get_device_info(
         for (auto d = 0; d < SYSCFG_DNA_COUNT; ++d) {
             build->add_dna(syscfg->dna[d]);
         }
+#endif
 
         auto hw_ver = getenv("SN_HW_VER");
         auto fw_ver = getenv("SN_FW_VER");
@@ -362,8 +386,10 @@ void SmartnicConfigImpl::get_device_status(
         for (auto sysmon : dev->stats.zones[DeviceStatsZone::SYSMON_MONITORS]) {
             stats_zone_for_each_metric(sysmon->zone, __get_device_stats, &ctx);
         }
+#ifdef WITH_CMS
         stats_zone_for_each_metric(
             dev->stats.zones[DeviceStatsZone::CARD_MONITORS][0]->zone, __get_device_stats, &ctx);
+#endif
 
         resp.set_error_code(ErrorCode::EC_OK);
         resp.set_dev_id(dev_id);

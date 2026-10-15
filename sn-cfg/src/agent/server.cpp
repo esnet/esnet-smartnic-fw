@@ -9,7 +9,9 @@
 #include <grpc/grpc.h>
 #include "sn_cfg_v2.grpc.pb.h"
 
+#ifdef WITH_CMS
 #include "cms.h"
+#endif
 
 using namespace grpc;
 using namespace sn_cfg::v2;
@@ -200,6 +202,7 @@ void SmartnicConfigImpl::init_server_stats(void) {
     nmetrics += 1;
     nlabels = 0;
 
+#ifdef WITH_CMS
     for (auto dev : devices) {
         auto ci = cms_card_info_read(&dev->cms);
         if (ci == NULL) {
@@ -257,6 +260,7 @@ void SmartnicConfigImpl::init_server_stats(void) {
         nmetrics += 1;
         nlabels = 0;
     }
+#endif
 
     bspec->name = "info";
     bspec->metrics = mspec - nmetrics;

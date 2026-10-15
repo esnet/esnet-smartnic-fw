@@ -102,8 +102,14 @@ services:
           # trim the extra trailing "A" from the quirky JTAG serial number to get the actual USB serial number
           export HW_USB_SERIAL="$${HW_TARGET_SERIAL%A}"
         fi
+
+        case "$${SN_HW_BOARD}" in
+            av80) INTF_PORT_ID='if02-port0' ;;
+               *) INTF_PORT_ID='if01-port0' ;;
+        esac
+
         ls -l /dev/serial/by-id/
-        export HW_SC_UART_DEV="$$(ls /dev/serial/by-id/usb-Xilinx_*_$${HW_USB_SERIAL}-if01-port0)"
+        export HW_SC_UART_DEV="$$(ls /dev/serial/by-id/usb-Xilinx_*_$${HW_USB_SERIAL}-$${INTF_PORT_ID})"
         echo "Logging console output from device $${HW_SC_UART_DEV}"
         [ -r $$HW_SC_UART_DEV ] || exit 1
         socat stdout $${HW_SC_UART_DEV},sane,rawer,b115200,cs8,parenb=0,igncr
@@ -127,26 +133,51 @@ services:
       - pipefail
       - -x
       - |
-        rm -f /bitfiles/ok
-        fw_dir=/usr/local/lib/firmware/esnet-smartnic
-        for f in $${fw_dir}/esnet-smartnic.{bit,mcs} ; do
-          if [ -e $${f}.zst ] ; then
+        # Cleanup the any files if the volume already exists.
+        rm -f /bitfiles/*
+
+        declare -A IMG_EXTS
+        IMG_EXTS[bit]=1
+        IMG_EXTS[pdi]=1
+
+        NAME=esnet-smartnic
+        fw_dir=/usr/local/lib/firmware/$${NAME}
+
+        for ext in bit bin mcs pdi ; do
+          name=$${NAME}.$${ext}
+          path=$${fw_dir}/$${name}
+          if [ -e $${path}.zst ] ; then
             # input file is compressed, uncompress to output
-            unzstd --force --output-dir-flat /bitfiles $${f}.zst
-          else
+            unzstd --force --output-dir-flat /bitfiles $${path}.zst
+          elif [ -e $${path} ] ; then
             # input file is not compressed, just copy it to output
-            cp -a $${f} /bitfiles
+            cp -a $${path} /bitfiles
+          else
+            continue
           fi
+
+          if [ -v IMG_EXTS[$${ext}] ] ; then
+            ln -s $${name} /bitfiles/$${NAME}.img
+          fi
+
+          # Copy any metadata associated with a particular file type.
+          case $${ext} in
+            pdi)
+              cp -a $${fw_dir}/$${NAME}-uuid.txt /bitfiles
+              ;;
+
+            *)
+              ;;
+          esac
         done
 
-        probes=$${fw_dir}/debug_nets.ltx
-        if [ -e $${probes} ]; then
-          cp -a $${probes} /bitfiles
-        else
-          # Cleanup leftovers in a pre-existing volume when moving
-          # from an FPGA with VIOs to one without them.
-          rm -f /bitfiles/$$(basename $${probes})
-        fi
+        for name in debug_nets $${NAME} ; do
+          probes=$${fw_dir}/$${name}.ltx
+          if [ -e $${probes} ] ; then
+            cp -a $${probes} /bitfiles/$${NAME}.ltx
+            break
+          fi
+        done
 
         touch /bitfiles/ok
 
@@ -283,6 +314,7 @@ services:
     environment:
       <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
+      EXTRA_PCIE_DEVS: ${EXTRA_PCIE_DEVS:-}
     volumes:
       - bitfiles:/bitfiles:ro
       - type: bind
@@ -305,10 +337,11 @@ services:
         /scripts/program_card.sh \
           xilinx-hwserver:3121 \
           "${HW_TARGET_SERIAL:-*}" \
-          /bitfiles/esnet-smartnic.bit \
-          /bitfiles/debug_nets.ltx \
+          /bitfiles/esnet-smartnic.img \
+          /bitfiles/esnet-smartnic.ltx \
+          AUTO `# Use "FORCE" to ignore version check` \
           $FPGA_PCIE_DEV \
-          # FORCE
+          $${EXTRA_PCIE_DEVS}
     profiles:
       - smartnic-mgr-dpdk-portlink
       - smartnic-mgr-dpdk-manual
@@ -329,6 +362,7 @@ services:
     environment:
       <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
+      EXTRA_PCIE_DEVS: ${EXTRA_PCIE_DEVS:-}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
@@ -342,13 +376,48 @@ services:
       - pipefail
       - -x
       - |
+        PCIE_DEVS=()
+        case "$${SN_HW_BOARD}" in
+            av80)
+                dev_group=''
+                for dev in $${FPGA_PCIE_DEV} $${EXTRA_PCIE_DEVS}; do
+                    group=$$(basename $$(readlink "/sys/bus/pci/devices/$${dev}.0/iommu_group"))
+                    if [ "$${dev_group}" = "" ]; then
+                        dev_group="$${group}"
+                        PCIE_DEVS+=("$${dev}")
+                        continue
+                    fi
+
+                    if [ "$${group}" != "$${dev_group}" ]; then
+                        echo "IOMMU groups are different for $${dev} ($${group} != $${dev_group})"
+                        continue
+                    fi
+
+                    echo "IOMMU groups are the same for $${dev}"
+                    PCIE_DEVS+=("$${dev}")
+                done
+                ;;
+
+            *)
+                PCIE_DEVS+=("$${FPGA_PCIE_DEV}")
+                ;;
+        esac
+
         # Unbind the kernel driver (if any) from each FPGA PF
-        dpdk-devbind.py -u $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
+        for dev in "$${PCIE_DEVS[@]}"; do
+            dpdk-devbind.py -u "$${dev}.0" "$${dev}.1"
+        done
+
+        # Wait for the binding events to settle and then check the status.
         udevadm settle
         dpdk-devbind.py --status
+
         # Manually enable device memory since there is no device driver in this mode
-        setpci -s $FPGA_PCIE_DEV.0 COMMAND=0x2
-        setpci -s $FPGA_PCIE_DEV.1 COMMAND=0x2
+        for dev in "$${PCIE_DEVS[@]}"; do
+            for func in 0 1; do
+                setpci -s "$${dev}.$${func}" COMMAND=0x2
+            done
+        done
     profiles:
       - smartnic-no-vfio
 
@@ -365,6 +434,7 @@ services:
     environment:
       <<: *smartnic-environment
       FPGA_PCIE_DEV: ${FPGA_PCIE_DEV}
+      EXTRA_PCIE_DEVS: ${EXTRA_PCIE_DEVS:-}
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /sys/bus/pci/drivers:/sys/bus/pci/drivers
@@ -380,14 +450,59 @@ services:
       - |
         # When vfio-pci is not builtin, ensure that it is loaded
         modinfo vfio-pci | egrep -q '^filename:\s+\(builtin\)$' || modprobe vfio-pci
+
+        PCIE_DEVS=()
+        case "$${SN_HW_BOARD}" in
+            av80)
+                dev_group=''
+                for dev in $${FPGA_PCIE_DEV} $${EXTRA_PCIE_DEVS}; do
+                    group=$$(basename $$(readlink "/sys/bus/pci/devices/$${dev}.0/iommu_group"))
+                    if [ "$${dev_group}" = "" ]; then
+                        dev_group="$${group}"
+                        PCIE_DEVS+=("$${dev}")
+                        continue
+                    fi
+
+                    if [ "$${group}" != "$${dev_group}" ]; then
+                        echo "IOMMU groups are different for $${dev} ($${group} != $${dev_group})"
+                        continue
+                    fi
+
+                    echo "IOMMU groups are the same for $${dev}"
+                    PCIE_DEVS+=("$${dev}")
+
+                    for func in 0 1; do
+                        bdf="$${dev}.$${func}"
+                        drv="/sys/bus/pci/devices/$${bdf}/driver"
+                        if [ -e "$${drv}" ]; then
+                            echo "Unbinding driver for $${bdf} (current driver $$(readlink $${drv}))"
+                            echo "$${bdf}" | tee "$${drv}/unbind"
+                        fi
+                    done
+                done
+                ;;
+
+            *)
+                PCIE_DEVS+=("$${FPGA_PCIE_DEV}")
+                ;;
+        esac
+
         # Bind the vfio-pci driver to each FPGA PF
-        dpdk-devbind.py -b vfio-pci $$FPGA_PCIE_DEV.0 $$FPGA_PCIE_DEV.1
+        for dev in "$${PCIE_DEVS[@]}"; do
+            dpdk-devbind.py -b vfio-pci "$${dev}.0" "$${dev}.1"
+        done
+
+        # Wait for the binding events to settle and then check the status.
         udevadm settle
         dpdk-devbind.py --status
+
         # Confirm that the driver is properly bound to each FPGA PF
         # Note the <TAB> before vfio-pci in the grep command
-        lspci -D -kvm -s $$FPGA_PCIE_DEV.0 | grep '^Driver:	vfio-pci'
-        lspci -D -kvm -s $$FPGA_PCIE_DEV.1 | grep '^Driver:	vfio-pci'
+        for dev in "$${PCIE_DEVS[@]}"; do
+            for func in 0 1; do
+                lspci -D -kvm -s "$${dev}.$${func}" | grep '^Driver:	vfio-pci'
+            done
+        done
     profiles:
       - smartnic-mgr-user
       - smartnic-mgr-dpdk-portlink
@@ -406,11 +521,10 @@ services:
         condition: service_completed_successfully
     environment:
       <<: *smartnic-environment
+      EXTRA_PCIE_DEVS: ${EXTRA_PCIE_DEVS:-}
+
       # Tell python to do unbuffered IO to stdout
       PYTHONUNBUFFERED: 1
-      VFIO_UNLOCK_PF: ${FPGA_PCIE_DEV}.0 ${FPGA_PCIE_DEV}.1
-      VFIO_UNLOCK_VF: ""
-      VFIO_UNLOCK_BAR: 2
     volumes:
       - /sys/bus/pci:/sys/bus/pci
       - /dev/vfio:/dev/vfio
@@ -427,7 +541,35 @@ services:
       - -o
       - pipefail
       - -x
-      - /scripts/vfio-unlock.py
+      - |
+        opts=()
+        opts+=("--pf=${FPGA_PCIE_DEV}.0")
+        opts+=("--pf=${FPGA_PCIE_DEV}.1")
+
+        case "$${SN_HW_BOARD}" in
+            av80)
+                for dev in $${EXTRA_PCIE_DEVS}; do
+                    for func in 0 1; do
+                        bdf="$${dev}.$${func}"
+                        drv="/sys/bus/pci/devices/$${bdf}/driver"
+                        if [ -e "$${drv}" ]; then
+                            drv_name=$$(basename $$(readlink "$${drv}"))
+                            if [ "$${drv_name}" = "vfio-pci" ]; then
+                                opts+=("--pf=$${bdf}")
+                            fi
+                        fi
+                    done
+                done
+
+                opts+=("--bar=-1")
+                ;;
+
+            *)
+                opts+=("--bar=2")
+                ;;
+        esac
+
+        /scripts/vfio-unlock.py "$${opts[@]}"
     profiles:
       - smartnic-mgr-vfio-unlock
 

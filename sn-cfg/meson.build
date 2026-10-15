@@ -1,5 +1,43 @@
 #---------------------------------------------------------------------------------------------------
 # C++ Agent
+
+agent_sources = files(
+    'src/agent/agent.cpp',
+    'src/agent/batch.cpp',
+    'src/agent/device.cpp',
+    'src/agent/server.cpp',
+    'src/agent/stats.cpp',
+)
+
+
+extra_c_args = []
+if board != 'av80'
+    extra_c_args += [
+        '-DWITH_CMS',
+        '-DWITH_DEFAULTS',
+        '-DWITH_HOST',
+        '-DWITH_MODULE',
+        '-DWITH_PORT',
+        '-DWITH_SYSCFG',
+        '-DWITH_SYSMON',
+    ]
+    agent_sources += files(
+        'src/agent/defaults.cpp',
+        'src/agent/host.cpp',
+        'src/agent/module.cpp',
+        'src/agent/port.cpp',
+    )
+endif
+
+if app_name != 'versal_shell'
+    extra_c_args += [
+        '-DWITH_SWITCH',
+    ]
+    agent_sources += files(
+        'src/agent/switch.cpp',
+    )
+endif
+
 cpp = meson.get_compiler('cpp')
 libgrpcpp_reflection_dep = cpp.find_library('grpc++_reflection')
 
@@ -23,18 +61,7 @@ regmap_dep = dependency('regmap')
 
 executable(
     'sn-cfg-agent',
-    files([
-        'src/agent/agent.cpp',
-        'src/agent/batch.cpp',
-        'src/agent/defaults.cpp',
-        'src/agent/device.cpp',
-        'src/agent/host.cpp',
-        'src/agent/module.cpp',
-        'src/agent/port.cpp',
-        'src/agent/server.cpp',
-        'src/agent/stats.cpp',
-        'src/agent/switch.cpp',
-    ]),
+    agent_sources,
     dependencies: [
         cli11_dep,
         jsoncpp_dep,
@@ -47,7 +74,7 @@ executable(
     ],
     cpp_args: [
         '-DSN_CFG_HOST_SET_QDMA_CHANNEL',
-    ],
+    ] + extra_c_args,
     # Force linking all libs so that the unreferenced grpc++_reflection lib gets linked
     link_args: '-Wl,--no-as-needed',
     install: true,

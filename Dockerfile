@@ -122,6 +122,7 @@ ARG DPDK_VER="22.11.2"
 ARG DPDK_TOPDIR="/root/dpdk-stable-${DPDK_VER}"
 ARG DPDK_PLATFORM
 ARG DPDK_CPU_INSTRUCTION_SET
+ARG SN_HW_BOARD
 
 ADD \
     --unpack=true \
@@ -136,9 +137,16 @@ RUN <<EOF
     ln -s /QDMA/DPDK/drivers/net/qdma ./drivers/net
     patch -p 1 < /dpdk-patches/0000-dpdk-include-xilinx-qdma-driver.patch
 
+    # Select whether to enable opennic compatibility patches in the QDMA driver.
+    case ${SN_HW_BOARD} in
+      av80) QDMA_FOR_OPENNIC=false ;;
+      *)    QDMA_FOR_OPENNIC=true  ;;
+    esac
+
     meson setup build \
       -Dplatform=${DPDK_PLATFORM:-generic} \
       -Dcpu_instruction_set=${DPDK_CPU_INSTRUCTION_SET:-auto} \
+      -Dqdma_for_opennic=${QDMA_FOR_OPENNIC} \
       -Denable_drivers=net/af_packet,net/pcap,net/qdma,net/ring,net/tap,net/virtio \
       -Denable_apps=dumpcap,pdump,proc-info,test-cmdline,test-pmd
 
@@ -258,7 +266,9 @@ RUN --mount=type=cache,target=/sn-fw/source/subprojects/packagecache <<EOF
       ${PWD}/sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
       subprojects/packagefiles/esnet-smartnic-hwapi.zip
     meson subprojects download
-    meson setup /sn-fw/build /sn-fw/source
+    meson setup /sn-fw/build /sn-fw/source \
+      -DSN_HW_BOARD=${SN_HW_BOARD} \
+      -DSN_HW_APP_NAME=${SN_HW_APP_NAME}
     meson compile --clean -C /sn-fw/build
     meson install -C /sn-fw/build --destdir /firmware-install-root
 EOF

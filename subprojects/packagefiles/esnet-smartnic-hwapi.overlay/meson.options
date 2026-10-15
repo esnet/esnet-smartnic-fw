@@ -1,0 +1,3 @@
+# Set the yield attribute on options in order to pickup values from the parent project.
+option('SN_HW_BOARD', type: 'string', value: 'None', yield: true)
+option('SN_HW_APP_NAME', type: 'string', value: 'None', yield: true)

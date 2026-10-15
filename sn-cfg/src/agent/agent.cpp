@@ -138,7 +138,9 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         auto dev = new Device{
             .bus_id = bus_id,
             .bar2 = bar2,
+#ifdef WITH_CMS
             .cms = {},
+#endif
 
             .nhosts = 2,
             .nports = 2,
@@ -199,10 +201,18 @@ SmartnicConfigImpl::SmartnicConfigImpl(const vector<string>& bus_ids,
         }
 
         init_device(dev);
+#ifdef WITH_HOST
         init_host(dev);
+#endif
+#ifdef WITH_MODULE
         init_module(dev);
+#endif
+#ifdef WITH_PORT
         init_port(dev);
+#endif
+#ifdef WITH_SWITCH
         init_switch(dev);
+#endif
 
         SERVER_LOG_LINE_INIT(ctor, INFO, "Starting statistics collection on device " << bus_id);
         for (auto dom = 0; dom < DeviceStatsDomain::NDOMAINS; ++dom) {
@@ -261,10 +271,18 @@ SmartnicConfigImpl::~SmartnicConfigImpl() {
         auto dev = devices.back();
 
         deinit_device(dev);
+#ifdef WITH_HOST
         deinit_host(dev);
+#endif
+#ifdef WITH_MODULE
         deinit_module(dev);
+#endif
+#ifdef WITH_PORT
         deinit_port(dev);
+#endif
+#ifdef WITH_SWITCH
         deinit_switch(dev);
+#endif
 
         for (auto domain : dev->stats.domains) {
             stats_domain_free(domain);

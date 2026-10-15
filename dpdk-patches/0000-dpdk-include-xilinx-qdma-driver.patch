@@ -1,6 +1,6 @@
 diff -Naur dpdk-stable-22.11.2-pristine/config/rte_config.h dpdk-stable-22.11.2/config/rte_config.h
 --- dpdk-stable-22.11.2-pristine/config/rte_config.h	2023-05-06 08:06:26.000000000 +0000
-+++ dpdk-stable-22.11.2/config/rte_config.h	2026-02-17 14:49:45.339713276 +0000
++++ dpdk-stable-22.11.2/config/rte_config.h	2026-10-09 18:37:27.004544111 +0000
 @@ -133,4 +133,7 @@
  /* DLB2 defines */
  // RTE_LIBRTE_PMD_DLB2_QUELL_STATS is not set
@@ -11,7 +11,7 @@ diff -Naur dpdk-stable-22.11.2-pristine/config/rte_config.h dpdk-stable-22.11.2/
  #endif /* _RTE_CONFIG_H_ */
 diff -Naur dpdk-stable-22.11.2-pristine/drivers/bus/pci/linux/pci_vfio.c dpdk-stable-22.11.2/drivers/bus/pci/linux/pci_vfio.c
 --- dpdk-stable-22.11.2-pristine/drivers/bus/pci/linux/pci_vfio.c	2023-05-06 08:06:26.000000000 +0000
-+++ dpdk-stable-22.11.2/drivers/bus/pci/linux/pci_vfio.c	2026-03-02 15:54:13.721899564 +0000
++++ dpdk-stable-22.11.2/drivers/bus/pci/linux/pci_vfio.c	2026-10-09 18:37:27.005544099 +0000
 @@ -498,13 +498,34 @@
  	 * Reset the device. If the device is not capable of resetting,
  	 * then it updates errno as EINVAL.
@@ -54,7 +54,7 @@ diff -Naur dpdk-stable-22.11.2-pristine/drivers/bus/pci/linux/pci_vfio.c dpdk-st
  static int
 diff -Naur dpdk-stable-22.11.2-pristine/drivers/net/meson.build dpdk-stable-22.11.2/drivers/net/meson.build
 --- dpdk-stable-22.11.2-pristine/drivers/net/meson.build	2023-05-06 08:06:26.000000000 +0000
-+++ dpdk-stable-22.11.2/drivers/net/meson.build	2026-02-17 14:49:45.339713276 +0000
++++ dpdk-stable-22.11.2/drivers/net/meson.build	2026-10-09 18:37:27.005544099 +0000
 @@ -51,6 +51,7 @@
          'octeon_ep',
          'pcap',
@@ -63,16 +63,25 @@ diff -Naur dpdk-stable-22.11.2-pristine/drivers/net/meson.build dpdk-stable-22.1
          'qede',
          'ring',
          'sfc',
+diff -Naur dpdk-stable-22.11.2-pristine/meson_options.txt dpdk-stable-22.11.2/meson_options.txt
+--- dpdk-stable-22.11.2-pristine/meson_options.txt	2023-05-06 08:06:26.000000000 +0000
++++ dpdk-stable-22.11.2/meson_options.txt	2026-10-09 18:38:04.794117902 +0000
+@@ -52,3 +52,5 @@
+        'build unit tests')
+ option('use_hpet', type: 'boolean', value: false, description:
+        'use HPET timer in EAL')
++option('qdma_for_opennic', type: 'boolean', value: false,
++       description: 'Enable opennic shell descriptor adaptations in the Xilinx QDMA driver')
 diff -Naur dpdk-stable-22.11.2-pristine/usertools/dpdk-devbind.py dpdk-stable-22.11.2/usertools/dpdk-devbind.py
 --- dpdk-stable-22.11.2-pristine/usertools/dpdk-devbind.py	2023-05-06 08:06:26.000000000 +0000
-+++ dpdk-stable-22.11.2/usertools/dpdk-devbind.py	2026-02-17 14:49:45.339713276 +0000
++++ dpdk-stable-22.11.2/usertools/dpdk-devbind.py	2026-10-09 18:37:27.006544088 +0000
 @@ -75,7 +75,13 @@
  virtio_blk = {'Class': '01', 'Vendor': "1af4", 'Device': '1001,1042',
                      'SVendor': None, 'SDevice': None}
  
 +xilinx_qdma_pf = {'Class': '05', 'Vendor': '10ee', 'Device': '9011,9111,9211,9311,9014,9114,9214,9314,9018,9118,9218,9318,901f,911f,921f,931f,9021,9121,9221,9321,9024,9124,9224,9324,9028,9128,9228,9328,902f,912f,922f,932f,9031,9131,9231,9331,9034,9134,9234,9334,9038,9138,9238,9338,903f,913f,923f,933f,9041,9141,9241,9341,9044,9144,9244,9344,9048,9148,9248,9348',
 +                  'SVendor': None, 'SDevice': None}
-+xilinx_qdma_vf = {'Class': '05', 'Vendor': '10ee', 'Device': 'a011,a111,a211,a311,a014,a114,a214,a314,a018,a118,a218,a318,a01f,a11f,a21f,a31f,a021,a121,a221,a321,a024,a124,a224,a324,a028,a128,a228,a328,a02f,a12f,a22f,a32f,a031,a131,a231,a331,a034,a134,a234,a334,a038,a138,a238,a338,a03f,a13f,a23f,a33f,a041,a141,a241,a341,a044,a144,a244,a344,a048,a148,a248,a348',
++xilinx_qdma_vf = {'Class': '05', 'Vendor': '10ee', 'Device': 'a011,a111,a211,a311,a014,a114,a214,a314,a018,a118,a218,a318,a01f,a11f,a21f,a31f,a021,a121,a221,a321,a024,a124,a224,a324,a028,a128,a228,a328,a02f,a12f,a22f,a32f,a031,a131,a231,a331,a034,a134,a234,a334,a038,a138,a238,a338,a03f,a13f,a23f,a33f,a041,a141,a241,a341,a044,a144,a244,a344,a048,a148,a248,a348,c03f,c13f,c23f,c33f,c43f,c53f,c63f,c73f',
 +                  'SVendor': None, 'SDevice': None}
 +
  network_devices = [network_class, cavium_pkx, avp_vnic, ifpga_class]

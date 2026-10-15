@@ -59,6 +59,7 @@ Status SmartnicConfigImpl::Batch(
             "item_case=" << item_case_name(item_case) << " (" << item_case << ")");
 
         switch (item_case) {
+#ifdef WITH_DEFAULTS
         case BatchRequest::ItemCase::kDefaults:
             switch (op) {
             case BatchOperation::BOP_SET:
@@ -70,6 +71,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
             }
             break;
+#endif
 
         case BatchRequest::ItemCase::kDeviceInfo:
             switch (op) {
@@ -95,6 +97,7 @@ Status SmartnicConfigImpl::Batch(
             }
             break;
 
+#ifdef WITH_HOST
         case BatchRequest::ItemCase::kHostConfig:
             switch (op) {
             case BatchOperation::BOP_GET:
@@ -126,7 +129,9 @@ Status SmartnicConfigImpl::Batch(
                 break;
             }
             break;
+#endif
 
+#ifdef WITH_MODULE
         case BatchRequest::ItemCase::kModuleGpio:
             switch (op) {
             case BatchOperation::BOP_GET:
@@ -182,7 +187,9 @@ Status SmartnicConfigImpl::Batch(
                 break;
             }
             break;
+#endif
 
+#ifdef WITH_PORT
         case BatchRequest::ItemCase::kPortConfig:
             switch (op) {
             case BatchOperation::BOP_GET:
@@ -226,7 +233,9 @@ Status SmartnicConfigImpl::Batch(
                 break;
             }
             break;
+#endif
 
+#ifdef WITH_SWITCH
         case BatchRequest::ItemCase::kSwitchConfig:
             switch (op) {
             case BatchOperation::BOP_GET:
@@ -258,6 +267,7 @@ Status SmartnicConfigImpl::Batch(
                 break;
             }
             break;
+#endif
 
         case BatchRequest::ItemCase::kStats:
             switch (op) {
