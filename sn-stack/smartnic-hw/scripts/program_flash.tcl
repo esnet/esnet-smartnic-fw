@@ -66,3 +66,6 @@ program_hw_cfgmem   -verbose -hw_cfgmem [current_hw_cfgmem]
 
 # initialize the FPGA from the newly programmed flash
 boot_hw_device                 [current_hw_device]
+
+puts "Closing connection to HW server."
+close_hw_target -verbose

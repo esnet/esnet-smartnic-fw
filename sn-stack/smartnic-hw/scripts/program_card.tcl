@@ -32,3 +32,6 @@ program_hw_device [current_hw_device]
 # TODO this also seems to work at 15MHz so maybe worth bumping this up in the future after retesting
 puts "Decreasing JTAG clock frequency back down to 10MHz so that VIO/ILA access works reliably"
 set_property PARAM.FREQUENCY 10000000 [current_hw_target]
+
+puts "Closing connection to HW server."
+close_hw_target -verbose
