@@ -106,7 +106,6 @@ void SmartnicConfigImpl::init_device([[maybe_unused]] Device* dev) {
 
         ostringstream name;
         name << "sysmon" << n;
-        n += 1;
 
         sysmon_sequencer_enable(info.blk, info.select_mask, 0);
 
@@ -126,6 +125,8 @@ void SmartnicConfigImpl::init_device([[maybe_unused]] Device* dev) {
         dev->stats.zones[DeviceStatsZone::SYSMON_MONITORS].push_back(stats);
         SERVER_LOG_LINE_INIT(device, INFO,
             "Setup monitors for sysmon " << n << " on device " << dev->bus_id);
+
+        n += 1;
     }
 #endif
 
