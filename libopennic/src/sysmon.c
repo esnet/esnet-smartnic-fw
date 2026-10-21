@@ -112,6 +112,14 @@ void sysmon_sequencer_enable(volatile struct sysmon_block* sysmon,
     sysmon->config_reg_1._v = config_reg_1._v;
     barrier();
 
+    // The ADC may still be mid-conversion when the sequencer is stopped.
+    // The seqchsel/seqavg DRP registers must only be written while the ADC
+    // is idle (BUSY deasserted); poll until it clears before proceeding.
+    bool is_busy = sysmon_poll_busy(sysmon, false);
+    if (is_busy) {
+        log_warn("sysmon [%p] ADC not idle after stopping sequencer", sysmon);
+    }
+
     // Set the selected channels for the sequencer to convert.
     sysmon->seqchsel0._v = select_mask & 0xffff;
     sysmon->seqavg0._v = average_mask & 0xffff;
