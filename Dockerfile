@@ -39,8 +39,8 @@ EOF
 ADD \
     --unpack=true \
     --chown=root:root \
-    --checksum=sha256:aa9fca823c03289fb6e3460b3dc864f3ea895cafaf9b99247701a67b17d1b018 \
-    https://github.com/astral-sh/uv/releases/download/0.11.33/uv-x86_64-unknown-linux-gnu.tar.gz \
+    --checksum=sha256:f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f \
+    https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-x86_64-unknown-linux-gnu.tar.gz \
     /root
 
 RUN <<EOF
