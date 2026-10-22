@@ -54,7 +54,9 @@ float sysmon_get_temp(volatile struct sysmon_block * sysmon) {
 
 //--------------------------------------------------------------------------------------------------
 static bool sysmon_poll_busy(volatile struct sysmon_block* sysmon, bool state) {
-#define ITER_TIMEOUT_US (2 * 1000)
+// The worst case delay observed through exprimental testing was 17.7ms.  Roughly doubling should
+// provide enough headroom to ensure that the block is ready before any further register updates.
+#define ITER_TIMEOUT_US (30 * 1000)
 #define ITER_DELAY_US   100
 #define MAX_ITER        (ITER_TIMEOUT_US / ITER_DELAY_US)
 
