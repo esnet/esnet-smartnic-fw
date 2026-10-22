@@ -39,8 +39,8 @@ EOF
 ADD \
     --unpack=true \
     --chown=root:root \
-    --checksum=sha256:aa9fca823c03289fb6e3460b3dc864f3ea895cafaf9b99247701a67b17d1b018 \
-    https://github.com/astral-sh/uv/releases/download/0.11.33/uv-x86_64-unknown-linux-gnu.tar.gz \
+    --checksum=sha256:f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f \
+    https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-x86_64-unknown-linux-gnu.tar.gz \
     /root
 
 RUN <<EOF
@@ -56,7 +56,7 @@ RUN <<EOF
     cat <<__EOF >/etc/uv/uv.toml
 # uv run --show-settings
 no-cache = true
-exclude-newer = "1 week"
+#exclude-newer = "1 week"
 __EOF
 
     # Create a new virtualenv for the root user.
@@ -384,8 +384,8 @@ EOF
 # From https://github.com/grpc-ecosystem/grpc-health-probe/releases
 ADD \
     --chmod=755 \
-    --checksum=sha256:b74ea9e3fe0e4fb19008a77422b6475e29141b30833a6f82c18941bf6eb6a136 \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.59/grpc_health_probe-linux-amd64 \
+    --checksum=sha256:faf2e85b5f71c9bee54bdcd8ac84c73dc052d3a1e2dcb78349e3a587a9935680 \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.60/grpc_health_probe-linux-amd64 \
     /usr/local/bin/grpc_health_probe
 
 # Install gRPC debug tool (uncomment for inclusion).
