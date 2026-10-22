@@ -14,3 +14,5 @@ connect_hw_server -url $hw_server_url
 current_hw_target [get_hw_targets [format "*/xilinx_tcf/Xilinx/%s" $hw_target_serial]]
 open_hw_target
 puts "[current_hw_device]"
+
+close_hw_target

@@ -103,3 +103,6 @@ if {$with_pcie_init_ready} {
     }
 }
 puts "Completed reset of PCIe endpoint"
+
+puts "Closing connection to HW server."
+close_hw_target -verbose

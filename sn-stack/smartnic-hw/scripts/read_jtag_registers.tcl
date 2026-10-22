@@ -32,3 +32,6 @@ proc property_list_to_json {chan alist} {
 
 set regfile [open [lindex $argv 2] w]
 property_list_to_json $regfile [list_property [current_hw_device] REGISTER.*]
+
+puts "Closing connection to HW server."
+close_hw_target -verbose
