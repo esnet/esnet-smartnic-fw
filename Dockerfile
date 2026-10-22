@@ -56,7 +56,7 @@ RUN <<EOF
     cat <<__EOF >/etc/uv/uv.toml
 # uv run --show-settings
 no-cache = true
-exclude-newer = "1 week"
+#exclude-newer = "1 week"
 __EOF
 
     # Create a new virtualenv for the root user.
