@@ -295,10 +295,116 @@ trivy_scan:
     - pull_cve_allowlist
     - package
 
-# Pure mixin job intended to be used for augmenting a manually triggered review job with support
-# for running Robot Framework tests.
+#===================================================================================================
+# Set <GL_ENV_HOST>/<GL_ENV_CARD><GL_ENV_EXTRA>
+#   e.g. ftap-ht1/1/foo
+#   where GL_ENV_HOST=ftap-ht1
+#         GL_ENV_CARD=1
+#         GL_ENV_EXTRA=/foo
+# Keep it short since it shows up in the UI
+#
+#
+# The following template defines the expected structure of each entry in a development node matrix tables.
+# This template MUST match the entries.  The names of the keys and their ordering are important (changing
+# either requires updating all entries and the template).
+#
+# References:
+# - parallel:matrix rules: https://docs.gitlab.com/ci/yaml/#parallelmatrix
+# - matrix expressions:    https://docs.gitlab.com/ci/yaml/matrix_expressions
+#
+#
+# Extra variables provided to the playbook:
+#   EXTRA_VARS is an optional JSON dictionary evaluated *first*
+#     NOTE: keys are *not* converted to lower case in this dictionary.  Use this if you need upper case keys.
+#   Example usage:
+#     EXTRA_VARS: '{ "foo": "bar", "xyzzy": "${SOME_GITLAB_VARIABLE}" }'
+#
+#   EXTRA_VAR_name/EXTRA_VAR_NAME is a string which will be merged into the extra_vars dictionary as
+#       "name": "value"
+#     and will *override* matching keys found in the EXTRA_VARS dictionary
+#     NOTE: keys like "NAME" or "NaMe" will be converted to lower case before merging
+#   Example usage:
+#     EXTRA_VAR_FOO: "baz"
+#
+#
+# AAP Job Template Overrides
+#   See here for more overrides: https://gitlab.es.net/ht/cicd-common/-/blob/main/README.md?ref_type=heads#aap-run
+#
+.review_matrix_template: &review_matrix_template
+  - GL_ENV_HOST: "$[[ matrix.GL_ENV_HOST ]]"
+    GL_ENV_CARD: "$[[ matrix.GL_ENV_CARD ]]"
+    GL_ENV_EXTRA: "$[[ matrix.GL_ENV_EXTRA ]]"
+    SYSTEM_HW_BOARD: "$[[ matrix.SYSTEM_HW_BOARD ]]"
+    AAP_LIMIT: "$[[ matrix.AAP_LIMIT ]]"
+    EXTRA_VAR_STACK_UNIQUE: "$[[ matrix.EXTRA_VAR_STACK_UNIQUE ]]"
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "$[[ matrix.EXTRA_VAR_STACK_HW_TARGET_SERIAL ]]"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "$[[ matrix.EXTRA_VAR_STACK_FPGA_PCIE_DEV ]]"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: "$[[ matrix.EXTRA_VAR_STACK_EXTRA_PCIE_DEVS ]]"
+
+#-------------------------------------------------
+.ftap_matrix: &ftap_matrix
+  - GL_ENV_HOST: ftap-ht1
+    GL_ENV_CARD: 1
+    GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: av80
+    AAP_LIMIT: ftap-ht1.es.net
+    EXTRA_VAR_STACK_UNIQUE: ""
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:da:00"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: "0000:d8:00"
+
+  - GL_ENV_HOST: ftap-ht2
+    GL_ENV_CARD: 1
+    GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au55c
+    AAP_LIMIT: ftap-ht2.es.net
+    EXTRA_VAR_STACK_UNIQUE: ""
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
+
+  - GL_ENV_HOST: ftap-ht3
+    GL_ENV_CARD: 1
+    GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: ftap-ht3.es.net
+    EXTRA_VAR_STACK_UNIQUE: ""
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
+
+  - GL_ENV_HOST: ftap-ht4
+    GL_ENV_CARD: 1
+    GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: ftap-ht4.es.net
+    EXTRA_VAR_STACK_UNIQUE: ""
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
+#===================================================================================================
+
+.review_run:
+  extends: .aap_run
+  stage: review
+  environment:
+    name: review${REVIEW_TYPE}/${GL_ENV_HOST}/${GL_ENV_CARD}${GL_ENV_EXTRA}
+    url: ssh://${AAP_LIMIT}
+    action: start
+  variables:
+    EXTRA_VAR_STACK_ROOT_PATH: /usr/local/smartnic/${EXTRA_VAR_STACK_UNIQUE}
+    EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
+    #AAP_SCM_BRANCH: testing
+    #AAP_VERBOSITY: 3
+  resource_group: ${AAP_LIMIT}/${EXTRA_VAR_STACK_UNIQUE}
+  needs:
+    - package
+
 .review_run_test:
-  extends: .aap_run_test
+  extends:
+    - .review_run
+    - .aap_run_test
+  stage: review_test
   variables:
     REVIEW_TYPE: "-test"
 
@@ -316,82 +422,11 @@ trivy_scan:
     # Override the test results filename to include the review job's parallel:matrix parameters.
     EXTRA_VAR_TEST_FILENAME: "test-results-${GL_ENV_HOST}-${GL_ENV_CARD}.${CI_JOB_ID}.tar.gz"
 
-#----------------------------------------------------------------------------------------------------
-# Set <GL_ENV_HOST>/<GL_ENV_CARD><GL_ENV_EXTRA>
-#   e.g. ftap-ht1/1/foo
-#   where GL_ENV_HOST=ftap-ht1
-#         GL_ENV_CARD=1
-#         GL_ENV_EXTRA=/foo
-# Keep it short since it shows up in the UI
-#
-# The following template defines the expected structure of each entry in an ftap matrix table. This
-# template MUST match the entries.  The names of the keys and their ordering are important (changing
-# either requires updating all entries and the template).
-#
-# References:
-# - parallel:matrix rules: https://docs.gitlab.com/ci/yaml/#parallelmatrix
-# - matrix expressions:    https://docs.gitlab.com/ci/yaml/matrix_expressions
-#
-.ftap_matrix_template: &ftap_matrix_template
-  - GL_ENV_HOST: "$[[ matrix.GL_ENV_HOST ]]"
-    GL_ENV_CARD: "$[[ matrix.GL_ENV_CARD ]]"
-    #GL_ENV_EXTRA: "$[[ matrix.GL_ENV_EXTRA ]]"
-    SYSTEM_HW_BOARD: "$[[ matrix.SYSTEM_HW_BOARD ]]"
-    AAP_LIMIT: "$[[ matrix.AAP_LIMIT ]]"
-    #EXTRA_VAR_STACK_UNIQUE: "$[[ matrix.EXTRA_VAR_STACK_UNIQUE ]]"
-    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: "$[[ matrix.EXTRA_VAR_STACK_HW_TARGET_SERIAL ]]"
-    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "$[[ matrix.EXTRA_VAR_STACK_FPGA_PCIE_DEV ]]"
-    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: "$[[ matrix.EXTRA_VAR_STACK_EXTRA_PCIE_DEVS ]]"
+.ht_review_variables:
+  variables:
+    EXTRA_VAR_STACK_COMPOSE_PROFILES: "smartnic-mgr-vfio-unlock,smartnic-ingress,smartnic-metrics"
 
-.ftap_matrix: &ftap_matrix
-  - GL_ENV_HOST: ftap-ht1
-    GL_ENV_CARD: 1
-    #GL_ENV_EXTRA: ""
-    SYSTEM_HW_BOARD: av80
-    AAP_LIMIT: ftap-ht1.es.net
-    #EXTRA_VAR_STACK_UNIQUE: 0
-    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
-    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:da:00"
-    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: "0000:d8:00"
-
-  - GL_ENV_HOST: ftap-ht2
-    GL_ENV_CARD: 1
-    #GL_ENV_EXTRA: ""
-    SYSTEM_HW_BOARD: au55c
-    AAP_LIMIT: ftap-ht2.es.net
-    #EXTRA_VAR_STACK_UNIQUE: 0
-    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
-    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
-    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
-
-  - GL_ENV_HOST: ftap-ht3
-    GL_ENV_CARD: 1
-    #GL_ENV_EXTRA: ""
-    SYSTEM_HW_BOARD: au280
-    AAP_LIMIT: ftap-ht3.es.net
-    #EXTRA_VAR_STACK_UNIQUE: 0
-    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
-    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
-    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
-
-  - GL_ENV_HOST: ftap-ht4
-    GL_ENV_CARD: 1
-    #GL_ENV_EXTRA: ""
-    SYSTEM_HW_BOARD: au280
-    AAP_LIMIT: ftap-ht4.es.net
-    #EXTRA_VAR_STACK_UNIQUE: 0
-    #EXTRA_VAR_STACK_HW_TARGET_SERIAL: ""
-    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:d8:00"
-    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
-#----------------------------------------------------------------------------------------------------
-
-.ftap:
-  environment:
-    name: review${REVIEW_TYPE}/${GL_ENV_HOST}/${GL_ENV_CARD}${GL_ENV_EXTRA}
-    url: ssh://${AAP_LIMIT}
-    action: start
-  parallel:
-    matrix: *ftap_matrix
+.ht_review_rules:
   rules:
     - if: ($SN_HW_BOARD != $SYSTEM_HW_BOARD)
       when: never
@@ -399,69 +434,53 @@ trivy_scan:
       when: manual
       allow_failure: true
 
-ftap:
+.ht_review:
   extends:
-    - .ftap
-    - .aap_run
-  stage: review
+    - .review_run
+    - .ht_review_variables
+    - .ht_review_rules
   variables:
     AAP_JOB_TEMPLATE: 641
-    #
-    # AAP Job Template Overrides
-    #   See here for more overrides: https://gitlab.es.net/ht/cicd-common/-/blob/main/README.md?ref_type=heads#aap-run
-    #
     #AAP_SCM_BRANCH: testing
     #AAP_VERBOSITY: 3
 
-    #
-    # Extra variables provided to the playbook
-    #   EXTRA_VARS is an optional JSON dictionary evaluated *first*
-    #     NOTE: keys are *not* converted to lower case in this dictionary.  Use this if you need upper case keys.
-    #
-    #   EXTRA_VAR_name/EXTRA_VAR_NAME is a string which will be merged into the extra_vars dictionary as
-    #       "name": "value"
-    #     and will *override* matching keys found in the EXTRA_VARS dictionary
-    #     NOTE: keys like "NAME" or "NaMe" will be converted to lower case before merging
-    #
-    # EXTRA_VARS: '{ "foo": "bar", "xyzzy": "${SOME_GITLAB_VARIABLE}" }'
-    # EXTRA_VAR_FOO: "baz"
+.ht_review_test:
+  extends:
+    - .review_run_test
+    - .ht_review_variables
+    - .ht_review_rules
+  variables:
+    AAP_JOB_TEMPLATE: 786
+    #AAP_SCM_BRANCH: testing
+    #AAP_VERBOSITY: 3
 
-    EXTRA_VAR_JOBID: ${SN_FW_API_JOB_NUMBER}
+.ftap_variables:
+  variables:
+    EXTRA_VAR_STACK_ROOT_PATH: /usr/local/ht
 
     # Run on port 443 on single card systems in the ftap environment so prometheus can scrape them
     EXTRA_VAR_STACK_SN_INGRESS_PORT: 443
-  needs:
-    - package
+  resource_group: ${AAP_LIMIT}
+
+ftap:
+  extends:
+    - .ht_review
+    - .ftap_variables
+  parallel:
+    matrix: *ftap_matrix
 
 ftap-test:
   extends:
-    - .ftap
-    - .aap_run
-    - .review_run_test
-  stage: review_test
-  variables:
-    AAP_JOB_TEMPLATE: 786
-    #
-    # AAP Job Template Overrides
-    #   See here for more overrides: https://gitlab.es.net/ht/cicd-common/-/blob/main/README.md?ref_type=heads#aap-run
-    #
-    #AAP_SCM_BRANCH: testing
-    #AAP_VERBOSITY: 3
-
-    #
-    # Extra variables provided to the playbook
-    #   EXTRA_VAR_name/EXTRA_VAR_NAME is a string which will be merged into the extra_vars dictionary as
-    #       "name": "value"
-    #     and will *override* matching keys found in the EXTRA_VARS dictionary
-    #     NOTE: keys like "NAME" or "NaMe" will be converted to lower case before merging
-    #
-    # EXTRA_VAR_FOO: "baz"
+    - .ht_review_test
+    - .ftap_variables
+  parallel:
+    matrix: *ftap_matrix
   needs:
     - package
     - job: ftap
       artifacts: false
       parallel:
-        matrix: *ftap_matrix_template
+        matrix: *review_matrix_template
 
 #----------------------------------------------------------------------------------------------------
 # Set <GL_ENV_HOST>/<GL_ENV_CARD><GL_ENV_EXTRA>
