@@ -556,6 +556,60 @@ trivy_scan:
     EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R00HA"
     EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:01:00"
     EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
+
+#-------------------------------------------------
+.dev_node_matrix: &dev_node_matrix
+  # node1.fpga.es.net
+  - GL_ENV_HOST: node1
+    GL_ENV_CARD: 1
+    GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node1.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 1
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R00VA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:e1:00"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
+
+  - GL_ENV_HOST: node1
+    GL_ENV_CARD: 2
+    GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node1.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 2
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R015A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:c1:00"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
+
+  # Left for documentation purposes until minimal shell FPGA loads are created.
+  #- GL_ENV_HOST: node1
+  #  GL_ENV_CARD: 3
+  #  GL_ENV_EXTRA: ""
+  #  SYSTEM_HW_BOARD: au250
+  #  AAP_LIMIT: node1.fpga.es.net
+  #  EXTRA_VAR_STACK_UNIQUE: 3
+  #  EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21320402F00JA"
+  #  EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:81:00"
+  #  EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
+
+  - GL_ENV_HOST: node1
+    GL_ENV_CARD: 4
+    GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: au280
+    AAP_LIMIT: node1.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 4
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "21760201R018A"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:a1:00"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: ""
+
+  - GL_ENV_HOST: node1
+    GL_ENV_CARD: 9
+    GL_ENV_EXTRA: ""
+    SYSTEM_HW_BOARD: av80
+    AAP_LIMIT: node1.fpga.es.net
+    EXTRA_VAR_STACK_UNIQUE: 9
+    EXTRA_VAR_STACK_HW_TARGET_SERIAL: "XFL11JPYKQRAA"
+    EXTRA_VAR_STACK_FPGA_PCIE_DEV: "0000:02:00"
+    EXTRA_VAR_STACK_EXTRA_PCIE_DEVS: "0000:01:00"
 #===================================================================================================
 
 .review_run:
@@ -762,6 +816,32 @@ ejfat-node3-prod-test:
       artifacts: false
       parallel:
         matrix: *review_matrix_template
+
+dev-node:
+  extends:
+    # Due to side effects of adding the hightouch user to the development node systems,
+    # the ansible_ejfat user must be used instead.  For this reason, the development
+    # nodes need to use the EJFAT AAP template but not restrict the application
+    - .ejfat_review
+    - .ht_review_variables
+    - .ht_review_rules
+  parallel:
+    matrix: *dev_node_matrix
+
+# Removed until Ceph S3 is reachable from node1.fpga.es.net.
+#dev-node-test:
+#  extends:
+#    - .ejfat_review_test
+#    - .ht_review_variables
+#    - .ht_review_rules
+#  parallel:
+#    matrix: *dev_node_matrix
+#  needs:
+#    - package
+#    - job: dev-node
+#      artifacts: false
+#      parallel:
+#        matrix: *review_matrix_template
 
 .trigger_sw:
   stage: trigger_downstream
