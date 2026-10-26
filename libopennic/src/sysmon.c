@@ -4,8 +4,15 @@
 #include "memory-barriers.h"
 #include "stats.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <unistd.h>
 #include "unused.h"
+
+//--------------------------------------------------------------------------------------------------
+#define log_warn(_format, _args...) \
+    fprintf(stderr, "WARN(%s): " _format "\n", __func__,## _args)
+#define log_err(_rv, _format, _args...) \
+    fprintf(stderr, "ERROR(%s)[%d (%s)]: " _format "\n", __func__, _rv, strerror(_rv),## _args)
 
 //--------------------------------------------------------------------------------------------------
 /*
@@ -46,10 +53,55 @@ float sysmon_get_temp(volatile struct sysmon_block * sysmon) {
 }
 
 //--------------------------------------------------------------------------------------------------
+static bool sysmon_poll_busy(volatile struct sysmon_block* sysmon, bool state) {
+// The worst case delay observed through exprimental testing was 17.7ms.  Roughly doubling should
+// provide enough headroom to ensure that the block is ready before any further register updates.
+#define ITER_TIMEOUT_US (30 * 1000)
+#define ITER_DELAY_US   100
+#define MAX_ITER        (ITER_TIMEOUT_US / ITER_DELAY_US)
+
+    unsigned int value = state ? 1 : 0;
+    for (unsigned int n = 0; n < MAX_ITER; ++n) {
+        union sysmon_status status = {._v = sysmon->status._v};
+        if (status.busy == value) {
+            return state;
+        }
+        usleep(ITER_DELAY_US);
+    }
+    barrier();
+
+    return !state;
+
+#undef ITER_TIMEOUT_US
+#undef ITER_DELAY_US
+#undef MAX_ITER
+}
+
+//--------------------------------------------------------------------------------------------------
 void sysmon_master_reset(volatile struct sysmon_block* sysmon) {
     sysmon->software_reset = 0xa;
     barrier();
-    usleep(1 * 1000);
+
+    // Allow a few microseconds for the SYSMON to assert BUSY before polling.
+    // Without this delay the poll loop can observe BUSY=0 before the hardware
+    // has had time to latch the reset and raise the flag.
+    bool is_busy = sysmon_poll_busy(sysmon, true);
+    if (!is_busy) {
+        log_warn("sysmon [%p] not busy after software reset", sysmon);
+        return;
+    }
+
+    // The SYSMONE4 reloads DRP configuration from the bitstream after a
+    // software reset and runs an ADC calibration sequence.  Writes to the
+    // sequencer channel-select registers that arrive before BUSY deasserts
+    // are silently discarded and then overwritten by the post-reset reload,
+    // which causes sysmon_stats_zone_alloc to see all channels as enabled.
+    // Poll until BUSY clears before returning so callers can safely write
+    // configuration registers.
+    is_busy = sysmon_poll_busy(sysmon, false);
+    if (is_busy) {
+        log_warn("sysmon [%p] not ready after software reset", sysmon);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -61,6 +113,14 @@ void sysmon_sequencer_enable(volatile struct sysmon_block* sysmon,
     config_reg_1.seq = SYSMON_CONFIG_REG_1_SEQ_SINGLE_CHANNEL;
     sysmon->config_reg_1._v = config_reg_1._v;
     barrier();
+
+    // The ADC may still be mid-conversion when the sequencer is stopped.
+    // The seqchsel/seqavg DRP registers must only be written while the ADC
+    // is idle (BUSY deasserted); poll until it clears before proceeding.
+    bool is_busy = sysmon_poll_busy(sysmon, false);
+    if (is_busy) {
+        log_warn("sysmon [%p] ADC not idle after stopping sequencer", sysmon);
+    }
 
     // Set the selected channels for the sequencer to convert.
     sysmon->seqchsel0._v = select_mask & 0xffff;
