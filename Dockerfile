@@ -80,8 +80,7 @@ RUN <<EOF
 
     apt install -y --no-install-recommends \
       build-essential \
-      pkg-config \
-      python3
+      pkg-config
 EOF
 
 RUN uv pip install \
@@ -229,7 +228,6 @@ RUN <<EOF
       libgrpc++-dev \
       libmicrohttpd-dev \
       libprotobuf-dev \
-      libpython3-dev \
       protobuf-compiler \
       protobuf-compiler-grpc \
       zstd
@@ -325,7 +323,6 @@ RUN <<EOF
       openssl \
       libgrpc++1.51t64 \
       libmicrohttpd12 \
-      python3 \
       screen \
       socat \
       tree \
@@ -415,7 +412,6 @@ RUN <<EOF
       jq \
       lsb-release \
       pciutils \
-      python3 \
       rclone \
       tcpreplay \
       tshark \
