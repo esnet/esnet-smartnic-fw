@@ -59,6 +59,9 @@ no-cache = true
 #exclude-newer = "1 week"
 __EOF
 
+    # Install the latest CPython version.
+    uv python install --verbose
+
     # Create a new virtualenv for the root user.
     uv venv --directory / --no-project --clear
 EOF
