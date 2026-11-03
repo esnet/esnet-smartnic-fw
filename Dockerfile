@@ -39,8 +39,8 @@ EOF
 ADD \
     --unpack=true \
     --chown=root:root \
-    --checksum=sha256:f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f \
-    https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-x86_64-unknown-linux-gnu.tar.gz \
+    --checksum=sha256:f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645 \
+    https://releases.astral.sh/github/uv/releases/download/0.13.6/uv-x86_64-unknown-linux-gnu.tar.gz \
     /root
 
 RUN <<EOF
@@ -58,6 +58,9 @@ RUN <<EOF
 no-cache = true
 #exclude-newer = "1 week"
 __EOF
+
+    # Install the latest CPython version.
+    uv python install --verbose
 
     # Create a new virtualenv for the root user.
     uv venv --directory / --no-project --clear
@@ -80,8 +83,7 @@ RUN <<EOF
 
     apt install -y --no-install-recommends \
       build-essential \
-      pkg-config \
-      python3
+      pkg-config
 EOF
 
 RUN uv pip install \
@@ -229,7 +231,6 @@ RUN <<EOF
       libgrpc++-dev \
       libmicrohttpd-dev \
       libprotobuf-dev \
-      libpython3-dev \
       protobuf-compiler \
       protobuf-compiler-grpc \
       zstd
@@ -325,7 +326,6 @@ RUN <<EOF
       openssl \
       libgrpc++1.51t64 \
       libmicrohttpd12 \
-      python3 \
       screen \
       socat \
       tree \
@@ -384,8 +384,8 @@ EOF
 # From https://github.com/grpc-ecosystem/grpc-health-probe/releases
 ADD \
     --chmod=755 \
-    --checksum=sha256:faf2e85b5f71c9bee54bdcd8ac84c73dc052d3a1e2dcb78349e3a587a9935680 \
-    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.60/grpc_health_probe-linux-amd64 \
+    --checksum=sha256:3746f63e89561616ce69eafdc9b46f8b23b47db3a564f6f2e8c31359a60e2f38 \
+    https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.61/grpc_health_probe-linux-amd64 \
     /usr/local/bin/grpc_health_probe
 
 # Install gRPC debug tool (uncomment for inclusion).
@@ -415,7 +415,6 @@ RUN <<EOF
       jq \
       lsb-release \
       pciutils \
-      python3 \
       rclone \
       tcpreplay \
       tshark \
