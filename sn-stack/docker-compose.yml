@@ -112,7 +112,7 @@ services:
         export HW_SC_UART_DEV="$$(ls /dev/serial/by-id/usb-Xilinx_*_$${HW_USB_SERIAL}-$${INTF_PORT_ID})"
         echo "Logging console output from device $${HW_SC_UART_DEV}"
         [ -r $$HW_SC_UART_DEV ] || exit 1
-        socat stdout $${HW_SC_UART_DEV},sane,rawer,b115200,cs8,parenb=0,igncr
+        socat -u $${HW_SC_UART_DEV},sane,rawer,b115200,cs8,parenb=0,igncr stdout
 
   smartnic-unpack:
     <<: *smartnic-fw-service
