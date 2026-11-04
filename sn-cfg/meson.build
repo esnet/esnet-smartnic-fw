@@ -14,22 +14,27 @@ extra_c_args = []
 if board != 'av80'
     extra_c_args += [
         '-DWITH_CMS',
-        '-DWITH_DEFAULTS',
-        '-DWITH_HOST',
-        '-DWITH_MODULE',
-        '-DWITH_PORT',
         '-DWITH_SYSCFG',
         '-DWITH_SYSMON',
     ]
-    agent_sources += files(
-        'src/agent/defaults.cpp',
-        'src/agent/host.cpp',
-        'src/agent/module.cpp',
-        'src/agent/port.cpp',
-    )
+
+  if app_name != 'shell'
+      extra_c_args += [
+          '-DWITH_DEFAULTS',
+          '-DWITH_HOST',
+          '-DWITH_MODULE',
+          '-DWITH_PORT',
+      ]
+      agent_sources += files(
+          'src/agent/defaults.cpp',
+          'src/agent/host.cpp',
+          'src/agent/module.cpp',
+          'src/agent/port.cpp',
+      )
+  endif
 endif
 
-if app_name != 'versal_shell'
+if app_name not in ['shell', 'versal_shell']
     extra_c_args += [
         '-DWITH_SWITCH',
     ]

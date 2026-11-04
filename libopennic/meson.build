@@ -5,17 +5,22 @@ sources = files(
 
 if board != 'av80'
   sources += files(
-    'src/cmac.c',
     'src/cms.c',
-    'src/qdma.c',
     'src/sff-8024.c',
     'src/sff-8089.c',
     'src/sff-8636.c',
     'src/sysmon.c',
   )
+
+  if app_name != 'shell'
+    sources += files(
+      'src/cmac.c',
+      'src/qdma.c',
+    )
+  endif
 endif
 
-if app_name != 'versal_shell'
+if app_name not in ['shell', 'versal_shell']
   sources += files(
     'src/smartnic_probe.c',
     'src/flow_control.c',
