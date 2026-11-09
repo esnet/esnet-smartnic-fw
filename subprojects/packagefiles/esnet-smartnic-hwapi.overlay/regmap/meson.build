@@ -11,7 +11,6 @@ regio_info_prog = find_program('regio-info')
 
 dev = 'esnet-smartnic'
 dev_ = dev.underscorify()
-top_ir = dev + '-top-ir.yaml'
 template_dir = '@SOURCE_ROOT@/regio/src/regio/tools/templates'
 this_dir = meson.current_source_dir()
 cc = meson.get_compiler('c')
@@ -19,7 +18,7 @@ cc = meson.get_compiler('c')
 regmap_info_blocks = run_command(
   regio_info_prog,
   '--blocks',
-  top_ir,
+  top_ir_file,
   check: true,
 )
 
@@ -34,7 +33,7 @@ endforeach
 regmap_info_decoders = run_command(
   regio_info_prog,
   '--decoders',
-  top_ir,
+  top_ir_file,
   check: true,
 )
 
@@ -48,7 +47,7 @@ endforeach
 
 regmap_c_headers = custom_target(
   'regmap-c-headers',
-  input : top_ir,
+  input : top_ir_file,
   output : regmap_block_headers + regmap_decoder_headers + [dev_ + '_toplevel.h'],
   command : [
     regio_generate_prog,
@@ -89,7 +88,7 @@ regmap_ver = '0.1.0' # TODO: How to discover this?
 regmap_stem = 'regmap_' + dev_ + '-' + regmap_ver
 regmap_python = custom_target(
   'regmap-python',
-  input : top_ir,
+  input : top_ir_file,
   output : [
     regmap_stem + '-py3-none-any.whl',
     regmap_stem + '.tar.gz',

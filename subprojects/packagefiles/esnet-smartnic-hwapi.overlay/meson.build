@@ -12,6 +12,10 @@ else
   hwapi_root_dir = this_dir
 endif
 
+# The regmap IR input file needs to be anchored at the root of the hwapi tree since custom_target()
+# input doesn't support reaching a level above (i.e. is locked to the "regmap" sub-directory).
+top_ir_file = files(board_subdir / 'regmap/esnet-smartnic-top-ir.yaml')
+
 subdir('regmap')
 subdir('libvitisnetp4drv')
 
@@ -28,9 +32,7 @@ install_subdir(
 )
 
 install_data(
-  [
-    board_subdir / 'regmap/esnet-smartnic-top-ir.yaml',
-  ],
+  top_ir_file,
   install_dir : 'share/esnet-smartnic',
 )
 
