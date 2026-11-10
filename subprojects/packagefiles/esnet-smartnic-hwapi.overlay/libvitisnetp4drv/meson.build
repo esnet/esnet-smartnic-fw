@@ -1,6 +1,12 @@
 # See: https://mesonbuild.com/Shipping-prebuilt-binaries-as-wraps.html
 
 this_dir = meson.current_source_dir()
+hwapi_lib_dir = hwapi_root_dir / fs.name(this_dir)
+if board_subdir != ''
+  board_lib_prefix = '..' / board_subdir / fs.name(this_dir) + '/'
+else
+  board_lib_prefix = ''
+endif
 
 lib_base = 'vitisnetp4drv'
 intf_base = lib_base + '-intf'
@@ -37,7 +43,7 @@ n_ip_names = 0
 foreach ip_prefix: EXPECTED_IP_PREFIXES
     found_ip_names = run_command(
         'bash', '-c',
-        'find ' + this_dir +
+        'find ' + hwapi_lib_dir +
         ' -mindepth 1 -maxdepth 1 ' +
         ' -name \'@0@*\' -printf \'%P\\n\''.format(ip_prefix) +
         ' | sort -V',
@@ -105,8 +111,8 @@ foreach ip_name: ip_names
     endif
 
     ip_dir_prefix = ip_dir_prefixes[ip_name]
-    ip_dir = this_dir / ip_dir_prefix
-    inc_dir = include_directories('.', ip_dir_prefix + 'include')
+    ip_dir = hwapi_lib_dir / ip_dir_prefix
+    inc_dir = include_directories('.', board_lib_prefix + ip_dir_prefix + 'include')
 
     # Create a dependency for the Vitis driver library.
     drv_dep = cc.find_library(
