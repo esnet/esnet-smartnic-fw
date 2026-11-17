@@ -77,6 +77,7 @@ bool cmac_disable(volatile struct cmac_block * cmac) {
 
   union cmac_conf_tx_1 conf_tx = {
     .ctl_tx_enable = 0,
+    .ctl_tx_send_lfi = 1,
   };
   cmac->conf_tx_1._v = conf_tx._v;
 
