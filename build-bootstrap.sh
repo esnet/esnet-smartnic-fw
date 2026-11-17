@@ -3,7 +3,7 @@
 #       as such, needs to find bash at a different path than where it is
 #       in ubuntu.  The indirection through /usr/bin/env is required.
 
-set -e
+set -e -o pipefail
 
 # Make sure these variables are **only** taken from the .env file
 unset SN_HW_GROUP
@@ -89,12 +89,26 @@ case "${SN_HW_BOARD}" in
         ;;
 esac
 
-unzip -q \
-      -j \
-      -c \
-      ./sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
-      esnet-smartnic-hwapi/firmware/esnet-smartnic.${fw_ext}.zst \
-  | zstdcat > ${OUT}/esnet-smartnic.${SN_HW_BOARD}.${fw_ext}
+found_flash=0
+for subdir in "/${SN_HW_BOARD}" ""; do
+    _rc=0
+    unzip \
+        -q \
+        -j \
+        -c \
+        ./sn-hw/artifacts.${SN_HW_BOARD}.${SN_HW_APP_NAME}.${SN_HW_VER}.zip \
+        esnet-smartnic-hwapi${subdir}/firmware/esnet-smartnic.${fw_ext}.zst \
+        | zstdcat > ${OUT}/esnet-smartnic.${SN_HW_BOARD}.${fw_ext} || _rc=$?
+    if [ ${_rc} -eq 0 ]; then
+        found_flash=1
+        break
+    fi
+done
+
+if [ ${found_flash} -ne 1 ]; then
+    echo "ERROR: Missing FLASH file from sn-hw artifact"
+    exit 1
+fi
 
 # Verify, unpack and import the user-supplied downloads
 
