@@ -1,17 +1,17 @@
 ---
 include:
   - template: 'Workflows/Branch-Pipelines.gitlab-ci.yml'
-  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.4.0
+  - component: $CI_SERVER_FQDN/ht/cicd-common/aap-run@v0.4.1
     inputs:
       aap_host:  $AAP_HOST
       aap_token: $AAP_TOKEN
-  - component: $CI_SERVER_FQDN/ht/cicd-common/harbor-cve@v0.4.0
+  - component: $CI_SERVER_FQDN/ht/cicd-common/harbor-cve@v0.4.1
     inputs:
       harbor_host:    $HSITE
       harbor_user:    $HUSER_CVE
       harbor_token:   $HTOKEN_CVE
       harbor_project: $CI_PROJECT_NAMESPACE
-  - component: $CI_SERVER_FQDN/ht/cicd-common/trivy-scan@v0.4.0
+  - component: $CI_SERVER_FQDN/ht/cicd-common/trivy-scan@v0.4.1
     inputs:
       #trivy_version: 0.74.0
       trivy_username: $HUSER_RO
