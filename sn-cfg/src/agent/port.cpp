@@ -32,6 +32,10 @@ void SmartnicConfigImpl::init_port(Device* dev) {
         ostringstream name;
         name << "port" << port_id;
 
+        SERVER_LOG_LINE_INIT(port, INFO,
+            "Disabling port ID " << port_id << " on device " << dev->bus_id);
+        cmac_disable(cmac);
+
         auto stats = new DeviceStats;
         stats->name = name.str();
         stats->zone = cmac_stats_zone_alloc(
