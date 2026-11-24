@@ -1,0 +1,124 @@
+From ef6f507df3c74ca09c843edd344b95c89fdd8870 Mon Sep 17 00:00:00 2001
+From: Keith Wiles <keith.wiles@intel.com>
+Date: Sat, 17 May 2025 09:21:17 -0500
+Subject: [PATCH] fix range JUMBO frames and stats
+
+Signed-off-by: Keith Wiles <keith.wiles@intel.com>
+---
+ app/pktgen-cmds.c  |  8 ++++----
+ app/pktgen-range.c |  3 +++
+ app/pktgen-stats.c | 49 +++++++++++++++++++++++-----------------------
+ changelog.txt      |  3 ++-
+ 5 files changed, 34 insertions(+), 31 deletions(-)
+
+diff --git a/app/pktgen-cmds.c b/app/pktgen-cmds.c
+index 7fc67ed..baa69eb 100644
+--- a/app/pktgen-cmds.c
++++ b/app/pktgen-cmds.c
+@@ -3638,10 +3638,10 @@ range_set_pkt_size(port_info_t *pinfo, char *what, uint16_t size)
+         if (size < RTE_ETHER_MIN_LEN)
+             size = RTE_ETHER_MIN_LEN;
+ 
+-        if ((pktgen.flags & JUMBO_PKTS_FLAG) && (size > RTE_ETHER_MAX_JUMBO_FRAME_LEN))
+-            size = RTE_ETHER_MAX_JUMBO_FRAME_LEN;
+-        else if (size > RTE_ETHER_MAX_LEN)
+-            size = RTE_ETHER_MAX_LEN;
++        const uint32_t max_size = (pktgen.flags & JUMBO_PKTS_FLAG) ? RTE_ETHER_MAX_JUMBO_FRAME_LEN
++                                                                   : RTE_ETHER_MAX_LEN;
++        if (size > max_size)
++            size = max_size;
+ 
+         if (pinfo->seq_pkt[RANGE_PKT].ethType == RTE_ETHER_TYPE_IPV6 && size < MIN_v6_PKT_SIZE)
+             size = MIN_v6_PKT_SIZE;
+diff --git a/app/pktgen-range.c b/app/pktgen-range.c
+index e852ce7..8277217 100644
+--- a/app/pktgen-range.c
++++ b/app/pktgen-range.c
+@@ -760,6 +760,9 @@ pktgen_range_setup(port_info_t *pinfo)
+     range->pkt_size_inc = 0;
+     range->pkt_size_min = (RTE_ETHER_MIN_LEN - RTE_ETHER_CRC_LEN);
+     range->pkt_size_max = (RTE_ETHER_MAX_LEN - RTE_ETHER_CRC_LEN);
++    range->pkt_size_max = (pktgen.flags & JUMBO_PKTS_FLAG) ? RTE_ETHER_MAX_JUMBO_FRAME_LEN
++                                                           : RTE_ETHER_MAX_LEN;
++    range->pkt_size_max -= RTE_ETHER_CRC_LEN;
+ 
+     range->vxlan_gid     = pinfo->seq_pkt[SINGLE_PKT].group_id;
+     range->vxlan_gid_inc = 0;
+diff --git a/app/pktgen-stats.c b/app/pktgen-stats.c
+index 5dd4b63..a84faa8 100644
+--- a/app/pktgen-stats.c
++++ b/app/pktgen-stats.c
+@@ -356,31 +356,30 @@ pktgen_page_stats(void)
+         snprintf(buff, sizeof(buff), "%'" PRIu64 "/%'" PRIu64, prev->ierrors, prev->oerrors);
+         scrn_printf(row++, col, "%*s", COLUMN_WIDTH_1, buff);
+ 
+-        for (int qid = 0; qid < RTE_ETHDEV_QUEUE_STAT_CNTRS; qid++) {
+-            sizes.broadcast += pinfo->pkt_sizes.broadcast;
+-            sizes.multicast += pinfo->pkt_sizes.multicast;
+-            sizes._64 += pinfo->pkt_sizes._64;
+-            sizes._65_127 += pinfo->pkt_sizes._65_127;
+-            sizes._128_255 += pinfo->pkt_sizes._128_255;
+-            sizes._256_511 += pinfo->pkt_sizes._256_511;
+-            sizes._512_1023 += pinfo->pkt_sizes._512_1023;
+-            sizes._1024_1518 += pinfo->pkt_sizes._1024_1518;
+-            sizes.runt += pinfo->pkt_sizes.runt;
+-            sizes.jumbo += pinfo->pkt_sizes.jumbo;
+-
+-            stats.arp_pkts += pinfo->pkt_stats.arp_pkts;
+-            stats.dropped_pkts += pinfo->pkt_stats.dropped_pkts;
+-            stats.echo_pkts += pinfo->pkt_stats.echo_pkts;
+-            stats.ibadcrc += pinfo->pkt_stats.ibadcrc;
+-            stats.ibadlen += pinfo->pkt_stats.ibadlen;
+-            stats.imissed += pinfo->pkt_stats.imissed;
+-            stats.ip_pkts += pinfo->pkt_stats.ip_pkts;
+-            stats.ipv6_pkts += pinfo->pkt_stats.ipv6_pkts;
+-            stats.rx_nombuf += pinfo->pkt_stats.rx_nombuf;
+-            stats.tx_failed += pinfo->pkt_stats.tx_failed;
+-            stats.unknown_pkts += pinfo->pkt_stats.unknown_pkts;
+-            stats.vlan_pkts += pinfo->pkt_stats.vlan_pkts;
+-        }
++        // Not really needed but makes the code easier to read
++        sizes.broadcast  = pinfo->pkt_sizes.broadcast;
++        sizes.multicast  = pinfo->pkt_sizes.multicast;
++        sizes._64        = pinfo->pkt_sizes._64;
++        sizes._65_127    = pinfo->pkt_sizes._65_127;
++        sizes._128_255   = pinfo->pkt_sizes._128_255;
++        sizes._256_511   = pinfo->pkt_sizes._256_511;
++        sizes._512_1023  = pinfo->pkt_sizes._512_1023;
++        sizes._1024_1518 = pinfo->pkt_sizes._1024_1518;
++        sizes.runt       = pinfo->pkt_sizes.runt;
++        sizes.jumbo      = pinfo->pkt_sizes.jumbo;
++
++        stats.arp_pkts     = pinfo->pkt_stats.arp_pkts;
++        stats.dropped_pkts = pinfo->pkt_stats.dropped_pkts;
++        stats.echo_pkts    = pinfo->pkt_stats.echo_pkts;
++        stats.ibadcrc      = pinfo->pkt_stats.ibadcrc;
++        stats.ibadlen      = pinfo->pkt_stats.ibadlen;
++        stats.imissed      = pinfo->pkt_stats.imissed;
++        stats.ip_pkts      = pinfo->pkt_stats.ip_pkts;
++        stats.ipv6_pkts    = pinfo->pkt_stats.ipv6_pkts;
++        stats.rx_nombuf    = pinfo->pkt_stats.rx_nombuf;
++        stats.tx_failed    = pinfo->pkt_stats.tx_failed;
++        stats.unknown_pkts = pinfo->pkt_stats.unknown_pkts;
++        stats.vlan_pkts    = pinfo->pkt_stats.vlan_pkts;
+ 
+         /* Packets Sizes */
+         row = PKT_SIZE_ROW;
+diff --git a/changelog.txt b/changelog.txt
+index c11bdeb..41e2b8c 100644
+--- a/changelog.txt
++++ b/changelog.txt
+@@ -6,8 +6,9 @@ Pktgen-DPDK - Traffic Generator powered by DPDK
+ ** (Pktgen) Sounds like 'Packet-Gen'**
+ 
+ **=== Modifications ===**
++ - 25.05.0 - fix issues with JUMBO frames and statistics (builds with 25.07.0-rc0)
+  - 24.10.3 - fix DPDK compatibility issues with 24.11.0-rc2
+- - 24.10.2 = fix tcp flags setting code.
++ - 24.10.2 - fix tcp flags setting code.
+  - 24.10.1 - fix compiler warnings on packed-not-aligned for ubuntu 24.10
+  - 24.10.0 - fix a number of bugs for pcap crash, tcp flags, socket crash, random and startup.
+              PCAP crash memory overrun was found and fixed.
+-- 
+2.43.0
+

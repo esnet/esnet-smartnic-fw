@@ -196,6 +196,8 @@ ARG PKTGEN_BASE_URL="https://github.com/pktgen/Pktgen-DPDK/archive/refs/tags"
 ARG PKTGEN_VER=24.10.3
 ARG PKTGEN_TOPDIR="/root/Pktgen-DPDK-pktgen-${PKTGEN_VER}"
 
+COPY pktgen-patches /pktgen-patches
+
 ADD \
     --unpack=true \
     --chown=root:root \
@@ -206,6 +208,11 @@ ADD \
 RUN <<EOF
     set -ex
     cd $PKTGEN_TOPDIR
+
+    for p in $(find /pktgen-patches -name '*.patch' | sort -n); do
+      patch -p 1 < ${p}
+    done
+
     export PKTGEN_DESTDIR=/pktgen-install-root
     make buildlua
     make install
